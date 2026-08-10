@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "name": "Faster-Whisper Large-v3 Turbo",
+  "source": "ModelScope mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+  "revision": "master; per-file revisions are pinned below",
+  "model_id": "whisper_large_v3_turbo",
+  "display_name": "Faster-Whisper Large-v3 Turbo",
+  "runtime_policy": {
+    "network_access": "forbidden"
+  },
+  "sources": {
+    "model": {
+      "provider": "modelscope",
+      "model_id": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+      "url": "https://modelscope.cn/models/mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+      "license": "MIT"
+    }
+  },
+  "files": [
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-whisper-large-v3-turbo/config.json",
+      "size": 2263,
+      "sha256": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e",
+      "source": "model",
+      "source_path": "config.json",
+      "source_revision": "master",
+      "source_file_revision": "2c8b6212cab564a21146bddc3aa503d2b1173d7b"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-whisper-large-v3-turbo/model.bin",
+      "size": 1617884929,
+      "sha256": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da",
+      "source": "model",
+      "source_path": "model.bin",
+      "source_revision": "master",
+      "source_file_revision": "2c8b6212cab564a21146bddc3aa503d2b1173d7b"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-whisper-large-v3-turbo/preprocessor_config.json",
+      "size": 340,
+      "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+      "source": "model",
+      "source_path": "preprocessor_config.json",
+      "source_revision": "master",
+      "source_file_revision": "2c8b6212cab564a21146bddc3aa503d2b1173d7b"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-whisper-large-v3-turbo/tokenizer.json",
+      "size": 2710337,
+      "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+      "source": "model",
+      "source_path": "tokenizer.json",
+      "source_revision": "master",
+      "source_file_revision": "2c8b6212cab564a21146bddc3aa503d2b1173d7b"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-whisper-large-v3-turbo/vocabulary.json",
+      "size": 1068114,
+      "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+      "source": "model",
+      "source_path": "vocabulary.json",
+      "source_revision": "master",
+      "source_file_revision": "2c8b6212cab564a21146bddc3aa503d2b1173d7b"
+    }
+  ]
+}

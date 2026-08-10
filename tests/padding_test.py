@@ -19,7 +19,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         model_dir = sys.argv[1]
     else:
-        model_dir = "checkpoints"
+        model_dir = "models/index_tts"
     audio_prompt="tests/sample_prompt.wav"
     tts = IndexTTS(cfg_path=f"{model_dir}/config.yaml", model_dir=model_dir, use_fp16=False, use_cuda_kernel=False)
     text = "晕 XUAN4 是 一 种 not very good GAN3 觉"
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         output_for_padded = []
         for t in pad_text_tokens:
             # test for each padded text
-            out = tts.gpt.inference_speech(auto_conditioning, text_tokens, **kwargs)
+            out = tts.gpt.inference_speech(auto_conditioning, t, **kwargs)
             output_for_padded.append(out.squeeze(0))
         # batched inference
         print("Inference padded text tokens as one batch...")

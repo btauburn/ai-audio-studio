@@ -1,6 +1,5 @@
 import os
-
-os.environ['HF_HUB_CACHE'] = './checkpoints/hf_cache'
+from pathlib import Path
 import time
 from subprocess import CalledProcessError
 from typing import Dict, List
@@ -23,10 +22,14 @@ from indextts.utils.feature_extractors import MelSpectrogramFeatures
 
 from indextts.utils.front import TextNormalizer, TextTokenizer
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+os.environ.setdefault('HF_HOME', str(_PROJECT_ROOT / 'models' / '.runtime_cache'))
+os.environ.setdefault('HF_HUB_CACHE', str(_PROJECT_ROOT / 'models' / '.runtime_cache' / 'hub'))
+
 
 class IndexTTS:
     def __init__(
-            self, cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=True, device=None,
+            self, cfg_path="models/index_tts/config.yaml", model_dir="models/index_tts", use_fp16=True, device=None,
             use_cuda_kernel=None,
     ):
         """
@@ -686,5 +689,5 @@ if __name__ == "__main__":
     prompt_wav = "examples/voice_01.wav"
     text = '欢迎大家来体验indextts2，并给予我们意见与反馈，谢谢大家。'
 
-    tts = IndexTTS(cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_cuda_kernel=False)
+    tts = IndexTTS(cfg_path="models/index_tts/config.yaml", model_dir="models/index_tts", use_cuda_kernel=False)
     tts.infer(audio_prompt=prompt_wav, text=text, output_path="gen.wav", verbose=True)

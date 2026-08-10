@@ -11,9 +11,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--share", action='store_true', default=False, help="make link public")
 args = parser.parse_args()
 
-en_ckpt_base = 'checkpoints/base_speakers/EN'
-zh_ckpt_base = 'checkpoints/base_speakers/ZH'
-ckpt_converter = 'checkpoints/converter'
+en_ckpt_base = 'models/index_tts/base_speakers/EN'
+zh_ckpt_base = 'models/index_tts/base_speakers/ZH'
+ckpt_converter = 'models/index_tts/converter'
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 output_dir = 'outputs'
 os.makedirs(output_dir, exist_ok=True)

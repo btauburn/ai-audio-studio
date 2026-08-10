@@ -1,3 +1,5 @@
+> [!WARNING]
+> 本文件是上游 IndexTTS2 的历史参考说明，其中 `checkpoints/`、Hugging Face、单环境和 Gradio 命令不适用于当前多后端配音平台。新用户请从仓库根 [README](../README.md) 和 [GitHub 新机安装指南](installation.md) 开始。
 
 <div align="center">
 <img src='../assets/index_icon.png' width="250"/>

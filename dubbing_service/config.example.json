@@ -1,0 +1,28 @@
+{
+  "tts_base_url": "http://127.0.0.1:8001",
+  "cosyvoice_base_url": "http://127.0.0.1:8002",
+  "qwen3tts_base_url": "http://127.0.0.1:8003",
+  "qwen3tts_cv_base_url": "http://127.0.0.1:8004",
+  "llm_base_url": "https://api.deepseek.com",
+  "llm_api_key": "",
+  "projects_root": "dubbing_projects",
+  "tts_service_name": "IndexTTS2",
+  "tts_api_key": "",
+  "llm_service_name": "",
+  "tts_backend": "indextts",
+  "tts_params": {
+    "max_text_tokens_per_segment": 120,
+    "max_mel_tokens": 1500,
+    "interval_silence": 200,
+    "temperature": 0.8,
+    "top_p": 0.8,
+    "top_k": 30,
+    "num_beams": 3,
+    "repetition_penalty": 1.8,
+    "length_penalty": 0.0,
+    "emotion_alpha": 0.65,
+    "context_injection_length": 50,
+    "cosyvoice_speed": 1.0,
+    "qwen3_default_language": "Chinese"
+  }
+}

@@ -1,5 +1,6 @@
 # Development Tools.
 .mypy_cache/
+.pytest_cache/
 .ruff_cache/
 __pycache__/
 .idea/
@@ -29,3 +30,59 @@ desktop.ini
 /checkpoints/*
 !/checkpoints/*.yaml
 /outputs/
+
+# Local runtime state and private project data.
+/.env
+.env
+.env.*
+!.env.example
+!**/.env.example
+/temp/
+/dubbing_projects/
+/dubbing_service/config.json
+/dubbing_service/llm_providers.json
+/dubbing_service/logs/
+/dubbing_service/voices/
+/dubbing_service/voices.json
+/dubbing_service/webui/node_modules/
+/VioceTimbre/
+/VoiceTimbre/
+/prompts/
+/service/claude_desktop_config.json
+/service/mcp_outputs/
+/service/mcp_prompts/
+/mcp_server.log
+/service/mcp_server.log
+/service/logs/
+/service/outputs/
+/service/prompts/
+/service/temp/
+/examples/sample_prompt.wav
+
+# Model weights stay local. Only provenance manifests and documentation belong
+# in source control.
+/models/*
+!/models/README.md
+!/models/manifests/
+!/models/manifests/**
+
+# Runtime caches created by local-only model workers.
+/models/.runtime_cache/
+/models/.modelscope_cache/
+/models/.download_cache/
+/models/.quarantine/
+
+# Test, coverage and local packaging artifacts.
+.coverage
+/htmlcov/
+/coverage.xml
+*.log
+*.pem
+*.key
+*.p12
+*.pfx
+*.bak
+*.tmp
+/dubbing_service/webui/dist/
+/release_packages/
+/backups/

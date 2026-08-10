@@ -328,7 +328,7 @@ class TextNormalizer:
             glossary_path: YAML 文件路径
 
         Example:
-            normalizer.load_glossary_from_yaml("checkpoints/glossary.yaml")
+            normalizer.load_glossary_from_yaml("models/index_tts/glossary.yaml")
 
         YAML 文件格式:
             M.2:
@@ -664,7 +664,7 @@ if __name__ == "__main__":
     ]
     # 测试分词器
     tokenizer = TextTokenizer(
-        vocab_file="checkpoints/bpe.model",
+        vocab_file="models/index_tts/bpe.model",
         normalizer=text_normalizer,
     )
 

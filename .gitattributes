@@ -5,6 +5,8 @@ examples/voice_03.wav filter=lfs diff=lfs merge=lfs -text
 examples/voice_06.wav filter=lfs diff=lfs merge=lfs -text
 examples/voice_08.wav filter=lfs diff=lfs merge=lfs -text
 tests/sample_prompt.wav filter=lfs diff=lfs merge=lfs -text
+*.bat text eol=crlf
+*.cmd text eol=crlf
 examples/emo_hate.wav filter=lfs diff=lfs merge=lfs -text
 examples/voice_01.wav filter=lfs diff=lfs merge=lfs -text
 examples/voice_05.wav filter=lfs diff=lfs merge=lfs -text
