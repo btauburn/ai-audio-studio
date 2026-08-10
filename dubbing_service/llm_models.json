@@ -1,0 +1,30 @@
+[
+  {
+    "id": "6cfe713f",
+    "name": "DeepSeek V4 Flash",
+    "provider_id": null,
+    "model": "deepseek-v4-flash",
+    "max_tokens": 64000,
+    "description": "默认分段模型：JSON 模式、关闭 thinking；校验或临时故障时仅回退一次 V4 Pro。",
+    "response_format_json": true,
+    "thinking": "disabled",
+    "reasoning_effort": null,
+    "fallback_model": "deepseek-v4-pro",
+    "fallback_enabled": true,
+    "is_default": true
+  },
+  {
+    "id": "b8abd9ab",
+    "name": "DeepSeek V4 Pro",
+    "provider_id": null,
+    "model": "deepseek-v4-pro",
+    "max_tokens": 64000,
+    "description": "V4 Flash 的备用模型，也可手动选择；默认关闭 thinking 以控制延迟与成本。",
+    "response_format_json": true,
+    "thinking": "disabled",
+    "reasoning_effort": null,
+    "fallback_model": null,
+    "fallback_enabled": false,
+    "is_default": false
+  }
+]

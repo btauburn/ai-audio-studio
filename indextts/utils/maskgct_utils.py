@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import torch
 import librosa
 import json5
@@ -84,10 +86,20 @@ class JsonHParams:
         return self.__dict__.__repr__()
 
 
-def build_semantic_model(path_='./models/tts/maskgct/ckpt/wav2vec2bert_stats.pt'):
-    semantic_model = Wav2Vec2BertModel.from_pretrained("facebook/w2v-bert-2.0")
+def build_semantic_model(path_=None, model_dir=None):
+    project_root = Path(__file__).resolve().parents[2]
+    stats_path = Path(path_ or project_root / "models" / "index_tts" / "wav2vec2bert_stats.pt")
+    local_model_dir = Path(
+        model_dir
+        or project_root / "models" / "index_tts" / "aux_models" / "w2v-bert-2.0"
+    )
+    # 只从 ModelScope 预置到项目目录的本地模型加载，禁止运行时隐式联网下载。
+    semantic_model = Wav2Vec2BertModel.from_pretrained(
+        str(local_model_dir),
+        local_files_only=True,
+    )
     semantic_model.eval()
-    stat_mean_var = torch.load(path_)
+    stat_mean_var = torch.load(stats_path)
     semantic_mean = stat_mean_var["mean"]
     semantic_std = torch.sqrt(stat_mean_var["var"])
     return semantic_model, semantic_mean, semantic_std

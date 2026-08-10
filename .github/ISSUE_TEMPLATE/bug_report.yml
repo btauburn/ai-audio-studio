@@ -1,0 +1,83 @@
+# Copyright 2026 TadashiJLU.
+
+name: Bug report
+description: 报告可稳定复现的功能、启动或音频流程问题
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请只提供脱敏后的最小复现；不要上传 API Key、私人音频、作品原稿、模型权重或商业素材。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题概述
+      description: 说明发生了什么，以及它影响了哪一步工作流。
+      placeholder: 例如：在配音审听页切换 Take 后……
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 功能区域
+      options:
+        - 安装或启动
+        - 文本与分段
+        - 音色与 TTS
+        - Take 与非破坏编辑
+        - 字幕与审听
+        - 声音设计与混音
+        - 导出与发布包
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本或提交
+      description: 分支名、标签或 `git rev-parse --short HEAD` 的输出。
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 环境
+      description: Windows 版本、GPU 与显存、Python/uv 版本、使用的 TTS 后端。
+      placeholder: Windows 11 24H2；RTX 4090 24 GB；Python 3.12；IndexTTS2
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 使用最少的脱敏数据，按顺序列出操作。
+      placeholder: |
+        1. 新建空白项目
+        2. 导入示例文本
+        3. ……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期与实际结果
+      description: 同时说明你预期看到什么、实际看到了什么。
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 脱敏日志
+      description: 粘贴最小相关日志；删除用户名、路径隐私、密钥、内容文本和音频信息。
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索现有 Issue，未发现相同问题。
+          required: true
+        - label: 我没有附带密钥、私人内容、模型权重或无权公开的素材。
+          required: true
+        - label: 我可以使用最小示例稳定复现此问题。
+          required: true

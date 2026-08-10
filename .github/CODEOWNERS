@@ -1,0 +1,13 @@
+# Copyright 2026 TadashiJLU.
+# Ownership metadata only; merge enforcement depends on repository rules.
+* @tadashijlu
+
+/.github/ @tadashijlu
+/scripts/ @tadashijlu
+/dubbing_service/ @tadashijlu
+/service/ @tadashijlu
+/models/manifests/ @tadashijlu
+/LICENSE* @tadashijlu
+/LICENSES/ @tadashijlu
+/NOTICE.md @tadashijlu
+/THIRD_PARTY_NOTICES.md @tadashijlu

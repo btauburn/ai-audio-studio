@@ -1,7 +1,6 @@
 import os
 from subprocess import CalledProcessError
 
-os.environ['HF_HUB_CACHE'] = './checkpoints/hf_cache'
 import json
 import re
 import time
@@ -18,9 +17,10 @@ warnings.filterwarnings("ignore", category=UserWarning)
 from omegaconf import OmegaConf
 
 from indextts.gpt.model_v2 import UnifiedVoice
-from indextts.utils.maskgct_utils import build_semantic_model, build_semantic_codec
+from indextts.utils.maskgct_utils import build_semantic_codec
 from indextts.utils.checkpoint import load_checkpoint
 from indextts.utils.front import TextNormalizer, TextTokenizer
+from indextts.utils.audio_safety import float_waveform_to_pcm16_range
 
 from indextts.s2mel.modules.commons import load_checkpoint2, MyModel
 from indextts.s2mel.modules.bigvgan import bigvgan
@@ -29,16 +29,16 @@ from indextts.s2mel.modules.audio import mel_spectrogram
 
 from transformers import AutoTokenizer
 from modelscope import AutoModelForCausalLM
-from huggingface_hub import hf_hub_download
 import safetensors
-from transformers import SeamlessM4TFeatureExtractor
+from transformers import SeamlessM4TFeatureExtractor, Wav2Vec2BertModel
 import random
 import torch.nn.functional as F
 
 class IndexTTS2:
     def __init__(
-            self, cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_fp16=False, device=None,
-            use_cuda_kernel=None,use_deepspeed=False, use_accel=False, use_torch_compile=False
+            self, cfg_path="models/index_tts/config.yaml", model_dir="models/index_tts", use_fp16=False, device=None,
+            use_cuda_kernel=None, use_deepspeed=False, use_accel=False, use_torch_compile=False,
+            aux_model_dir=None,
     ):
         """
         Args:
@@ -74,7 +74,10 @@ class IndexTTS2:
             print(">> Be patient, it may take a while to run in CPU mode.")
 
         self.cfg = OmegaConf.load(cfg_path)
-        self.model_dir = model_dir
+        self.model_dir = os.path.abspath(model_dir)
+        if aux_model_dir is None:
+            aux_model_dir = os.path.join(self.model_dir, "aux_models")
+        self.aux_model_dir = os.path.abspath(aux_model_dir)
         self.dtype = torch.float16 if self.use_fp16 else None
         self.stop_mel_token = self.cfg.gpt.stop_mel_token
         self.use_accel = use_accel
@@ -112,16 +115,33 @@ class IndexTTS2:
                 print(f"{e!r}")
                 self.use_cuda_kernel = False
 
-        self.extract_features = SeamlessM4TFeatureExtractor.from_pretrained("facebook/w2v-bert-2.0")
-        self.semantic_model, self.semantic_mean, self.semantic_std = build_semantic_model(
-            os.path.join(self.model_dir, self.cfg.w2v_stat))
+        w2v_bert_dir = os.path.join(self.aux_model_dir, "w2v-bert-2.0")
+        self.extract_features = SeamlessM4TFeatureExtractor.from_pretrained(
+            w2v_bert_dir,
+            local_files_only=True,
+        )
+        self.semantic_model = Wav2Vec2BertModel.from_pretrained(
+            w2v_bert_dir,
+            local_files_only=True,
+        )
+        stat_mean_var = torch.load(
+            os.path.join(self.model_dir, self.cfg.w2v_stat),
+            map_location="cpu",
+        )
+        self.semantic_mean = stat_mean_var["mean"]
+        self.semantic_std = torch.sqrt(stat_mean_var["var"])
         self.semantic_model = self.semantic_model.to(self.device)
         self.semantic_model.eval()
         self.semantic_mean = self.semantic_mean.to(self.device)
         self.semantic_std = self.semantic_std.to(self.device)
 
         semantic_codec = build_semantic_codec(self.cfg.semantic_codec)
-        semantic_code_ckpt = hf_hub_download("amphion/MaskGCT", filename="semantic_codec/model.safetensors")
+        semantic_code_ckpt = os.path.join(
+            self.aux_model_dir,
+            "maskgct",
+            "semantic_codec",
+            "model.safetensors",
+        )
         safetensors.torch.load_model(semantic_codec, semantic_code_ckpt)
         self.semantic_codec = semantic_codec.to(self.device)
         self.semantic_codec.eval()
@@ -150,8 +170,10 @@ class IndexTTS2:
         print(">> s2mel weights restored from:", s2mel_path)
 
         # load campplus_model
-        campplus_ckpt_path = hf_hub_download(
-            "funasr/campplus", filename="campplus_cn_common.bin"
+        campplus_ckpt_path = os.path.join(
+            self.aux_model_dir,
+            "campplus",
+            "campplus_cn_common.bin",
         )
         campplus_model = CAMPPlus(feat_dim=80, embedding_size=192)
         campplus_model.load_state_dict(torch.load(campplus_ckpt_path, map_location="cpu"))
@@ -159,12 +181,16 @@ class IndexTTS2:
         self.campplus_model.eval()
         print(">> campplus_model weights restored from:", campplus_ckpt_path)
 
-        bigvgan_name = self.cfg.vocoder.name
-        self.bigvgan = bigvgan.BigVGAN.from_pretrained(bigvgan_name, use_cuda_kernel=self.use_cuda_kernel)
+        bigvgan_dir = os.path.join(self.aux_model_dir, "bigvgan")
+        self.bigvgan = bigvgan.BigVGAN.from_pretrained(
+            bigvgan_dir,
+            local_files_only=True,
+            use_cuda_kernel=self.use_cuda_kernel,
+        )
         self.bigvgan = self.bigvgan.to(self.device)
         self.bigvgan.remove_weight_norm()
         self.bigvgan.eval()
-        print(">> bigvgan weights restored from:", bigvgan_name)
+        print(">> bigvgan weights restored from:", bigvgan_dir)
 
         self.bpe_path = os.path.join(self.model_dir, self.cfg.dataset["bpe_model"])
         self.normalizer = TextNormalizer(enable_glossary=True)
@@ -661,7 +687,9 @@ class IndexTTS2:
                     bigvgan_time += time.perf_counter() - m_start_time
                     wav = wav.squeeze(1)
 
-                wav = torch.clamp(32767 * wav, -32767.0, 32767.0)
+                wav, raw_peak = float_waveform_to_pcm16_range(wav)
+                if raw_peak > 0.95:
+                    print(f">> waveform peak {raw_peak:.4f}; applied PCM16 anti-clipping headroom")
                 if verbose:
                     print(f"wav shape: {wav.shape}", "min:", wav.min(), "max:", wav.max())
                 # wavs.append(wav[:, :-512])
@@ -719,11 +747,15 @@ def find_most_similar_cosine(query_vector, matrix):
 class QwenEmotion:
     def __init__(self, model_dir):
         self.model_dir = model_dir
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_dir)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.model_dir,
+            local_files_only=True,
+        )
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_dir,
             torch_dtype="float16",  # "auto"
-            device_map="auto"
+            device_map="auto",
+            local_files_only=True,
         )
         self.prompt = "文本情感分类"
         self.cn_key_to_en = {
@@ -834,8 +866,8 @@ if __name__ == "__main__":
     prompt_wav = "examples/voice_01.wav"
     text = '欢迎大家来体验indextts2，并给予我们意见与反馈，谢谢大家。'
     tts = IndexTTS2(
-        cfg_path="checkpoints/config.yaml", 
-        model_dir="checkpoints", 
+        cfg_path="models/index_tts/config.yaml",
+        model_dir="models/index_tts",
         use_cuda_kernel=False,
         use_torch_compile=True
     )

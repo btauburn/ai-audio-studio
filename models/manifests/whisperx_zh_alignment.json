@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "name": "WhisperX Chinese Alignment",
+  "source": "ModelScope jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn",
+  "revision": "master; per-file revisions are pinned below",
+  "model_id": "whisperx_zh_alignment",
+  "display_name": "WhisperX Chinese Wav2Vec2 Alignment",
+  "runtime_policy": {
+    "network_access": "forbidden",
+    "languages": ["zh"]
+  },
+  "sources": {
+    "model": {
+      "provider": "modelscope",
+      "model_id": "jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn",
+      "url": "https://modelscope.cn/models/jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn",
+      "license": "Apache-2.0"
+    }
+  },
+  "files": [
+    {
+      "group": "runtime",
+      "path": "models/whisper/whisperx-wav2vec2-zh/config.json",
+      "size": 1567,
+      "sha256": "9af98614e322a5300c75605227d93c98af0c8f78754aba1dfc279166688afddd",
+      "source": "model",
+      "source_path": "config.json",
+      "source_revision": "master",
+      "source_file_revision": "dc70e032dd023312c750ac50ba03ade725fd8016"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/whisperx-wav2vec2-zh/pytorch_model.bin",
+      "size": 1276296151,
+      "sha256": "de031fd4b29e0c0667e5346450fadfe1326c89936b888b59c4ede608db763ee4",
+      "source": "model",
+      "source_path": "pytorch_model.bin",
+      "source_revision": "master",
+      "source_file_revision": "dc70e032dd023312c750ac50ba03ade725fd8016"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/whisperx-wav2vec2-zh/preprocessor_config.json",
+      "size": 158,
+      "sha256": "c403ce09975b90dff0dd8302c42d422e9de1f166cd7772df23490069893cb0cf",
+      "source": "model",
+      "source_path": "preprocessor_config.json",
+      "source_revision": "master",
+      "source_file_revision": "dc70e032dd023312c750ac50ba03ade725fd8016"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/whisperx-wav2vec2-zh/special_tokens_map.json",
+      "size": 85,
+      "sha256": "bb7068de1150661a10b55f9e4b12a0e77af8bf91f5e45e1b58afaf1d0e17f675",
+      "source": "model",
+      "source_path": "special_tokens_map.json",
+      "source_revision": "master",
+      "source_file_revision": "dc70e032dd023312c750ac50ba03ade725fd8016"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/whisperx-wav2vec2-zh/vocab.json",
+      "size": 44357,
+      "sha256": "33fea3444869c2cd2433f59da079b04ce91515f946d21fe1b0ff3825398bcec7",
+      "source": "model",
+      "source_path": "vocab.json",
+      "source_revision": "master",
+      "source_file_revision": "dc70e032dd023312c750ac50ba03ade725fd8016"
+    }
+  ]
+}

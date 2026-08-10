@@ -1,0 +1,17 @@
+# ===================================
+# IndexTTS2 服务依赖
+# 支持REST API和MCP两种服务
+# ===================================
+
+# REST API服务依赖
+fastapi>=0.104.0          # Web框架
+uvicorn[standard]>=0.24.0 # ASGI服务器
+python-multipart>=0.0.6   # 文件上传支持
+pydantic>=2.0.0          # 数据验证
+
+# MCP服务依赖
+# MCP服务仅使用Python标准库，无需额外依赖
+# 需要的模块：asyncio, json, logging, subprocess
+
+# 可选依赖（用于测试和开发）
+# requests>=2.31.0        # API测试脚本需要

@@ -1,0 +1,11 @@
+{
+  "name": "dubbing-platform-webui-assets",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.cjs -i src/tailwind.css -o vendor/tailwindcss-3.4.17/tailwindcss.min.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

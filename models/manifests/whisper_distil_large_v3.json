@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "name": "Faster Distil-Whisper Large-v3",
+  "source": "ModelScope Systran/faster-distil-whisper-large-v3",
+  "revision": "master; per-file revisions are pinned below",
+  "model_id": "whisper_distil_large_v3",
+  "display_name": "Faster Distil-Whisper Large-v3 (English only)",
+  "runtime_policy": {
+    "network_access": "forbidden",
+    "languages": ["en"]
+  },
+  "sources": {
+    "model": {
+      "provider": "modelscope",
+      "model_id": "Systran/faster-distil-whisper-large-v3",
+      "url": "https://modelscope.cn/models/Systran/faster-distil-whisper-large-v3",
+      "license": "MIT"
+    }
+  },
+  "files": [
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-distil-whisper-large-v3/config.json",
+      "size": 2690,
+      "sha256": "90c55f775cc4e0bb17293d0bf12f96557a486f20dea886fabd8e6075a3588b21",
+      "source": "model",
+      "source_path": "config.json",
+      "source_revision": "master",
+      "source_file_revision": "89c0aa833f420e31459bb0fdc7556d9330642f5d"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-distil-whisper-large-v3/model.bin",
+      "size": 1512927867,
+      "sha256": "b79368e19b6623813609431a6e5ee309a71506701ebc49fd7820e692dec7c5f5",
+      "source": "model",
+      "source_path": "model.bin",
+      "source_revision": "master",
+      "source_file_revision": "3e48e961c58d944c3563e6c0090c5102d19b7125"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-distil-whisper-large-v3/preprocessor_config.json",
+      "size": 340,
+      "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+      "source": "model",
+      "source_path": "preprocessor_config.json",
+      "source_revision": "master",
+      "source_file_revision": "89c0aa833f420e31459bb0fdc7556d9330642f5d"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-distil-whisper-large-v3/tokenizer.json",
+      "size": 2480617,
+      "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+      "source": "model",
+      "source_path": "tokenizer.json",
+      "source_revision": "master",
+      "source_file_revision": "89c0aa833f420e31459bb0fdc7556d9330642f5d"
+    },
+    {
+      "group": "runtime",
+      "path": "models/whisper/faster-distil-whisper-large-v3/vocabulary.json",
+      "size": 1068114,
+      "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+      "source": "model",
+      "source_path": "vocabulary.json",
+      "source_revision": "master",
+      "source_file_revision": "89c0aa833f420e31459bb0fdc7556d9330642f5d"
+    }
+  ]
+}
