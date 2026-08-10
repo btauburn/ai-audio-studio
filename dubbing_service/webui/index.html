@@ -2,8 +2,14 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>IndexTTS2 配音平台 · 新版 UI</title>
+    <title>AI 有声工作室</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="从脚本、音色与 A/B Take，到声音设计、母带和发布包的本地 AI 有声制作工作台。"
+    />
+    <meta name="theme-color" content="#020617" />
+    <link rel="icon" type="image/svg+xml" href="/web/brand/logo-mark.svg" />
     <style>
       #app-loading {
         display: flex;
@@ -33,11 +39,15 @@
       <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
         <div class="mx-auto w-full max-w-screen-2xl px-4 py-3 flex items-center justify-between gap-4">
           <div class="flex items-center gap-3">
-            <div class="h-9 w-9 rounded-xl bg-primary-600/90 flex items-center justify-center text-xs font-semibold tracking-wide">
-              TTS
-            </div>
+            <img
+              src="/web/brand/logo-mark.svg"
+              alt=""
+              class="h-10 w-10 shrink-0 rounded-xl"
+              width="40"
+              height="40"
+            />
             <div class="space-y-0.5">
-              <h1 class="text-lg font-semibold leading-tight">IndexTTS2 配音平台</h1>
+              <h1 class="text-lg font-semibold leading-tight">AI 有声工作室</h1>
               <p class="text-xs text-slate-400 leading-snug">
                 脚本 · 音色 · 配音审听 · 声音设计 · 导出发布
               </p>
@@ -81,7 +91,7 @@
                 <div class="flex items-center gap-1.5">
                   <span
                     class="h-2.5 w-2.5 rounded-full"
-                    :class="health && health.whisper_model_loaded ? 'bg-emerald-400' : 'bg-rose-500'"
+                    :class="health && health.whisper_model_loaded ? 'bg-emerald-400' : 'bg-amber-400'"
                   ></span>
                   <span class="text-xs">Whisper {{ health && health.whisper_model_loaded ? '已加载' : '未加载' }}</span>
                 </div>
@@ -2708,7 +2718,7 @@
                   <h4 class="text-[11px] font-semibold text-slate-200">LLM 模型预设</h4>
                   <div class="space-y-1 max-h-64 overflow-auto pr-1">
                     <div v-if="!filteredLlmConfigs || !filteredLlmConfigs.length" class="text-[11px] text-slate-500">
-                      暂无显式配置，将自动使用默认提供商上的默认模型（如 deepseek-chat）。
+                      暂无显式配置，将自动使用默认提供商上的默认模型（如 deepseek-v4-flash）。
                     </div>
                     <div
                       v-for="cfg in (filteredLlmConfigs || [])"
@@ -3539,7 +3549,7 @@
             </label>
             <label class="block space-y-1">
               <span class="text-slate-300">模型</span>
-              <input v-model="llmConfigForm.model" class="w-full rounded bg-slate-950 border border-slate-700 px-2 py-1" placeholder="deepseek-chat" />
+              <input v-model="llmConfigForm.model" class="w-full rounded bg-slate-950 border border-slate-700 px-2 py-1" placeholder="deepseek-v4-flash" />
             </label>
             <label class="block space-y-1">
               <span class="text-slate-300">max_tokens（K，可选）</span>

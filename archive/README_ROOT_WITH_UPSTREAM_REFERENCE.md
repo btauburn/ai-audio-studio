@@ -6,13 +6,13 @@
 
 ## 当前权威入口
 
-- [开箱即用说明](开箱即用说明.md)：新机器从零恢复与首次启动。
-- [架构说明](docs/architecture.md)：四后端、三环境、数据事务和供应链边界。
-- [生产运维手册](docs/operations.md)：doctor、模型恢复、备份、巡检和故障处理。
-- [本机恢复报告](docs/recovery_report.md)：2026-07-11 实测状态、风险与 Go/No-Go。
-- [第三方源码基线](docs/third_party_sources.md)：CosyVoice/Matcha-TTS 的 vendored 提交、备份与升级规则。
-- [配音平台服务说明](dubbing_service/README.md)：平台 API/业务层的维护入口。
-- [单后端服务说明](service/README.md)：四个内部 TTS 工作进程与高级 API 参考。
+- [开箱即用说明](LEGACY_QUICKSTART_ZH.md)：新机器从零恢复与首次启动。
+- [架构说明](../docs/architecture.md)：四后端、三环境、数据事务和供应链边界。
+- [生产运维手册](../docs/operations.md)：doctor、模型恢复、备份、巡检和故障处理。
+- [启动巡检清单](../docs/production_startup_and_inspection_checklist.md)：当前环境检查与验收标准。
+- [第三方源码基线](../docs/third_party_sources.md)：CosyVoice/Matcha-TTS 的 vendored 提交、备份与升级规则。
+- [配音平台服务说明](../dubbing_service/README.md)：平台 API/业务层的维护入口。
+- [单后端服务说明](../service/README.md)：四个内部 TTS 工作进程与高级 API 参考。
 
 ## 最短启动路径（Windows）
 
@@ -93,7 +93,7 @@ start_platform.bat
 
 <center><h3>IndexTTS2: A Breakthrough in Emotionally Expressive and Duration-Controlled Auto-Regressive Zero-Shot Text-to-Speech</h3></center>
 
-[![IndexTTS2](assets/IndexTTS2_banner.png)](assets/IndexTTS2_banner.png)
+[![IndexTTS2](../assets/IndexTTS2_banner.png)](../assets/IndexTTS2_banner.png)
 
 
 <div align="center">
@@ -147,7 +147,7 @@ Finally, experimental results on multiple datasets show that IndexTTS2 outperfor
 
 **IndexTTS2: The Future of Voice, Now Generating**
 
-[![IndexTTS2 Demo](assets/IndexTTS2-video-pic.png)](https://www.bilibili.com/video/BV136a9zqEk5)
+[![IndexTTS2 Demo](../assets/IndexTTS2-video-pic.png)](https://www.bilibili.com/video/BV136a9zqEk5)
 
 *Click the image to watch the IndexTTS2 introduction video.*
 
@@ -481,7 +481,7 @@ text = "大家好，我现在正在bilibili 体验 ai 科技，说实话，来�
 tts.infer(voice, text, 'gen.wav')
 ```
 
-For more detailed information, see [README_INDEXTTS_1_5](archive/README_INDEXTTS_1_5.md),
+For more detailed information, see [README_INDEXTTS_1_5](README_INDEXTTS_1_5.md),
 or visit the IndexTTS1 repository at <a href="https://github.com/index-tts/index-tts/tree/v1.5.0">index-tts:v1.5.0</a>.
 
 

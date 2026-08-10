@@ -218,11 +218,37 @@ def test_modelscope_recovery_blob_is_optional_for_source_only_backup(
     assert '"recovery_blob_count":0' in completed.stdout.replace(" ", "")
 
 
-def test_disclaimer_has_explicit_release_blockers_instead_of_placeholders() -> None:
+def test_disclaimer_has_explicit_multi_license_and_commercial_boundaries() -> None:
     disclaimer = (ROOT / "DISCLAIMER").read_text(encoding="utf-8")
 
     assert "[开源许可证类型]" not in disclaimer
     assert "[国家/地区]" not in disclaimer
-    assert "尚未为“整个配音平台”的对外发布选择并确认单一许可证" in disclaimer
-    assert "本声明尚未选择特定国家或地区的管辖法律" in disclaimer
-    assert "对外发布前必须填写" in disclaimer
+    assert "维护者与平台自研部分版权主体：TadashiJLU" in disclaimer
+    assert "本仓库不是一份整体采用 Apache-2.0 的作品" in disclaimer
+    assert "1698b32033f38a034572891aed698609da2ff392" in disclaimer
+    assert "LICENSES/README.md" in disclaimer
+    assert "CC-BY-NC-4.0" in disclaimer
+    assert "MaskGCT" in disclaimer
+    assert "冲突时以中文版本为准" in disclaimer
+    assert (
+        "Any modifications made to the original model in this Derivative Work "
+        "are not endorsed, warranted, or guaranteed by the original right-holder "
+        "of the original model, and the original right-holder disclaims all "
+        "liability related to this Derivative Work."
+    ) in disclaimer
+
+
+def test_repository_notice_keeps_required_license_scope_records() -> None:
+    notice = (ROOT / "NOTICE.md").read_text(encoding="utf-8")
+    third_party = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    scope_map = (ROOT / "LICENSES" / "README.md").read_text(encoding="utf-8")
+
+    for text in (notice, third_party, scope_map):
+        assert "1698b32033f38a034572891aed698609da2ff392" in text
+        assert "TadashiJLU" in text
+
+    assert "LICENSES/Apache-2.0.txt" in notice
+    assert "CC-BY-NC-4.0" in third_party
+    assert "dubbing_service/**" in scope_map
+    assert "LICENSES/Bilibili-IndexTTS.txt" in scope_map
+    assert "LICENSES/Bilibili-IndexTTS-ZH.txt" in scope_map

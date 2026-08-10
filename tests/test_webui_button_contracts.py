@@ -7,6 +7,15 @@ from dubbing_service.app.main import create_app
 
 
 class TestWebUIButtonContracts(unittest.TestCase):
+    def test_webui_uses_current_deepseek_v4_defaults(self) -> None:
+        webui_root = Path(__file__).resolve().parents[1] / "dubbing_service" / "webui"
+        index_html = (webui_root / "index.html").read_text(encoding="utf-8")
+        app_js = (webui_root / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('placeholder="deepseek-v4-flash"', index_html)
+        self.assertIn('model: "deepseek-v4-flash"', app_js)
+        self.assertNotIn('placeholder="deepseek-chat"', index_html)
+
     def test_click_handlers_have_function_and_return_binding(self) -> None:
         webui_root = Path(__file__).resolve().parents[1] / "dubbing_service" / "webui"
         index_html = (webui_root / "index.html").read_text(encoding="utf-8")

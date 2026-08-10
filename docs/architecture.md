@@ -1,6 +1,6 @@
 # 配音平台架构说明
 
-本文描述当前仓库中用于生产配音的平台架构。它以当前代码为准，而不是上游 IndexTTS2 演示项目或早期 MVP 文档。运维步骤见 [operations.md](operations.md)，本机恢复状态见 [recovery_report.md](recovery_report.md)。
+本文描述当前仓库中用于生产配音的平台架构。它以当前代码为准，而不是上游 IndexTTS2 演示项目或早期 MVP 文档。运维步骤见 [operations.md](operations.md)；历史恢复与规划材料仅保存在 [`archive/`](../archive/README.md) 供维护审计。
 
 ## 1. 系统边界
 
@@ -184,7 +184,7 @@ FFmpeg/ffprobe 负责裁剪、静音、变速、拼接和媒体探测；字幕�
 
 本仓库不是一份统一的宽松许可证作品：
 
-- 根 `LICENSE` / `LICENSE_ZH.txt` 是 bilibili IndexTTS2 自定义模型使用许可，覆盖范围、商用阈值、下游义务和用途限制必须按协议原文审查；中英文出现差异时协议声明以中文为准。
+- `LICENSES/Bilibili-IndexTTS.txt` / `LICENSES/Bilibili-IndexTTS-ZH.txt` 是 bilibili IndexTTS2 自定义模型使用许可，覆盖范围、商用阈值、下游义务和用途限制必须按协议原文审查；中英文出现差异时协议声明以中文为准。
 - IndexTTS2 manifest 中的 MaskGCT 辅助权重标记为 `CC-BY-NC-4.0`，默认含非商业限制；用于商业生产前必须取得适当授权或完成替换与技术验证。
 - `cosyvoice/` 主要源码为 Apache-2.0，但其 `third_party/` 和模型仍需逐项保留并遵守各自声明。
 - Qwen3-TTS 与 CosyVoice3 模型在当前 manifest 中记录为 Apache-2.0；正式发布前仍应以取得模型时的上游 revision 和随附许可证为准。

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">AI 有声工作室</title>
+  <desc id="desc">A Windows-first studio for scripts, voices, takes, sound design, mastering, and publishing.</desc>
+  <defs>
+    <linearGradient id="background" x1="80" y1="40" x2="1180" y2="610" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f1d30"/>
+      <stop offset=".52" stop-color="#07111f"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(1056 140) rotate(136) scale(500 420)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22c28f" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#22c28f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="signal" x1="82" y1="154" x2="360" y2="356" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#22c28f"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000" flood-opacity=".32"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="640" rx="32" fill="url(#background)"/>
+  <rect width="1280" height="640" rx="32" fill="url(#glow)"/>
+  <path d="M0 510c224-70 383 44 582-22 180-60 316-185 698-107v259H0Z" fill="#0b1625" opacity=".66"/>
+
+  <g transform="translate(76 116)" filter="url(#shadow)">
+    <rect width="320" height="320" rx="82" fill="#0f172a" stroke="#334155" stroke-width="5"/>
+    <g fill="none" stroke="url(#signal)" stroke-linecap="round" stroke-width="14">
+      <path d="M54 83h45c27 0 39 17 59 52" opacity=".55"/>
+      <path d="M54 133h54c21 0 31 10 50 27" opacity=".72"/>
+      <path d="M54 187h54c21 0 31-10 50-27" opacity=".86"/>
+      <path d="M54 237h45c27 0 39-17 59-52"/>
+      <path d="M158 160h18l16-47 27 92 23-67 22 37h16" stroke-width="17"/>
+    </g>
+    <g fill="#d1fae5">
+      <circle cx="54" cy="83" r="7" opacity=".55"/>
+      <circle cx="54" cy="133" r="7" opacity=".72"/>
+      <circle cx="54" cy="187" r="7" opacity=".86"/>
+      <circle cx="54" cy="237" r="7"/>
+    </g>
+  </g>
+
+  <g transform="translate(460 130)">
+    <text x="0" y="84" fill="#f8fafc" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="72" font-weight="750" letter-spacing="1">AI 有声工作室</text>
+    <text x="4" y="133" fill="#7dd3c0" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="650" letter-spacing="7">AI AUDIO STUDIO</text>
+    <text x="4" y="211" fill="#cbd5e1" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="28">从脚本、音色与 A/B Take，到声音设计、母带与发布包</text>
+
+    <g transform="translate(4 263)" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="19" font-weight="600">
+      <rect width="148" height="48" rx="24" fill="#11261f" stroke="#1f6f59"/>
+      <text x="74" y="31" fill="#a7f3d0" text-anchor="middle">多 TTS 后端</text>
+      <rect x="164" width="148" height="48" rx="24" fill="#11261f" stroke="#1f6f59"/>
+      <text x="238" y="31" fill="#a7f3d0" text-anchor="middle">非破坏编辑</text>
+      <rect x="328" width="148" height="48" rx="24" fill="#11261f" stroke="#1f6f59"/>
+      <text x="402" y="31" fill="#a7f3d0" text-anchor="middle">四轨声音设计</text>
+      <rect x="492" width="148" height="48" rx="24" fill="#11261f" stroke="#1f6f59"/>
+      <text x="566" y="31" fill="#a7f3d0" text-anchor="middle">发布级交付</text>
+    </g>
+
+    <text x="4" y="380" fill="#64748b" font-family="Segoe UI, Arial, sans-serif" font-size="18" letter-spacing="1.5">WINDOWS · LOCAL-FIRST · APACHE-2.0 PLATFORM LAYER</text>
+  </g>
+</svg>

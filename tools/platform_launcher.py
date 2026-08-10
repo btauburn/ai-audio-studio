@@ -151,8 +151,24 @@ class PlatformLauncherUI:
             raise ValueError("launcher host must be 127.0.0.1 or 0.0.0.0")
         self._host = host
         self.root = tk.Tk()
-        self.root.title("配音平台启动器")
+        self.root.title("AI 有声工作室启动器")
         self.root.geometry("800x600")
+        self._window_icon: tk.PhotoImage | None = None
+        icon_path = (
+            PROJECT_ROOT
+            / "dubbing_service"
+            / "webui"
+            / "brand"
+            / "logo-mark-256.png"
+        )
+        if icon_path.is_file() and hasattr(self.root, "iconphoto"):
+            try:
+                self._window_icon = tk.PhotoImage(file=str(icon_path))
+                self.root.iconphoto(True, self._window_icon)
+            except Exception:
+                # Branding must never prevent the recovery launcher from
+                # opening on a minimal or unusual Tk installation.
+                self._window_icon = None
 
         self.dubbing = ManagedProcess("Dubbing Service")
 
@@ -201,7 +217,7 @@ class PlatformLauncherUI:
 
         ttk.Label(
             options,
-            text="提示：TTS 服务可在配音平台的「平台配置」页面中启动和管理",
+            text="提示：TTS 服务可在 AI 有声工作室的「平台配置」页面中启动和管理",
             foreground="gray",
         ).pack(anchor=tk.W, pady=(10, 0))
 

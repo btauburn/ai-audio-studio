@@ -1,7 +1,7 @@
 # IndexTTS 配音平台（Dubbing Service）最终项目文档
 
 > [!WARNING]
-> 此文件是早期阶段归档，包含单一环境、旧启动命令和旧前端依赖描述，不再作为生产事实来源。当前说明请阅读 [架构说明](architecture.md)、[生产运维手册](operations.md) 和 [恢复报告](recovery_report.md)。
+> 此文件是早期阶段归档，包含单一环境、旧启动命令和旧前端依赖描述，不再作为生产事实来源。当前说明请阅读 [架构说明](../docs/architecture.md)、[生产运维手册](../docs/operations.md) 和 [启动巡检清单](../docs/production_startup_and_inspection_checklist.md)。
 
 > 适用范围：`index-tts` 仓库中的 `dubbing_service` 平台
 > 

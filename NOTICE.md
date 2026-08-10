@@ -1,11 +1,36 @@
-# Repository notice
+# NOTICE
 
-This repository is a derivative, multi-component audio production project.
+AI Audio Studio is a multi-license derivative distribution maintained by
+TadashiJLU.
 
-- The IndexTTS2 base originates from `https://github.com/index-tts/index-tts` and remains subject to the included `LICENSE`, `LICENSE_ZH.txt`, attribution, disclaimer, downstream notice, use and redistribution requirements.
-- Vendored CosyVoice and Matcha-TTS sources retain their own license files and upstream attribution. Exact source revisions are recorded in `docs/third_party_sources.md`.
-- Qwen3-TTS, CosyVoice3, Whisper, alignment and auxiliary model weights are not included in Git. Their manifests record source and license metadata, but those records do not grant extra rights.
-- The IndexTTS2 auxiliary model set currently includes MaskGCT material identified as `CC-BY-NC-4.0`. Commercial use requires replacement, separate permission or an appropriate legal determination.
-- Platform-specific additions have not yet been offered under a separate public open-source license. Until the copyright owner explicitly chooses one, no additional redistribution permission should be inferred from this repository.
+Copyright 2026 TadashiJLU for the original platform-specific code and
+documentation identified in `LICENSES/README.md`. Those contributions are
+licensed under Apache License 2.0, reproduced in
+`LICENSES/Apache-2.0.txt`.
 
-This notice is informational and is not legal advice. Anyone distributing the repository or publishing generated work must independently review all applicable code, model, voice, music, sound-effect and content rights.
+The project is based on IndexTTS2 from `index-tts/index-tts`, baseline commit
+`1698b32033f38a034572891aed698609da2ff392`. The upstream code, model-facing
+materials and derivatives identified in `LICENSES/README.md` remain governed
+by the unmodified bilibili IndexTTS2 Model Use License in
+`LICENSES/Bilibili-IndexTTS.txt` and
+`LICENSES/Bilibili-IndexTTS-ZH.txt`. Nothing in the Apache-2.0 grant
+relicenses those materials.
+
+As required by the IndexTTS2 license, this distribution states:
+
+> Any modifications made to the original model in this Derivative Work are not endorsed, warranted, or guaranteed by the original right-holder of the original model, and the original right-holder disclaims all liability related to this Derivative Work.
+
+The Chinese license states the corresponding notice as:
+
+> 该衍生品对原模型所作的任何改动与原模型原始权利人无关，原始权利人对该衍生品不背书、不担保、不承担责任。
+
+Vendored CosyVoice, Matcha-TTS and browser assets retain their own licenses and
+copyright notices. Model weights are not included in Git and remain subject to
+their source terms. The current IndexTTS2 manifest includes MaskGCT material
+recorded as CC-BY-NC-4.0; it is not cleared for commercial use merely because
+the Apache-2.0 platform code can load it.
+
+See `LICENSES/README.md` for the authoritative path-to-license map and
+`THIRD_PARTY_NOTICES.md` for component, model, media and commercial-use
+boundaries. This notice does not replace any included license and is not legal
+advice.

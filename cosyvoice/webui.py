@@ -1,4 +1,5 @@
 # Copyright (c) 2024 Alibaba Inc (authors: Xiang Lyu, Liu Yue)
+# Modified by TadashiJLU in 2026 for Windows and project-local offline runtime integration.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

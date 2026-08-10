@@ -15,18 +15,22 @@ $AllowedRootFiles = @(
     ".gitattributes",
     ".gitignore",
     ".python-version",
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
     "DISCLAIMER",
     "LICENSE",
-    "LICENSE_ZH.txt",
     "MANIFEST.in",
     "NOTICE.md",
     "README.md",
+    "README_EN.md",
     "SECURITY.md",
+    "SUPPORT.md",
+    "THIRD_PARTY_NOTICES.md",
     "pyproject.toml",
     "start_platform.bat",
     "uv.lock",
     "webui.py",
-    "开箱即用说明.md",
     "dubbing_service/__init__.py",
     "dubbing_service/config.example.json",
     "dubbing_service/llm_models.json",
@@ -34,6 +38,7 @@ $AllowedRootFiles = @(
 )
 
 $AllowedTrees = @(
+    ".github",
     "archive",
     "cosyvoice",
     "docs",
@@ -43,6 +48,7 @@ $AllowedTrees = @(
     "environments",
     "examples",
     "indextts",
+    "LICENSES",
     "models/manifests",
     "scripts",
     "service",
@@ -55,7 +61,7 @@ $AllowedExtensions = [Collections.Generic.HashSet[string]]::new(
         ".bat", ".c", ".cc", ".cfg", ".cmake", ".cmd", ".conf", ".cpp",
         ".css", ".cu", ".cuh", ".h", ".hpp", ".html", ".ini", ".j2",
         ".jinja", ".js", ".json", ".jsonl", ".lock", ".md", ".mjs",
-        ".proto", ".ps1", ".py", ".pyi", ".rst", ".sh", ".toml", ".txt",
+        ".proto", ".ps1", ".py", ".pyi", ".rst", ".sh", ".svg", ".toml", ".txt",
         ".xml", ".yaml", ".yml"
     ),
     [StringComparer]::OrdinalIgnoreCase
@@ -124,6 +130,17 @@ $ForbiddenBinaryExtensions = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::OrdinalIgnoreCase
 )
 
+$AllowedPublicBinaryFiles = [Collections.Generic.HashSet[string]]::new(
+    [string[]]@(
+        "docs/assets/screenshots/publish-workflow.png",
+        "docs/assets/screenshots/sound-design.png",
+        "docs/assets/screenshots/studio-overview.png",
+        "dubbing_service/webui/brand/logo-mark-256.png",
+        "dubbing_service/webui/brand/social-preview.png"
+    ),
+    [StringComparer]::OrdinalIgnoreCase
+)
+
 $SecretPatterns = @(
     '(?i)-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
     '(?i)\bAKIA[0-9A-Z]{16}\b',
@@ -176,6 +193,9 @@ function Test-AllowedSourceFile {
     }
     if ($ExcludedFileNames.Contains($File.Name)) {
         return $false
+    }
+    if ($AllowedPublicBinaryFiles.Contains($relative)) {
+        return $true
     }
     if ($ForbiddenBinaryExtensions.Contains($File.Extension)) {
         return $false
@@ -242,11 +262,13 @@ foreach ($entry in $selectedByPath.GetEnumerator()) {
     if ($ForbiddenBinaryExtensions.Contains($entry.Value.Extension)) {
         throw "Internal error: model/media binary passed the allow-list: $relative"
     }
-    Assert-NoEmbeddedSecret -File $entry.Value -RelativePath $relative
+    if (-not $AllowedPublicBinaryFiles.Contains($relative)) {
+        Assert-NoEmbeddedSecret -File $entry.Value -RelativePath $relative
+    }
 }
 
 if ($ValidateOnly) {
-    Write-Host "Source export validation passed: $($selectedByPath.Count) allow-listed text/source files."
+    Write-Host "Source export validation passed: $($selectedByPath.Count) allow-listed source and public brand files."
     return
 }
 

@@ -6,7 +6,7 @@ set "PYTHONIOENCODING=utf-8"
 
 cd /d "%~dp0"
 echo ====================================
-echo IndexTTS 配音平台 - 一键启动器
+echo AI 有声工作室 - 一键启动器
 echo ====================================
 echo.
 echo 正在执行启动预检...

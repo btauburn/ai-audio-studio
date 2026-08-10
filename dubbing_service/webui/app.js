@@ -294,7 +294,7 @@ createApp({
 
     const llm = ref({
       text: "",
-      model: "deepseek-chat",
+      model: "deepseek-v4-flash",
       // 为空表示使用模型自身的默认温度，用户填写后才显式传递给后端
       temperature: null,
       // 为空表示使用模型自身的默认 top_p
@@ -899,7 +899,7 @@ createApp({
       id: null,
       name: "",
       provider_id: null,
-      model: "deepseek-chat",
+      model: "deepseek-v4-flash",
       max_tokens_k: null,
       description: "",
       response_format_json: false,
@@ -6198,7 +6198,7 @@ createApp({
         id: null,
         name: "",
         provider_id: null,
-        model: "deepseek-chat",
+        model: "deepseek-v4-flash",
         max_tokens_k: null,
         description: "",
         response_format_json: false,

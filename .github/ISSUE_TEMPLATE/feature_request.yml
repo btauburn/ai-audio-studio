@@ -1,0 +1,54 @@
+# Copyright 2026 TadashiJLU.
+
+name: Feature request
+description: 提议直接改善高质量有声作品生产流程的功能
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        当前项目聚焦“高质量、可发布的有声作品”。请描述真实制作场景和可验证的价值，而不只是技术名称。
+  - type: textarea
+    id: use_case
+    attributes:
+      label: 制作场景与问题
+      description: 谁在什么工作流中遇到了什么问题？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 描述期望的交互、输入输出和失败处理。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 已考虑的替代方案
+      description: 说明现有变通方案及其不足。
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 对核心流程的影响
+      options:
+        - 阻塞作品制作或发布
+        - 明显改善质量或效率
+        - 便利性改进
+        - 长期探索
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: 模型、素材与许可影响
+      description: 若涉及新模型、数据、声音、音乐或素材，请列出来源、体积、运行需求及许可边界。
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索现有 Issue 和项目计划。
+          required: true
+        - label: 此建议直接服务于有声作品制作，而非平台运营、视频或企业治理。
+          required: true

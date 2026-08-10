@@ -196,8 +196,19 @@ def list_projects() -> List[Project]:
         else:
             results.append(project)
 
+    # Legacy projects may contain offset-naive timestamps while current
+    # projects are stored in UTC. Comparing both forms directly raises a
+    # TypeError and used to make the whole project-list API fail after the
+    # first new-format project was created. Treat legacy values as UTC for a
+    # stable, backwards-compatible order.
+    def _created_at_utc(project: Project) -> datetime:
+        created_at = project.created_at
+        if created_at.tzinfo is None:
+            return created_at.replace(tzinfo=timezone.utc)
+        return created_at.astimezone(timezone.utc)
+
     # 按创建时间排序，旧项目在前
-    results.sort(key=lambda p: p.created_at)
+    results.sort(key=_created_at_utc)
     return results
 
 

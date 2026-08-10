@@ -1,12 +1,26 @@
 [project]
-name = "indextts"
-version = "2.0.0"
+name = "ai-audio-studio"
+version = "0.1.0b1"
 description = "A Windows-first multi-backend AI audio production studio built around IndexTTS2"
-authors = [{ name = "Bilibili IndexTTS Team" }]
-maintainers = [{ name = "Tadashijlu" }]
-license = "LicenseRef-Bilibili-IndexTTS"
-license-files = ["LICEN[CS]E*", "INDEX_MODEL_LICENSE*"]
+authors = [{ name = "TadashiJLU" }]
+maintainers = [{ name = "TadashiJLU" }]
+license = "Apache-2.0 AND LicenseRef-Bilibili-IndexTTS"
+license-files = [
+  "LICENSE",
+  "LICENSES/*",
+  "NOTICE.md",
+  "THIRD_PARTY_NOTICES.md",
+]
 readme = "README.md"
+keywords = [
+  "text-to-speech",
+  "audio-production",
+  "podcast",
+  "audiobook",
+  "indextts2",
+  "qwen3-tts",
+  "cosyvoice3",
+]
 classifiers = [
   "Development Status :: 4 - Beta",
 
@@ -15,6 +29,7 @@ classifiers = [
 
   "Topic :: Scientific/Engineering",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
 
   "Natural Language :: English",
   "Natural Language :: Chinese (Simplified)",
@@ -116,6 +131,9 @@ addopts = "-ra"
 # NOTE: Use `uv tool install -e .` to install the package as a CLI tool.
 requires = ["hatchling >= 1.27.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["indextts", "dubbing_service"]
 
 [tool.uv]
 # Disable build isolation when building DeepSpeed from source.

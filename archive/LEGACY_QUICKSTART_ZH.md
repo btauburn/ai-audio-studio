@@ -171,7 +171,7 @@ http://127.0.0.1:9000/web/
 7. 运行项目数据审计；
 8. 做一次冷备份并在隔离目录恢复演练。
 
-详细命令见 [docs/operations.md](docs/operations.md)。
+详细命令见 [docs/operations.md](../docs/operations.md)。
 
 ## 8. 备份
 

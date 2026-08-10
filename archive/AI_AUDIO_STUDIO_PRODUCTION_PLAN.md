@@ -2,7 +2,7 @@
 
 ## 1. 文档定位
 
-本文是配音平台的产品边界、实施路线与验收基线。下方“实施状态”记录当前完成度；具体运行架构与恢复环境仍以 [architecture.md](architecture.md) 和 [recovery_report.md](recovery_report.md) 为准。
+本文是配音平台的产品边界、实施路线与验收基线。下方“实施状态”记录当前完成度；具体运行架构与本机验收方式以 [architecture.md](../docs/architecture.md) 和 [启动巡检清单](../docs/production_startup_and_inspection_checklist.md) 为准。
 
 ### 1.1 实施状态（2026-07-11）
 

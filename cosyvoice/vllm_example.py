@@ -1,3 +1,7 @@
+# Modified by TadashiJLU in 2026 for the vendored project integration.
+# The upstream CosyVoice copyright and Apache-2.0 license are retained;
+# see cosyvoice/LICENSE and docs/third_party_sources.md.
+
 import sys
 sys.path.append('third_party/Matcha-TTS')
 from vllm import ModelRegistry

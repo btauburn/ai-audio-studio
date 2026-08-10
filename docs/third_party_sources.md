@@ -6,7 +6,7 @@
 
 - 上游：`https://github.com/FunAudioLLM/CosyVoice.git`
 - 本轮整理前的上游提交：`c93d3dda01ae69fde8a4b2372f0e4260135599c3`
-- 本地适配文件：`cosyvoice/cli/frontend.py`、`vllm_example.py`、`webui.py`、`cosyvoice/utils/wetext_utils.py`
+- 已知本地适配文件：`cosyvoice/cosyvoice/cli/frontend.py`、`cosyvoice/vllm_example.py`、`cosyvoice/webui.py`、`cosyvoice/cosyvoice/utils/wetext_utils.py`。这些文件保留上游 Apache-2.0，并带有 TadashiJLU 修改声明；最后一个文件是项目新增的离线适配器。
 - 2026-07-11 已移除 `cosyvoice/.git/` 嵌套元数据；源文件和本地改动保持不变，由项目根仓库统一管理。
 
 可逆历史备份位于：

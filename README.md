@@ -1,137 +1,236 @@
-# AI 有声工作室（IndexTTS 多后端配音平台）
+<p align="center">
+  <img src="dubbing_service/webui/brand/wordmark.svg" width="560" alt="AI 有声工作室 / AI Audio Studio" />
+</p>
 
-这是一个面向 Windows 本机制作的 AI 有声内容工作室，用于把故事、资讯、知识内容和播客脚本制作成可审听、可混音、可打包发布的有声作品。
+<h1 align="center">AI 有声工作室</h1>
 
-项目以 [IndexTTS2](https://github.com/index-tts/index-tts) 为上游基础，增加了项目管理、DeepSeek 分段、四种 TTS 后端、不可变 Take、独立 A/B 版本、非破坏编辑、审听、BGM/Ambience/SFX、Master、字幕和发布包等完整工作流。
+<p align="center">
+  面向故事、资讯、知识内容与播客的 Windows 本地 AI 有声制作工作台
+</p>
 
-> 当前支持边界：Windows 10/11、NVIDIA GPU、单机或受信任局域网。平台没有账户认证，严禁直接暴露到公网。商业发布前还必须分别确认模型、声音、音乐、音效和原始文本的授权。
+<p align="center">
+  <a href="https://github.com/tadashijlu/ai-audio-studio/actions/workflows/windows-no-model-ci.yml"><img alt="Windows no-model CI" src="https://github.com/tadashijlu/ai-audio-studio/actions/workflows/windows-no-model-ci.yml/badge.svg" /></a>
+  <img alt="Platform layer license: Apache-2.0" src="https://img.shields.io/badge/platform%20layer-Apache--2.0-22c28f" />
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb" />
+  <img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776ab" />
+</p>
+
+<p align="center">
+  <a href="README_EN.md">English</a> ·
+  <a href="docs/installation.md">安装</a> ·
+  <a href="docs/user_guide.md">使用指南</a> ·
+  <a href="docs/architecture.md">架构</a> ·
+  <a href="CONTRIBUTING.md">参与贡献</a>
+</p>
+
+> [!IMPORTANT]
+> 当前版本为 `0.1.0-beta`，面向 Windows + NVIDIA GPU，适合个人本地制作与技术预览。平台自研层由 **TadashiJLU** 以 Apache-2.0 开源；仓库中的 IndexTTS2、CosyVoice、Matcha-TTS、浏览器依赖及另行下载的模型继续适用各自许可证。它们并未被统一重新许可，商业使用前请先阅读[许可证边界](LICENSES/README.md)。
+
+AI 有声工作室把零散的 TTS 调用整理成一条可追溯的制作链：
+
+**脚本 → 音色 → A/B Take → 非破坏编辑 → 声音设计 → Master → 发布包**
+
+它不是“输入文字、下载一个音频”的演示页，而是为反复审听、修改、混音和正式交付设计的本地工作室。
+
+![AI 有声工作室配音审听界面](docs/assets/screenshots/studio-overview.png)
+
+## 为什么做这个项目
+
+制作可发布的有声作品，真正耗时的通常不是单次合成，而是脚本分段、角色与音色一致性、多个版本比较、局部返工、声音设计、响度质检和交付整理。本项目将这些环节保存在同一个工程中，优先保证：
+
+- **可回退**：A/B 槽位相互独立，每次生成形成不可变 Take，除非手动清理；
+- **非破坏**：裁剪、静音、增益、变速和淡化先记录为编辑配方，原始 Take 不被覆盖；
+- **可审听**：每段有待审、需修改、通过、问题备注和最终 Take 选择；
+- **可交付**：Dialogue / BGM / Ambience / SFX 四轨汇入 Master，并输出字幕、元数据、授权清单与校验和；
+- **本地优先**：作品、声音、密钥、模型和生成结果默认只留在本机，不进入 Git。
 
 ## 核心能力
 
-- TTS：IndexTTS2、Qwen3-TTS CustomVoice、Qwen3-TTS VoiceDesign、CosyVoice3。
-- 脚本：手工分段、JSON 导入，或使用 DeepSeek Flash/Pro 自动分段。
-- 音色：参考音频、全局音色库、角色级后端、CustomVoice 内置音色和 VoiceDesign 音色设计。
-- 配音审听：每段独立 A/B、不可变 Take、历史恢复/固定、最终 Take 选择和审听状态。
-- 非破坏编辑：裁剪、静音、音量、变速、淡入淡出、头尾留白；需要固化时渲染为新的 Take。
-- 声音设计：Dialogue/BGM/Ambience/SFX 四轨、素材授权记录、增益、循环、淡入淡出、对白交叉淡化和 BGM 自动闪避。
-- 交付：响度与峰值质检、不可变 Master、WAV/MP3、SRT/VTT、章节、封面、元数据、授权清单和校验和 ZIP。
+| 工作区 | 已实现能力 |
+| --- | --- |
+| 脚本与角色 | 手工分段、JSON 导入、可选 DeepSeek V4 Flash / Pro 分段、章节/场景、角色 Voice Bible、发音词典 |
+| 音色 | 参考音频、全局音色库、角色级后端、Qwen CustomVoice 内置音色、Qwen VoiceDesign 文本音色设计 |
+| 配音审听 | 每段独立 A/B、不可变 Take、历史恢复/固定、最终 Take 选择、人工审听状态、持久任务队列 |
+| 非破坏编辑 | 裁剪、删除区间、静音、音量、变速、淡入淡出、头尾留白；需要固化时渲染为新 Take |
+| 声音设计 | Dialogue / BGM / Ambience / SFX 四轨、素材授权记录、循环、增益、淡化、对白交叉淡化、BGM ducking |
+| 导出发布 | Preview、响度/峰值质检、不可变 Master、WAV/MP3、SRT/VTT、章节、封面、元数据、授权清单、ZIP 校验和 |
 
-## 先读这个
+<details>
+<summary><strong>查看更多界面</strong></summary>
 
-从 GitHub 新下载项目时，不包含以下本机内容：模型权重、API Key、虚拟环境、作品项目、参考声音、BGM/SFX、缓存、日志和生成音频。
+### 声音设计
 
-完整部署顺序是：
+![声音设计工作区](docs/assets/screenshots/sound-design.png)
 
-1. 安装 Git、Git LFS、uv、FFmpeg 和 NVIDIA 驱动；
-2. 克隆仓库并重建三个隔离的 uv 环境；
-3. 从 ModelScope 下载所需模型；
-4. 在本机配置 DeepSeek API Key；
-5. 运行 doctor；
-6. 启动平台并完成首个短项目验收。
+### Master 与发布
 
-详细命令见 [GitHub 新机安装与模型配置](docs/installation.md)。实际制作方法见 [有声作品制作使用指南](docs/user_guide.md)。
+![Master 与发布工作区](docs/assets/screenshots/publish-workflow.png)
 
-## 最短启动路径
+</details>
+
+## TTS 后端
+
+| 后端 | 适合场景 | 音色方式 | 许可提醒 |
+| --- | --- | --- | --- |
+| IndexTTS2 | 主播旁白、参考声音复刻、细粒度情感 | 参考音频 + 8 维情感/文本/音频控制 | 上游自定义许可；当前辅助清单含 `CC-BY-NC-4.0` 的 MaskGCT，不能默认用于商业生产 |
+| Qwen3-TTS CustomVoice | 快速角色分配、无需参考音频 | 内置音色 + 情感指令 | 权重不进仓库；使用前核对模型页条款 |
+| Qwen3-TTS VoiceDesign | 文本描述设计新音色 | 自然语言音色描述 | 权重不进仓库；使用前核对模型页条款 |
+| CosyVoice3 | 自然语言控制语气和风格 | 参考声音/指令控制 | vendored 代码为 Apache-2.0；模型权重仍按模型页条款 |
+
+模型权重、API Key、参考声音和作品数据均不随仓库发布。模型供应脚本只从 manifest 固定的 ModelScope 来源下载，并在写入项目目录前校验文件大小和 SHA256。
+
+## 快速开始：完整功能安装
+
+### 1. 准备环境
+
+- Windows 10/11、NVIDIA GPU 和可用驱动；
+- 已验证基线：RTX 4070 Ti SUPER 16 GiB；更低显存尚未形成正式支持矩阵；
+- 建议至少 **80 GiB** 可用磁盘空间，用于约 31.86 GiB 模型、下载缓存和三个 uv 环境；
+- 首次安装需要联网，日常推理按离线模型目录运行。
+
+在 PowerShell 中安装系统工具：
 
 ```powershell
+winget install --id Git.Git -e
+winget install --id GitHub.GitLFS -e
+winget install --id astral-sh.uv -e
+winget install --id Gyan.FFmpeg -e
+```
+
+安装后重新打开 PowerShell。
+
+### 2. 克隆、环境与配置
+
+```powershell
+git lfs install
 git clone https://github.com/tadashijlu/ai-audio-studio.git
 Set-Location .\ai-audio-studio
-git lfs install
 git lfs pull
 
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Runtime All
 Copy-Item .\dubbing_service\config.example.json .\dubbing_service\config.json
 ```
 
-模型下载完成后，在平台和 TTS 均未运行时检查：
+项目刻意保留三个隔离环境，不能把依赖合并到一个 Python 环境：
+
+- `.venv`：平台、IndexTTS2、字幕；
+- `environments/qwen3tts/.venv`：两个 Qwen3-TTS 后端；
+- `environments/cosyvoice/.venv`：CosyVoice3。
+
+### 3. 从 ModelScope 安装全部模型
+
+先阅读 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和各 manifest 的许可字段。预演不会修改模型文件：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 -Profile Full -DryRun
+```
+
+确认后下载并逐文件校验：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 `
+  -Profile Full `
+  -AcceptThirdPartyLicenses
+```
+
+`-AcceptThirdPartyLicenses` 只表示你已阅读相关条款，不会额外授予商业或再分发权利。下载中断后可安全重跑，已有正确文件不会重复恢复。
+
+### 4. 检查并启动
+
+平台和 TTS 工作进程均未运行时执行：
 
 ```powershell
 .\.venv\Scripts\python.exe .\scripts\platform_doctor.py --startup
+.\start_platform.bat
 ```
 
-默认仅本机启动：
+doctor 应以 `0 failed` 结束。启动后打开 `http://127.0.0.1:9000/web/`，进入“平台配置”，选择一个 TTS 后端并点击启动/加载模型。
 
-```bat
-start_platform.bat
-```
+> [!WARNING]
+> 默认启动仅绑定 `127.0.0.1`。平台目前没有账户、TLS 或权限系统；不要直接暴露到公网。只有受信任局域网确有需要时才使用 `start_platform.bat --lan`，并自行配置防火墙。
 
-只有确实需要受信任局域网访问时才使用：
+完整命令、部分后端开发模式、健康检查和首次样音见[安装指南](docs/installation.md)。
 
-```bat
-start_platform.bat --lan
-```
+## 可选：DeepSeek 自动分段
 
-浏览器访问：`http://127.0.0.1:9000/web/`。
+平台不依赖 LLM 也能手工分段或导入 JSON。需要自动分段时，在平台启动后进入“平台配置 → LLM 提供商”，新建 DeepSeek：
 
-`start_platform.bat --check` 只做启动预检；如果 9000 或 8001～8004 已被正在运行的平台占用，端口检查失败属于预期结果，不代表代码损坏。
+- Base URL：`https://api.deepseek.com`
+- 首选模型：`deepseek-v4-flash`
+- 备选模型：`deepseek-v4-pro`
+- API Key：保存到操作系统凭据库，不写入 Git 配置
+
+这两个模型 ID 与 Base URL 已按 [DeepSeek 官方 API 文档](https://api-docs.deepseek.com/quick_start/pricing/)核对。原始文本会发送给 DeepSeek；敏感或受限制内容请使用手工分段或本地 JSON。
 
 ## 运行架构
 
-平台与三个模型栈必须保持隔离，不能把依赖合并到同一个环境。
+平台只管理一个 GPU TTS 工作进程，切换后端时会释放旧进程，避免多个模型同时争用显存。
 
 | 服务 | 端口 | 解释器 | 项目内模型目录 |
 | --- | ---: | --- | --- |
-| 平台 + IndexTTS2 | 9000 / 8001 | `.venv` | `models/index_tts` |
+| Web/API 平台 | 9000 | `.venv` | — |
+| IndexTTS2 | 8001 | `.venv` | `models/index_tts` |
 | CosyVoice3 | 8002 | `environments/cosyvoice/.venv` | `models/cosyvoice3/Fun-CosyVoice3-0.5B` |
 | Qwen VoiceDesign | 8003 | `environments/qwen3tts/.venv` | `models/qwen3_tts/Qwen3-TTS-VoiceDesign` |
 | Qwen CustomVoice | 8004 | `environments/qwen3tts/.venv` | `models/qwen3_tts/Qwen3-TTS-CustomVoice` |
 
-平台同一时间只托管一个 GPU TTS 工作进程。WebUI 不会在打开时自动加载模型；请在“平台配置”中选择后端并明确启动。
+更多模块边界、持久化结构和并发约束见[架构说明](docs/architecture.md)。
 
-## DeepSeek 配置
+## 数据与隐私边界
 
-推荐在 WebUI 的“平台配置 → LLM 提供商”中新建 DeepSeek：
+以下内容被 `.gitignore` 排除，禁止使用 `git add -f` 强行提交：
 
-- Base URL：`https://api.deepseek.com`
-- API Key：填写自己的 Key；保存后进入操作系统凭据库，不进入 Git 配置文件
-- 首选模型：`deepseek-v4-flash`
-- 备选模型：`deepseek-v4-pro`
+- `.env`、`dubbing_service/config.json`、`dubbing_service/llm_providers.json`；
+- `models/` 下的权重、下载缓存、运行缓存和隔离区；
+- `.venv*` 以及两个隔离运行环境中的 `.venv`；
+- `dubbing_projects/`、音色库、参考声音、BGM/SFX 和其他作品素材；
+- `outputs/`、`temp/`、日志、字幕中间文件和生成音频。
 
-也可以只对当前 PowerShell 会话设置环境变量：
-
-```powershell
-$env:DUBBING_LLM_BASE_URL = "https://api.deepseek.com"
-$env:DUBBING_LLM_API_KEY = "请在本机填写，不要写入仓库"
-```
-
-DeepSeek 会收到用于自动分段的原始文本。涉及敏感、保密或受限制内容时，请改用手工分段或导入本地生成的 JSON。
-
-## 本地数据与 Git 边界
-
-以下内容由 `.gitignore` 排除，不应通过 `git add -f` 强行提交：
-
-- `.env`、`dubbing_service/config.json`、`dubbing_service/llm_providers.json`
-- `models/` 下的权重、下载缓存、运行缓存和隔离区
-- `.venv*` 及三个运行环境中的 `.venv`
-- `dubbing_projects/`、音色库、参考声音、BGM/SFX 和其他作品素材
-- `outputs/`、`temp/`、日志、字幕中间文件和生成音频
-
-发布前可运行无模型、无密钥、无用户数据的白名单检查：
+发布源码前运行白名单检查：
 
 ```powershell
-.\scripts\export_source.ps1 -ValidateOnly
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\export_source.ps1 -ValidateOnly
 ```
 
-## 文档导航
+## 文档
+
+### 开始使用
 
 - [新机安装、模型下载与首次验收](docs/installation.md)
 - [从脚本到发布包的完整使用指南](docs/user_guide.md)
-- [第三方来源、归属与许可边界](NOTICE.md)
-- [架构说明](docs/architecture.md)
+- [模型目录与供应链规则](models/README.md)
+
+### 架构与运维
+
+- [系统架构](docs/architecture.md)
 - [生产运维与故障排查](docs/operations.md)
 - [启动与巡检清单](docs/production_startup_and_inspection_checklist.md)
-- [模型目录与供应链规则](models/README.md)
-- [第三方源码与版本基线](docs/third_party_sources.md)
-- [本机恢复及审查报告](docs/recovery_report.md)
-- [AI 有声导演工作室生产化方案](docs/ai_audio_studio_production_plan.md)
 - [安全策略](SECURITY.md)
 
-上游 IndexTTS2 的原始介绍与示例保存在 [archive/README_ROOT_WITH_UPSTREAM_REFERENCE.md](archive/README_ROOT_WITH_UPSTREAM_REFERENCE.md)。根目录 `webui.py` 是上游单模型 Gradio 演示，不是本平台入口。
+### 许可证与维护
 
-## 安全与许可证
+- [多许可证路径边界](LICENSES/README.md)
+- [第三方源码、浏览器依赖与模型说明](THIRD_PARTY_NOTICES.md)
+- [固定的第三方源码基线](docs/third_party_sources.md)
+- [参与贡献](CONTRIBUTING.md) · [支持渠道](SUPPORT.md) · [版本记录](CHANGELOG.md)
 
-- 一键启动默认只绑定 `127.0.0.1`。平台没有登录、权限管理或 TLS；显式 `--lan` 模式必须配置防火墙。
-- 不要在 Issue、日志、截图或提交记录中粘贴 API Key、私人脚本、参考声音或作品文件。
-- 当前 GitHub 仓库按私人项目保存，并不表示已经公开开源。平台新增代码尚未授予独立的公开再分发许可；IndexTTS2、MaskGCT、CosyVoice、Qwen、WebUI vendor 及其他第三方组件继续适用各自许可证或使用条款。
-- 当前 IndexTTS2 辅助模型清单包含具有非商业限制的 MaskGCT 权重。技术可运行不等于已经获准商业生产或再分发。
-- 克隆、合成或发布任何人的声音前，必须取得明确授权，并遵守适用的隐私、人格权、版权和 AI 内容标识规则。
+上游 IndexTTS2 的原始介绍保存在 `archive/`。根目录 `webui.py` 是上游单模型 Gradio 演示，不是本平台入口。
+
+## 当前边界
+
+- 当前重点是单人本地生产，不建设多用户、云同步、平台发布 API 或完整 DAW；
+- BGM/SFX 目前是素材导入、编排、混音与授权记录，不包含即时部署的音乐生成模型；
+- GitHub CI 不下载模型、不占用 GPU；真实 TTS、字幕和发布包 E2E 需在本地 GPU 机器验收；
+- IndexTTS2 当前辅助依赖中的 MaskGCT 具有非商业限制，替换或获得单独许可前不能把该链路视为商业放行。
+
+## 参与贡献
+
+欢迎提交可复现的 Bug、文档改进和聚焦有声制作流程的功能建议。开始前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告，不要公开粘贴密钥、声音或作品数据。
+
+## 许可证与归属
+
+Copyright 2026 **TadashiJLU**.
+
+平台自研层采用 [Apache License 2.0](LICENSE)。本仓库是多许可证分发：上游 IndexTTS2 及其派生修改、vendored CosyVoice/Matcha-TTS、浏览器依赖、模型权重和示例媒体仍受各自条款约束。以 [LICENSES/README.md](LICENSES/README.md)、相邻许可证和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 为准。
+
+本项目基于 [index-tts/index-tts](https://github.com/index-tts/index-tts) 的固定上游提交构建；本项目的修改不受上游原权利人背书、保证或担保。

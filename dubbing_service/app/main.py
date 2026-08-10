@@ -1,4 +1,4 @@
-"""FastAPI entrypoint for the IndexTTS dubbing service.
+"""FastAPI entrypoint for AI Audio Studio.
 
 提供项目管理、角色管理、LLM 分段、批量合成、字幕生成等功能的后端 API。
 API 前缀：/api/v1/
@@ -92,8 +92,8 @@ def create_app() -> FastAPI:
     """创建 FastAPI 应用实例。"""
 
     app = FastAPI(
-        title="IndexTTS Dubbing Service",
-        description="基于 IndexTTS2 的有声作品配音平台后端服务。",
+        title="AI Audio Studio API",
+        description="多 TTS 后端的本地有声作品制作服务。",
         version="1.0.0",
         lifespan=lifespan,
     )
