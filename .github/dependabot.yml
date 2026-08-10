@@ -2,6 +2,10 @@
 
 version: 2
 updates:
+  # CosyVoice3 is updated manually because Dependabot's Linux updater cannot
+  # resolve its Windows CUDA lock against the upstream Whisper/Triton markers.
+  # The WebUI build tool is also manual: package metadata, precompiled CSS,
+  # versioned vendor paths, checksums and notices must change together.
   - package-ecosystem: uv
     directory: /
     schedule:
@@ -29,24 +33,6 @@ updates:
           - version-update:semver-minor
 
   - package-ecosystem: uv
-    directory: /environments/cosyvoice
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:05"
-      timezone: Asia/Shanghai
-    open-pull-requests-limit: 2
-    groups:
-      cosyvoice-python-patch:
-        update-types:
-          - patch
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - version-update:semver-major
-          - version-update:semver-minor
-
-  - package-ecosystem: uv
     directory: /environments/qwen3tts
     schedule:
       interval: weekly
@@ -56,24 +42,6 @@ updates:
     open-pull-requests-limit: 2
     groups:
       qwen3tts-python-patch:
-        update-types:
-          - patch
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - version-update:semver-major
-          - version-update:semver-minor
-
-  - package-ecosystem: npm
-    directory: /dubbing_service/webui
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:15"
-      timezone: Asia/Shanghai
-    open-pull-requests-limit: 3
-    groups:
-      webui-patch:
         update-types:
           - patch
     ignore:

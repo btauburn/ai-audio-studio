@@ -42,8 +42,9 @@ Copyright 2026 TadashiJLU.
 - 在自动化检查中阻止本机 Provider 配置、项目数据、项目目录内模型权重和高置信度凭据进入源码提交。
 - TTS Worker 的参考音频、下载和删除操作统一限制在管理员配置的音频根目录，
   并校验扩展名、存在性及符号链接/Junction 最终边界。
-- Dependabot 按根环境、CosyVoice3 与 Qwen3-TTS 分开生成补丁升级，排除 vendored、
-  历史和旧式重复清单；真实运行时告警继续公开，并记录可达性、缓解措施和退出条件。
+- Dependabot 只为可独立解析的根环境、Qwen3-TTS、CI 与 Actions 生成补丁升级，
+  排除 vendored、历史和旧式重复清单；Windows CUDA 专用的 CosyVoice3 与预编译
+  WebUI 资产采用人工升级。真实运行时告警继续公开，并记录可达性、缓解措施和退出条件。
 - CosyVoice3 升级到 PyTorch 2.6.0 + CUDA 12.4，修复旧版
   `torch.load` 关键漏洞；生产环境移除 Lightning、Diffusers、ONNX 导出、
   PyArrow 等训练/工具依赖，并将 ModelScope/Protobuf 固定到已修复版本。
