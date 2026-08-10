@@ -221,6 +221,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\export_source.ps1 
 - 当前重点是单人本地生产，不建设多用户、云同步、平台发布 API 或完整 DAW；
 - BGM/SFX 目前是素材导入、编排、混音与授权记录，不包含即时部署的音乐生成模型；
 - GitHub CI 不下载模型、不占用 GPU；真实 TTS、字幕和发布包 E2E 需在本地 GPU 机器验收；
+- 只支持清单固定、SHA256 校验并放在项目目录内的模型；不要用来加载来源不明的
+  checkpoint、Transformers 仓库或训练配置；
 - IndexTTS2 当前辅助依赖中的 MaskGCT 具有非商业限制，替换或获得单独许可前不能把该链路视为商业放行。
 
 ## 参与贡献

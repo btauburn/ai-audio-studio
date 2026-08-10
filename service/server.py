@@ -7,7 +7,6 @@ IndexTTS2 FastAPI服务器
 import os
 import sys
 import base64
-import re
 import argparse
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -38,6 +37,13 @@ sys.path.insert(0, project_root)
 sys.path.insert(0, os.path.join(project_root, "indextts"))
 
 from indextts.infer_v2 import IndexTTS2  # noqa: E402
+from dubbing_service.app.core.audio_path_policy import (  # noqa: E402
+    AudioFileNotFoundError,
+    InvalidAudioPathError,
+    managed_audio_roots,
+    resolve_existing_audio_file,
+    resolve_existing_audio_name,
+)
 from service.model_path_policy import require_project_model_dir  # noqa: E402
 
 # ==================== 配置 ====================
@@ -102,21 +108,6 @@ _INDEX_AUX_REQUIRED_FILES = (
     "bigvgan/bigvgan_generator.pt",
 )
 
-_SAFE_COMPONENT_RE = re.compile(r"[^0-9A-Za-z_\-.\u4e00-\u9fff]+")
-
-def _sanitize_filename_component(value: str, default: str = "file") -> str:
-    if not isinstance(value, str):
-        return default
-    value = value.strip()
-    if not value:
-        return default
-    value = value.replace("/", "_").replace("\\", "_")
-    value = _SAFE_COMPONENT_RE.sub("_", value)
-    value = value.strip(" ._-")
-    if not value:
-        return default
-    return value[:64]
-
 def _safe_resolve_under_dir(base_dir: Path, filename: str) -> Path:
     if not isinstance(filename, str) or not filename:
         raise HTTPException(status_code=400, detail="非法文件名")
@@ -130,6 +121,29 @@ def _safe_resolve_under_dir(base_dir: Path, filename: str) -> Path:
     except ValueError:
         raise HTTPException(status_code=400, detail="非法文件路径")
     return candidate
+
+
+def _resolve_reference_audio(value: str) -> Path:
+    try:
+        return resolve_existing_audio_file(
+            value,
+            roots=managed_audio_roots(project_root),
+            relative_bases=(Path(project_root), Path.cwd()),
+            allow_bare_name=True,
+        )
+    except InvalidAudioPathError as exc:
+        raise HTTPException(status_code=400, detail="参考音频路径非法") from exc
+    except AudioFileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail="参考音频不存在") from exc
+
+
+def _resolve_download_audio(directory: Path, filename: str) -> Path:
+    try:
+        return resolve_existing_audio_name(directory, filename)
+    except InvalidAudioPathError as exc:
+        raise HTTPException(status_code=400, detail="非法音频文件名") from exc
+    except AudioFileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="文件不存在") from exc
 
 
 def _validated_model_paths(args: argparse.Namespace) -> tuple[Path, Path]:
@@ -323,7 +337,7 @@ class TTSRequest(BaseModel):
     IndexTTS2支持零样本音色克隆和丰富的情感控制，可以从3-10秒的参考音频克隆任何人的声音。
     """
     text: str = Field(..., description="要合成的文本内容（支持中英文）", min_length=1, max_length=10000, examples=["你好，这是IndexTTS2的测试。"])
-    speaker_audio: str = Field(..., description="参考音频：可以是绝对路径（如'E:/audio/voice.wav'）或base64编码字符串，用于克隆音色", examples=["E:/audio/voice.wav", "UklGRi4gAABXQVZF..."])
+    speaker_audio: str = Field(..., description="参考音频：项目/音色库内路径或base64编码字符串，用于克隆音色", examples=["dubbing_projects/example/roles/prompts/voice.wav", "UklGRi4gAABXQVZF..."])
     
     @field_validator('emotion_vector')
     @classmethod
@@ -389,7 +403,8 @@ def save_base64_audio(base64_str: str, output_path: str) -> str:
         if ',' in base64_str and 'base64' in base64_str:
             base64_str = base64_str.split(',')[1]
         
-        audio_data = base64.b64decode(base64_str)
+        compact = "".join(base64_str.split())
+        audio_data = base64.b64decode(compact, validate=True)
         with open(output_path, 'wb') as f:
             f.write(audio_data)
         return output_path
@@ -500,10 +515,17 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
         start_time = time.time()
         
         # 处理说话人参考音频
-        speaker_audio_path = request.speaker_audio
-        if not os.path.exists(request.speaker_audio):
-            # 假设是base64编码
-            speaker_audio_path = f"temp/speaker_{uuid.uuid4().hex}.wav"
+        try:
+            speaker_audio_path = str(_resolve_reference_audio(request.speaker_audio))
+        except HTTPException:
+            # 路径未命中托管音频时，仅允许将输入作为严格 base64 解码；
+            # 绝不会把未经批准的绝对路径交给文件系统。
+            speaker_audio_path = str(
+                _safe_resolve_under_dir(
+                    Path("temp"),
+                    f"speaker_{uuid.uuid4().hex}.wav",
+                )
+            )
             save_base64_audio(request.speaker_audio, speaker_audio_path)
             background_tasks.add_task(cleanup_temp_file, speaker_audio_path)
         
@@ -513,10 +535,15 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
             # emotion_mode=0: 使用说话人情感，移除外部情感参考
             emotion_audio_path = None
         elif request.emotion_mode == 1 and request.emotion_audio:
-            if os.path.exists(request.emotion_audio):
-                emotion_audio_path = request.emotion_audio
-            else:
-                emotion_audio_path = f"temp/emotion_{uuid.uuid4().hex}.wav"
+            try:
+                emotion_audio_path = str(_resolve_reference_audio(request.emotion_audio))
+            except HTTPException:
+                emotion_audio_path = str(
+                    _safe_resolve_under_dir(
+                        Path("temp"),
+                        f"emotion_{uuid.uuid4().hex}.wav",
+                    )
+                )
                 save_base64_audio(request.emotion_audio, emotion_audio_path)
                 background_tasks.add_task(cleanup_temp_file, emotion_audio_path)
         
@@ -800,8 +827,7 @@ async def upload_prompt(
 ) -> Dict[str, Any]:
     """上传并保存命名的参考音频"""
     try:
-        safe_name = _sanitize_filename_component(name, default="prompt")
-        filename = f"{safe_name}_{uuid.uuid4().hex[:8]}.wav"
+        filename = f"prompt_{uuid.uuid4().hex}.wav"
         save_path = _safe_resolve_under_dir(Path("prompts"), filename)
          
         with open(save_path, "wb") as f:
@@ -841,9 +867,7 @@ async def list_prompts() -> Dict[str, Any]:
 async def delete_prompt(filename: str) -> Dict[str, Any]:
     """删除指定的参考音频"""
     try:
-        file_path = _safe_resolve_under_dir(Path("prompts"), filename)
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="文件不存在")
+        file_path = _resolve_download_audio(Path("prompts"), filename)
          
         file_path.unlink()
         return {
@@ -860,9 +884,7 @@ async def delete_prompt(filename: str) -> Dict[str, Any]:
 @app.get("/api/v1/outputs/{filename}")
 async def download_output(filename: str):
     """下载生成的音频文件"""
-    file_path = _safe_resolve_under_dir(Path("outputs"), filename)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="文件不存在")
+    file_path = _resolve_download_audio(Path("outputs"), filename)
     return FileResponse(str(file_path), media_type="audio/wav", filename=file_path.name)
 
 

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Dict, List, Optional
+from urllib.parse import SplitResult, urlsplit
 
 import httpx
 
@@ -17,6 +18,50 @@ from dubbing_service.app.core.config import get_config
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=10.0)
 _DEFAULT_MAX_ATTEMPTS = 3
 _MAX_RETRY_DELAY_SECONDS = 30.0
+_HTTP_SCHEMES = frozenset({"http", "https"})
+_DEEPSEEK_DOMAIN = "deepseek.com"
+
+
+def _parse_llm_base_url(value: str) -> tuple[str, SplitResult]:
+    """Validate an HTTP(S) LLM base URL without restricting its network.
+
+    Loopback and private hosts are intentionally valid: this desktop-first
+    application supports locally hosted OpenAI-compatible providers. Embedded
+    credentials are rejected because API keys have a dedicated configuration
+    field and userinfo makes origin checks unnecessarily ambiguous.
+    """
+
+    text = str(value).strip()
+    if not text or any(ord(char) < 0x20 or ord(char) == 0x7F for char in text):
+        raise ValueError("LLM Base URL 不能为空或包含控制字符")
+
+    try:
+        parsed = urlsplit(text)
+        # Accessing ``port`` validates malformed and out-of-range values.
+        _ = parsed.port
+    except (TypeError, ValueError) as exc:
+        raise ValueError("LLM Base URL 格式无效") from exc
+
+    if parsed.scheme.lower() not in _HTTP_SCHEMES or not parsed.netloc or not parsed.hostname:
+        raise ValueError("LLM Base URL 必须是包含主机名的 http:// 或 https:// 地址")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("LLM Base URL 不应包含用户名或密码，请使用独立的 API Key 配置")
+
+    return text.rstrip("/"), parsed
+
+
+def is_deepseek_base_url(value: str | None) -> bool:
+    """Return whether *value* targets DeepSeek's domain or a true subdomain."""
+
+    if value is None:
+        return False
+    try:
+        _, parsed = _parse_llm_base_url(value)
+    except (TypeError, ValueError):
+        return False
+
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    return hostname == _DEEPSEEK_DOMAIN or hostname.endswith(f".{_DEEPSEEK_DOMAIN}")
 
 
 @dataclass
@@ -95,13 +140,16 @@ class OpenAIStyleLLMProvider(LLMProvider):
         if not effective_base_url:
             raise RuntimeError("LLM 未配置：请设置 DUBBING_LLM_BASE_URL 或在 Provider 中提供 base_url。")
 
-        self.base_url = str(effective_base_url).rstrip("/")
+        try:
+            self.base_url, _ = _parse_llm_base_url(str(effective_base_url))
+        except ValueError as exc:
+            raise RuntimeError(str(exc)) from exc
         self.api_key = api_key if api_key is not None else (cfg.llm_api_key if cfg is not None else None)
 
         effective_model = model or "gpt-4o-mini"
         # Keep backward compatibility for callers that relied on provider-based
         # model inference, while selecting the current DeepSeek production model.
-        if effective_model == "gpt-4o-mini" and "deepseek.com" in self.base_url.lower():
+        if effective_model == "gpt-4o-mini" and is_deepseek_base_url(self.base_url):
             effective_model = "deepseek-v4-flash"
 
         self.model = effective_model

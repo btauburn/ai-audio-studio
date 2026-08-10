@@ -29,6 +29,19 @@ git status --short
 
 不要使用 `git add -f` 绕过忽略规则。若密钥曾进入提交，即使随后删除，也应立即在服务商后台撤销并重新生成，然后清理 Git 历史。
 
+## 模型与依赖供应链
+
+- 只使用 `models/manifests/` 中固定 revision、大小与 SHA256 的模型，并通过
+  `scripts/install_models.ps1` 恢复；
+- TTS Worker 只接受项目内已批准的模型目录和托管音频根目录，运行期按离线模式
+  加载；
+- 不要加载来源不明的 checkpoint、Transformers 仓库、训练配置或序列化对象，
+  即使底层框架本身提供相应入口；
+- `cosyvoice/requirements.txt` 和训练示例清单属于 vendored 上游参考，不是本项目的
+  安装入口；受支持环境以根 `uv.lock` 和 `environments/*/uv.lock` 为准；
+- 模型栈的依赖升级必须经过真实 GPU 模型加载、合成和音频回读验收，不能仅为消除
+  扫描提示而跳过兼容性验证。
+
 ## 报告漏洞
 
 请使用 GitHub 的[私密漏洞报告](https://github.com/tadashijlu/ai-audio-studio/security/advisories/new)，提供受影响版本、风险、最小复现和建议修复方式。不要先创建公开 Issue，也不要附带真实密钥、私人音频或作品内容。

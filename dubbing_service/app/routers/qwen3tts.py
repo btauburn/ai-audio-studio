@@ -16,6 +16,11 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from dubbing_service.app.core.config import get_qwen3tts_base_url
+from dubbing_service.app.core.audio_path_policy import (
+    AudioFileNotFoundError,
+    InvalidAudioPathError,
+    resolve_existing_audio_file,
+)
 
 router = APIRouter(prefix="/qwen3tts", tags=["qwen3tts"])
 
@@ -25,34 +30,43 @@ def _get_qwen3tts_base_url() -> str:
     return get_qwen3tts_base_url()
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _audio_output_roots() -> tuple[Path, ...]:
+    repo_root = _repo_root()
+    return (
+        (repo_root / "outputs").resolve(),
+        (repo_root / "service" / "outputs").resolve(),
+    )
+
+
+def _resolve_output_audio(path: str) -> Path:
+    repo_root = _repo_root()
+    try:
+        return resolve_existing_audio_file(
+            path,
+            roots=_audio_output_roots(),
+            relative_bases=(repo_root,),
+            recursive=False,
+            allow_bare_name=True,
+        )
+    except InvalidAudioPathError as exc:
+        raise HTTPException(status_code=400, detail="音频路径非法") from exc
+    except AudioFileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="音频文件不存在") from exc
+
+
 def _normalize_audio_path(audio_file: Optional[str]) -> Optional[str]:
     if not audio_file:
         return None
 
-    repo_root = Path(__file__).resolve().parents[3]
-    allowed_roots = [
-        (repo_root / "outputs").resolve(),
-        (repo_root / "service" / "outputs").resolve(),
-    ]
-
     try:
-        raw_path = Path(audio_file)
-        if raw_path.is_absolute():
-            candidate = raw_path.resolve()
-        else:
-            candidate = (repo_root / raw_path).resolve()
-    except Exception:
-        return audio_file
-
-    for root in allowed_roots:
-        if candidate.is_relative_to(root):
-            try:
-                rel = candidate.relative_to(repo_root)
-            except Exception:
-                return audio_file
-            return rel.as_posix()
-
-    return audio_file
+        candidate = _resolve_output_audio(audio_file)
+        return candidate.relative_to(_repo_root()).as_posix()
+    except (HTTPException, ValueError):
+        return None
 
 
 class GenerateRequest(BaseModel):
@@ -159,34 +173,7 @@ def api_get_audio(path: str = Query(..., description="音频文件路径")):
     用于前端预览 AI 生成的音频。
     """
     try:
-        repo_root = Path(__file__).resolve().parents[3]
-        allowed_roots = [
-            (repo_root / "outputs").resolve(),
-            (repo_root / "service" / "outputs").resolve(),
-        ]
-
-        raw_path = Path(path)
-        if raw_path.is_absolute():
-            candidate = raw_path.resolve()
-        else:
-            candidate = (repo_root / raw_path).resolve()
-
-        def _is_allowed(p: Path) -> bool:
-            return any(p.is_relative_to(root) for root in allowed_roots)
-
-        if not _is_allowed(candidate):
-            if Path(path).name == path:
-                fallback = (allowed_roots[0] / path).resolve()
-                if _is_allowed(fallback):
-                    candidate = fallback
-                else:
-                    raise HTTPException(status_code=400, detail="音频路径非法")
-            else:
-                raise HTTPException(status_code=400, detail="音频路径非法")
-
-        if not candidate.is_file():
-            raise HTTPException(status_code=404, detail="音频文件不存在")
-        
+        candidate = _resolve_output_audio(path)
         return FileResponse(
             str(candidate),
             media_type="audio/wav",

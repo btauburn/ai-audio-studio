@@ -12,7 +12,7 @@ from dubbing_service.app.core.helpers import (
     mask_secrets_in_text as _mask_secrets_in_text,
     sanitize_raw_for_response as _sanitize_raw_for_response,
 )
-from dubbing_service.app.providers.llm import OpenAIStyleLLMProvider
+from dubbing_service.app.providers.llm import OpenAIStyleLLMProvider, is_deepseek_base_url
 from dubbing_service.app.storage.llm_configs import (
     LLMConfig,
     LLMConfigStorageError,
@@ -119,7 +119,7 @@ def _seed_default_if_empty(configs: List[LLMConfig]) -> List[LLMConfig]:
     cfg = get_config()
 
     default_model = "gpt-4o-mini"
-    is_deepseek = bool(cfg.llm_base_url and "deepseek.com" in cfg.llm_base_url.lower())
+    is_deepseek = is_deepseek_base_url(cfg.llm_base_url)
     if is_deepseek:
         default_model = "deepseek-v4-flash"
 

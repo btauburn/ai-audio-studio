@@ -31,10 +31,22 @@ Copyright 2026 TadashiJLU.
 - 将音频编辑改为编辑配方和“渲染为新 Take”，不再覆盖原始 Take。
 - 兼容旧工程的无时区时间戳与新工程 UTC 时间戳，避免项目列表刷新后返回 500。
 - 修复 Windows 启动器编码/路径问题，并统一运行时、模型目录和离线缓存策略。
+- 将 CTranslate2 升至 4.8.1，兼容已移除 `pkg_resources` 的新版
+  Setuptools，同时保持 Faster-Whisper / WhisperX 字幕链路可用。
+- 修复 LLM Provider 对 DeepSeek 域名的子串判断，拒绝伪装域名、URL
+  内嵌凭据、非法端口和控制字符。
+- 将两处可被超长文本放大的正则替换为线性字符串处理。
 
 ### Security
 
 - 在自动化检查中阻止本机 Provider 配置、项目数据、项目目录内模型权重和高置信度凭据进入源码提交。
+- TTS Worker 的参考音频、下载和删除操作统一限制在管理员配置的音频根目录，
+  并校验扩展名、存在性及符号链接/Junction 最终边界。
+- CosyVoice3 升级到 PyTorch 2.6.0 + CUDA 12.4，修复旧版
+  `torch.load` 关键漏洞；生产环境移除 Lightning、Diffusers、ONNX 导出、
+  PyArrow 等训练/工具依赖，并将 ModelScope/Protobuf 固定到已修复版本。
+- Click、Gradio、aiohttp、cryptography、PostCSS 与 Nano ID 更新至补丁版本；
+  模型继续采用固定 revision、SHA256 校验和离线加载。
 
 <!-- 发布版本时，把 Unreleased 内容移动到带日期的版本标题，并补充比较链接。 -->
 

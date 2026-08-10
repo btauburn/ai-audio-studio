@@ -11,12 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# Modified by AI Audio Studio (TadashiJLU), 2026: enforce the platform's
+# manifest-provisioned, offline-only model policy.
 import os
 import time
 from typing import Generator
 from tqdm import tqdm
 from hyperpyyaml import load_hyperpyyaml
-from modelscope import snapshot_download
 import torch
 from cosyvoice.cli.frontend import CosyVoiceFrontEnd
 from cosyvoice.cli.model import CosyVoiceModel, CosyVoice2Model, CosyVoice3Model
@@ -24,13 +25,23 @@ from cosyvoice.utils.file_utils import logging
 from cosyvoice.utils.class_utils import get_model_type
 
 
+def _require_local_model_dir(model_dir):
+    model_dir = os.fspath(model_dir)
+    if not os.path.isdir(model_dir):
+        raise FileNotFoundError(
+            "CosyVoice model directory is missing. This runtime is offline-only; "
+            "provision the manifest-pinned ModelScope files with scripts/install_models.ps1 first: "
+            f"{model_dir}"
+        )
+    return model_dir
+
+
 class CosyVoice:
 
     def __init__(self, model_dir, load_jit=False, load_trt=False, fp16=False, trt_concurrent=1):
+        model_dir = _require_local_model_dir(model_dir)
         self.model_dir = model_dir
         self.fp16 = fp16
-        if not os.path.exists(model_dir):
-            model_dir = snapshot_download(model_dir)
         hyper_yaml_path = '{}/cosyvoice.yaml'.format(model_dir)
         if not os.path.exists(hyper_yaml_path):
             raise ValueError('{} not found!'.format(hyper_yaml_path))
@@ -141,10 +152,9 @@ class CosyVoice:
 class CosyVoice2(CosyVoice):
 
     def __init__(self, model_dir, load_jit=False, load_trt=False, load_vllm=False, fp16=False, trt_concurrent=1):
+        model_dir = _require_local_model_dir(model_dir)
         self.model_dir = model_dir
         self.fp16 = fp16
-        if not os.path.exists(model_dir):
-            model_dir = snapshot_download(model_dir)
         hyper_yaml_path = '{}/cosyvoice2.yaml'.format(model_dir)
         if not os.path.exists(hyper_yaml_path):
             raise ValueError('{} not found!'.format(hyper_yaml_path))
@@ -191,10 +201,9 @@ class CosyVoice2(CosyVoice):
 class CosyVoice3(CosyVoice2):
 
     def __init__(self, model_dir, load_trt=False, load_vllm=False, fp16=False, trt_concurrent=1):
+        model_dir = _require_local_model_dir(model_dir)
         self.model_dir = model_dir
         self.fp16 = fp16
-        if not os.path.exists(model_dir):
-            model_dir = snapshot_download(model_dir)
         hyper_yaml_path = '{}/cosyvoice3.yaml'.format(model_dir)
         if not os.path.exists(hyper_yaml_path):
             raise ValueError('{} not found!'.format(hyper_yaml_path))
@@ -228,8 +237,7 @@ class CosyVoice3(CosyVoice2):
 
 
 def AutoModel(**kwargs):
-    if not os.path.exists(kwargs['model_dir']):
-        kwargs['model_dir'] = snapshot_download(kwargs['model_dir'])
+    kwargs['model_dir'] = _require_local_model_dir(kwargs['model_dir'])
     if os.path.exists('{}/cosyvoice.yaml'.format(kwargs['model_dir'])):
         return CosyVoice(**kwargs)
     elif os.path.exists('{}/cosyvoice2.yaml'.format(kwargs['model_dir'])):

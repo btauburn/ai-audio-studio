@@ -7,7 +7,6 @@ CosyVoice3 FastAPI服务器
 import os
 import sys
 import base64
-import re
 import argparse
 from pathlib import Path
 from typing import Optional, Dict
@@ -41,6 +40,13 @@ sys.path.insert(0, os.path.join(project_root, "cosyvoice", "third_party", "Match
 from service.model_path_policy import (  # noqa: E402
     require_project_model_dir,
     require_project_model_dir_from_env,
+)
+from dubbing_service.app.core.audio_path_policy import (  # noqa: E402
+    AudioFileNotFoundError,
+    InvalidAudioPathError,
+    managed_audio_roots,
+    resolve_existing_audio_file,
+    resolve_existing_audio_name,
 )
 
 # ==================== 配置 ====================
@@ -90,21 +96,27 @@ _WETEXT_REQUIRED_FILES = (
     "zh/tn/verbalizer.fst",
 )
 
-_SAFE_COMPONENT_RE = re.compile(r"[^0-9A-Za-z_\-.\u4e00-\u9fff]+")
+def _resolve_reference_audio(value: str) -> Path:
+    try:
+        return resolve_existing_audio_file(
+            value,
+            roots=managed_audio_roots(project_root),
+            relative_bases=(Path(project_root), Path.cwd()),
+            allow_bare_name=True,
+        )
+    except InvalidAudioPathError as exc:
+        raise HTTPException(status_code=400, detail="参考音频路径非法") from exc
+    except AudioFileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail="参考音频不存在") from exc
 
 
-def _sanitize_filename_component(value: str, default: str = "file") -> str:
-    if not isinstance(value, str):
-        return default
-    value = value.strip()
-    if not value:
-        return default
-    value = value.replace("/", "_").replace("\\", "_")
-    value = _SAFE_COMPONENT_RE.sub("_", value)
-    value = value.strip(" ._-")
-    if not value:
-        return default
-    return value[:64]
+def _resolve_download_audio(directory: Path, filename: str) -> Path:
+    try:
+        return resolve_existing_audio_name(directory, filename)
+    except InvalidAudioPathError as exc:
+        raise HTTPException(status_code=400, detail="非法音频文件名") from exc
+    except AudioFileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="文件不存在") from exc
 
 
 def _validated_model_paths(args: argparse.Namespace) -> tuple[Path, Path]:
@@ -312,7 +324,8 @@ def save_base64_audio(base64_str: str, output_path: str) -> str:
     try:
         if ',' in base64_str and 'base64' in base64_str:
             base64_str = base64_str.split(',')[1]
-        audio_data = base64.b64decode(base64_str)
+        compact = "".join(base64_str.split())
+        audio_data = base64.b64decode(compact, validate=True)
         with open(output_path, 'wb') as f:
             f.write(audio_data)
         return output_path
@@ -376,19 +389,15 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
             raise HTTPException(status_code=500, detail="模型加载失败")
         
         # 处理参考音频
-        speaker_audio_path = request.speaker_audio
         temp_audio_path = None
-        
-        if request.speaker_audio.startswith("data:") or len(request.speaker_audio) > 500:
-            # base64编码的音频
-            temp_audio_path = f"temp/ref_{uuid.uuid4().hex}.wav"
+        try:
+            speaker_audio_path = str(_resolve_reference_audio(request.speaker_audio))
+        except HTTPException:
+            # 未命中托管音频时只尝试严格 base64 解码，避免读取任意本机路径。
+            temp_audio_path = str(
+                (Path("temp").resolve() / f"ref_{uuid.uuid4().hex}.wav")
+            )
             speaker_audio_path = save_base64_audio(request.speaker_audio, temp_audio_path)
-        elif not os.path.isabs(request.speaker_audio):
-            # 相对路径转绝对路径
-            speaker_audio_path = os.path.join(project_root, request.speaker_audio)
-        
-        if not os.path.exists(speaker_audio_path):
-            raise HTTPException(status_code=400, detail=f"参考音频不存在: {speaker_audio_path}")
         
         # 确定推理模式和指令
         mode = request.mode
@@ -404,8 +413,7 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
         
         # 生成输出路径
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        text_preview = _sanitize_filename_component(request.text[:20])
-        output_filename = f"cosyvoice_{timestamp}_{text_preview}_{uuid.uuid4().hex[:8]}.wav"
+        output_filename = f"cosyvoice_{timestamp}_{uuid.uuid4().hex}.wav"
         output_path = Path("outputs") / output_filename
         
         logger.info(f"🎙️ 开始合成: mode={mode}, text={request.text[:50]}...")
@@ -525,17 +533,8 @@ def unload_model():
 @app.get("/api/v1/tts/download/{filename}")
 async def download_audio(filename: str):
     """下载生成的音频文件"""
-    # 路径穿越防护：仅允许简单文件名
-    safe_name = os.path.basename(filename.replace("\\", "/"))
-    if not safe_name or safe_name in {".", ".."}:
-        raise HTTPException(status_code=400, detail="非法文件名")
-    outputs_dir = Path("outputs").resolve()
-    file_path = (outputs_dir / safe_name).resolve()
-    if not file_path.is_relative_to(outputs_dir):
-        raise HTTPException(status_code=400, detail="非法文件路径")
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="文件不存在")
-    return FileResponse(str(file_path), media_type="audio/wav", filename=safe_name)
+    file_path = _resolve_download_audio(Path("outputs"), filename)
+    return FileResponse(str(file_path), media_type="audio/wav", filename=file_path.name)
 
 
 # ==================== 主入口 ====================

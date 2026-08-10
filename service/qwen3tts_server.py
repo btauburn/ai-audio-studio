@@ -7,7 +7,6 @@ Qwen3-TTS VoiceDesign FastAPI服务器
 import os
 import sys
 import base64
-import re
 import argparse
 from pathlib import Path
 from typing import Dict, Optional
@@ -37,6 +36,11 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from service.model_path_policy import require_project_model_dir  # noqa: E402
+from dubbing_service.app.core.audio_path_policy import (  # noqa: E402
+    AudioFileNotFoundError,
+    InvalidAudioPathError,
+    resolve_existing_audio_name,
+)
 
 # ==================== 配置 ====================
 parser = argparse.ArgumentParser(description="Qwen3-TTS VoiceDesign API Server")
@@ -79,21 +83,13 @@ _QWEN_REQUIRED_FILES = (
     "speech_tokenizer/preprocessor_config.json",
 )
 
-_SAFE_COMPONENT_RE = re.compile(r"[^0-9A-Za-z_\-.\u4e00-\u9fff]+")
-
-
-def _sanitize_filename_component(value: str, default: str = "file") -> str:
-    if not isinstance(value, str):
-        return default
-    value = value.strip()
-    if not value:
-        return default
-    value = value.replace("/", "_").replace("\\", "_")
-    value = _SAFE_COMPONENT_RE.sub("_", value)
-    value = value.strip(" ._-")
-    if not value:
-        return default
-    return value[:64]
+def _resolve_download_audio(directory: Path, filename: str) -> Path:
+    try:
+        return resolve_existing_audio_name(directory, filename)
+    except InvalidAudioPathError as exc:
+        raise HTTPException(status_code=400, detail="非法音频文件名") from exc
+    except AudioFileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="文件不存在") from exc
 
 
 def _validated_model_path(args: argparse.Namespace) -> Path:
@@ -411,8 +407,7 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
         
         # 生成输出路径
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        text_preview = _sanitize_filename_component(request.text[:20])
-        output_filename = f"qwen3tts_{timestamp}_{text_preview}_{uuid.uuid4().hex[:8]}.wav"
+        output_filename = f"qwen3tts_{timestamp}_{uuid.uuid4().hex}.wav"
         output_path = Path("outputs") / output_filename
         
         logger.info(f"🎙️ VoiceDesign 合成: instruct={instruct[:50]}..., text={request.text[:50]}...")
@@ -472,17 +467,8 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
 @app.get("/api/v1/tts/download/{filename}")
 async def download_audio(filename: str):
     """下载生成的音频文件"""
-    # 路径穿越防护：仅允许简单文件名
-    safe_name = os.path.basename(filename.replace("\\", "/"))
-    if not safe_name or safe_name in {".", ".."}:
-        raise HTTPException(status_code=400, detail="非法文件名")
-    outputs_dir = Path("outputs").resolve()
-    file_path = (outputs_dir / safe_name).resolve()
-    if not file_path.is_relative_to(outputs_dir):
-        raise HTTPException(status_code=400, detail="非法文件路径")
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="文件不存在")
-    return FileResponse(str(file_path), media_type="audio/wav", filename=safe_name)
+    file_path = _resolve_download_audio(Path("outputs"), filename)
+    return FileResponse(str(file_path), media_type="audio/wav", filename=file_path.name)
 
 
 # ==================== 主入口 ====================

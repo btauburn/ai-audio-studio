@@ -46,6 +46,9 @@ dependencies = [
   # while generating the lockfile: https://github.com/astral-sh/uv/issues/15741
   "accelerate==1.8.1",
   "cn2an==0.5.22",
+  # 4.8.1 replaces the removed pkg_resources API with importlib.resources on
+  # Windows while remaining within Faster-Whisper/WhisperX's supported range.
+  "ctranslate2==4.8.1",
   "cython==3.0.7",
   "descript-audiotools==0.7.2",
   "einops>=0.8.1",
@@ -82,7 +85,7 @@ dependencies = [
 [project.optional-dependencies]
 # To install the WebUI support, use `uv sync --extra webui` (or `--all-extras`).
 webui = [
-  "gradio==6.15.2",
+  "gradio==6.16.0",
 ]
 # To install the DeepSpeed support, use `uv sync --extra deepspeed` (or `--all-extras`).
 # deepspeed = [

@@ -9,6 +9,20 @@ from indextts.utils.common import tokenize_by_CJK_char, de_tokenized_by_CJK_char
 from sentencepiece import SentencePieceProcessor
 
 
+def _restore_hyphen_placeholders(text: str) -> str:
+    """Restore protected hyphens without a backtracking regular expression."""
+
+    parts = text.split("<H>")
+    if len(parts) == 1:
+        return text
+
+    parts[0] = parts[0].rstrip()
+    parts[-1] = parts[-1].lstrip()
+    for index in range(1, len(parts) - 1):
+        parts[index] = parts[index].strip()
+    return "-".join(parts)
+
+
 class TextNormalizer:
     def __init__(self, enable_glossary=False):
         self.zh_normalizer = None
@@ -262,10 +276,9 @@ class TextNormalizer:
         if not original_tech_list or len(original_tech_list) == 0:
             return normalized_text
 
-        # 清理 <H> 周围可能的空格，然后恢复为连字符
-        # 处理模式: " <H> " -> "-", " <H>" -> "-", "<H> " -> "-", "<H>" -> "-"
-        transformed_text = re.sub(r'\s*<H>\s*', '-', normalized_text)
-        return transformed_text
+        # 清理 <H> 周围可能的空格，然后恢复为连字符。
+        # 使用线性字符串处理，避免超长空白输入触发正则回溯。
+        return _restore_hyphen_placeholders(normalized_text)
 
     def apply_glossary_terms(self, text, lang="zh"):
         """

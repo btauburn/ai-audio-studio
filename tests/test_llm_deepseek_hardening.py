@@ -4,6 +4,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
@@ -11,7 +12,11 @@ from fastapi import HTTPException
 
 from dubbing_service.app.core.config import clear_config_caches
 from dubbing_service.app.models.project import Segment
-from dubbing_service.app.providers.llm import LLMResult, OpenAIStyleLLMProvider
+from dubbing_service.app.providers.llm import (
+    LLMResult,
+    OpenAIStyleLLMProvider,
+    is_deepseek_base_url,
+)
 from dubbing_service.app.routers import llm_configs as llm_configs_router
 from dubbing_service.app.routers import segments as segments_router
 from dubbing_service.app.storage import llm_configs as llm_config_storage
@@ -22,6 +27,67 @@ from dubbing_service.app.storage.segments import load_segments, save_segments
 
 
 class TestDeepSeekProvider(unittest.TestCase):
+    def test_deepseek_detection_uses_parsed_hostname(self) -> None:
+        for base_url in (
+            "https://deepseek.com",
+            "https://api.deepseek.com",
+            "HTTPS://API.DEEPSEEK.COM.:443/v1",
+        ):
+            with self.subTest(base_url=base_url):
+                self.assertTrue(is_deepseek_base_url(base_url))
+
+        for bypass_url in (
+            "https://deepseek.com.evil.example/v1",
+            "https://evil-deepseek.com/v1",
+            "https://evil.example/deepseek.com/v1",
+            "https://deepseek.com@evil.example/v1",
+            "https://evil.example/?next=https://api.deepseek.com",
+            "https://evil.example/#deepseek.com",
+            "not-a-url/deepseek.com",
+        ):
+            with self.subTest(base_url=bypass_url):
+                self.assertFalse(is_deepseek_base_url(bypass_url))
+
+    def test_deepseek_like_custom_host_does_not_change_model(self) -> None:
+        provider = OpenAIStyleLLMProvider(
+            base_url="https://deepseek.com.evil.example/v1",
+            api_key="test-only",
+        )
+
+        self.assertEqual(provider.model, "gpt-4o-mini")
+
+    def test_local_custom_provider_remains_supported(self) -> None:
+        captured_urls: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured_urls.append(str(request.url))
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "pong"}}]},
+            )
+
+        provider = OpenAIStyleLLMProvider(
+            base_url="http://127.0.0.1:9010/v1/",
+            api_key="test-only",
+            transport=httpx.MockTransport(handler),
+        )
+        result = provider.chat([{"role": "user", "content": "ping"}])
+
+        self.assertTrue(result.success)
+        self.assertEqual(provider.model, "gpt-4o-mini")
+        self.assertEqual(captured_urls, ["http://127.0.0.1:9010/v1/chat/completions"])
+
+    def test_invalid_or_credential_bearing_base_url_is_rejected(self) -> None:
+        for base_url in (
+            "ftp://api.deepseek.com/v1",
+            "https://user:password@api.deepseek.com/v1",
+            "https://api.deepseek.com:99999/v1",
+            "https://api.deepseek.com/\n.evil",
+        ):
+            with self.subTest(base_url=base_url):
+                with self.assertRaises(RuntimeError):
+                    OpenAIStyleLLMProvider(base_url=base_url, api_key="test-only")
+
     def test_deepseek_defaults_to_v4_flash_and_sends_v4_options(self) -> None:
         captured: list[dict] = []
 
@@ -127,6 +193,29 @@ class TestSegmentationValidation(unittest.TestCase):
 
 
 class TestDeepSeekConfigMigration(unittest.TestCase):
+    def test_seeded_defaults_do_not_trust_deepseek_text_outside_hostname(self) -> None:
+        cases = (
+            ("https://api.deepseek.com/v1", "deepseek-v4-flash", True),
+            ("https://provider.example/v1/deepseek.com", "gpt-4o-mini", False),
+            ("https://deepseek.com.attacker.example/v1", "gpt-4o-mini", False),
+        )
+
+        for base_url, expected_model, expected_json_mode in cases:
+            with (
+                self.subTest(base_url=base_url),
+                patch.object(
+                    llm_configs_router,
+                    "get_config",
+                    return_value=SimpleNamespace(llm_base_url=base_url),
+                ),
+                patch.object(llm_configs_router, "save_llm_configs") as save_configs,
+            ):
+                seeded = llm_configs_router._seed_default_if_empty([])
+
+                self.assertEqual(seeded[0].model, expected_model)
+                self.assertEqual(seeded[0].response_format_json, expected_json_mode)
+                save_configs.assert_called_once_with(seeded)
+
     def test_legacy_presets_are_migrated_once_and_keep_ids_and_provider(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             path = Path(tmp_dir) / "llm_models.json"

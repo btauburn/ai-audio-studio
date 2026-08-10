@@ -11,18 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# Modified by AI Audio Studio (TadashiJLU), 2026: defer training-only dataset
+# dependencies so the supported CosyVoice3 inference runtime stays minimal.
+from io import BytesIO
 import logging
 import random
 
-import pyarrow.parquet as pq
-from io import BytesIO
 import numpy as np
 import whisper
 import torch
 import torchaudio
 from torch.nn.utils.rnn import pad_sequence
 import torch.nn.functional as F
-import pyworld as pw
 from cosyvoice.utils.onnx import embedding_extractor, online_feature
 
 AUDIO_FORMAT_SETS = {'flac', 'mp3', 'm4a', 'ogg', 'opus', 'wav', 'wma'}
@@ -38,6 +38,8 @@ def parquet_opener(data, mode='train'):
         Returns:
             Iterable[{src, stream}]
     """
+    import pyarrow.parquet as pq
+
     for sample in data:
         assert 'src' in sample
         url = sample['src']
@@ -206,6 +208,8 @@ def compute_f0(data, sample_rate, hop_size, mode='train'):
         Returns:
             Iterable[{key, feat, label}]
     """
+    import pyworld as pw
+
     frame_period = hop_size * 1000 / sample_rate
     for sample in data:
         assert 'sample_rate' in sample

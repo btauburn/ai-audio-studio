@@ -1,12 +1,9 @@
+# Modified by AI Audio Studio (TadashiJLU), 2026: defer training-only
+# dependencies so the supported CosyVoice3 inference runtime stays minimal.
 from abc import ABC
 
 import torch
 import torch.nn.functional as F
-
-from matcha.models.components.decoder import Decoder
-from matcha.utils.pylogger import get_pylogger
-
-log = get_pylogger(__name__)
 
 
 class BASECFM(torch.nn.Module, ABC):
@@ -120,6 +117,11 @@ class BASECFM(torch.nn.Module, ABC):
 
 class CFM(BASECFM):
     def __init__(self, in_channels, out_channel, cfm_params, decoder_params, n_spks=1, spk_emb_dim=64):
+        # Decoder pulls in Diffusers and is only needed when the training-time
+        # Matcha CFM class is instantiated. CosyVoice3 uses BASECFM through its
+        # own estimator and must not import this optional training stack.
+        from matcha.models.components.decoder import Decoder
+
         super().__init__(
             n_feats=in_channels,
             cfm_params=cfm_params,

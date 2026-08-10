@@ -159,6 +159,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\export_source.ps1 
 - Single-user local production is the priority; multi-user accounts, cloud sync, publishing-platform APIs, analytics, and a full DAW are out of scope.
 - BGM/SFX currently covers asset import, arrangement, mixing, and rights records; no music-generation model is deployed.
 - GitHub CI is model-free and GPU-free. Real TTS, subtitle, and release-package E2E must be accepted on a local GPU machine.
+- Only manifest-pinned, SHA256-verified models stored inside the project are supported. Do not load untrusted checkpoints, Transformers repositories, or training configurations.
 - The IndexTTS2 path is not commercially cleared while its current MaskGCT dependency remains non-commercial without separate permission.
 
 ## Contributing and security
