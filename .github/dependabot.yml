@@ -3,25 +3,66 @@
 version: 2
 updates:
   - package-ecosystem: uv
-    directories:
-      - /
-      - /environments/cosyvoice
-      - /environments/qwen3tts
+    directory: /
     schedule:
       interval: weekly
       day: monday
       time: "09:00"
       timezone: Asia/Shanghai
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
+    # The root uv updater otherwise discovers vendored and separately managed
+    # manifests and combines incompatible model-runtime upgrades into one PR.
+    exclude-paths:
+      - .github/**
+      - archive/**
+      - cosyvoice/**
+      - environments/**
+      - service/requirements.txt
     groups:
-      python-minor-and-patch:
+      root-python-patch:
         update-types:
-          - minor
           - patch
     ignore:
       - dependency-name: "*"
         update-types:
           - version-update:semver-major
+          - version-update:semver-minor
+
+  - package-ecosystem: uv
+    directory: /environments/cosyvoice
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:05"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 2
+    groups:
+      cosyvoice-python-patch:
+        update-types:
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+
+  - package-ecosystem: uv
+    directory: /environments/qwen3tts
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:10"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 2
+    groups:
+      qwen3tts-python-patch:
+        update-types:
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
 
   - package-ecosystem: npm
     directory: /dubbing_service/webui
@@ -32,14 +73,14 @@ updates:
       timezone: Asia/Shanghai
     open-pull-requests-limit: 3
     groups:
-      webui-minor-and-patch:
+      webui-patch:
         update-types:
-          - minor
           - patch
     ignore:
       - dependency-name: "*"
         update-types:
           - version-update:semver-major
+          - version-update:semver-minor
 
   - package-ecosystem: pip
     directory: /.github
@@ -50,14 +91,14 @@ updates:
       timezone: Asia/Shanghai
     open-pull-requests-limit: 3
     groups:
-      ci-minor-and-patch:
+      ci-patch:
         update-types:
-          - minor
           - patch
     ignore:
       - dependency-name: "*"
         update-types:
           - version-update:semver-major
+          - version-update:semver-minor
 
   - package-ecosystem: github-actions
     directory: /

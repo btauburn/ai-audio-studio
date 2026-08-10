@@ -24,7 +24,7 @@
 </p>
 
 > [!IMPORTANT]
-> 当前版本为 `0.1.0-beta`，面向 Windows + NVIDIA GPU，适合个人本地制作与技术预览。平台自研层由 **TadashiJLU** 以 Apache-2.0 开源；仓库中的 IndexTTS2、CosyVoice、Matcha-TTS、浏览器依赖及另行下载的模型继续适用各自许可证。它们并未被统一重新许可，商业使用前请先阅读[许可证边界](LICENSES/README.md)。
+> 当前版本为 `0.1.0-beta.1`，面向 Windows + NVIDIA GPU，适合个人本地制作与技术预览。平台自研层由 **TadashiJLU** 以 Apache-2.0 开源；仓库中的 IndexTTS2、CosyVoice、Matcha-TTS、浏览器依赖及另行下载的模型继续适用各自许可证。它们并未被统一重新许可，商业使用前请先阅读[许可证边界](LICENSES/README.md)。
 
 AI 有声工作室把零散的 TTS 调用整理成一条可追溯的制作链：
 
@@ -206,6 +206,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\export_source.ps1 
 - [生产运维与故障排查](docs/operations.md)
 - [启动与巡检清单](docs/production_startup_and_inspection_checklist.md)
 - [安全策略](SECURITY.md)
+- [依赖安全与兼容风险](docs/dependency_security.md)
 
 ### 许可证与维护
 

@@ -33,7 +33,7 @@
 - Git + Git LFS、uv、FFmpeg/ffprobe；
 - 单机使用，或将 Windows 主机作为受信任局域网服务端。
 
-本项目当前实机验证使用 **RTX 4070 Ti SUPER 16 GiB**。三个环境分别锁定 CUDA 12.9、13.0 和 12.1 系 PyTorch wheel；显卡驱动必须能支持其中最新的 wheel。更低显存、较旧驱动、CPU-only、AMD GPU、macOS 推理和 Linux 部署尚未完成本版本验收，不能视为已支持配置。
+本项目当前实机验证使用 **RTX 4070 Ti SUPER 16 GiB**。三个环境分别锁定 CUDA 12.9、13.0 和 12.4 系 PyTorch wheel；显卡驱动必须能支持其中最新的 wheel。更低显存、较旧驱动、CPU-only、AMD GPU、macOS 推理和 Linux 部署尚未完成本版本验收，不能视为已支持配置。
 
 Mac 可以作为局域网浏览器客户端，但 TTS 工作进程仍运行在 Windows/NVIDIA 主机上。
 

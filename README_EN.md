@@ -23,7 +23,7 @@
 </p>
 
 > [!IMPORTANT]
-> `0.1.0-beta` targets Windows with an NVIDIA GPU. The TadashiJLU-authored platform layer is open-sourced under Apache-2.0. IndexTTS2, CosyVoice, Matcha-TTS, browser vendors, and separately downloaded models retain their own licenses; they are not relicensed as one Apache-2.0 work. Review the [path-level license map](LICENSES/README.md) before redistribution or commercial use.
+> `0.1.0-beta.1` targets Windows with an NVIDIA GPU. The TadashiJLU-authored platform layer is open-sourced under Apache-2.0. IndexTTS2, CosyVoice, Matcha-TTS, browser vendors, and separately downloaded models retain their own licenses; they are not relicensed as one Apache-2.0 work. Review the [path-level license map](LICENSES/README.md) before redistribution or commercial use.
 
 AI Audio Studio turns isolated TTS calls into a traceable production pipeline:
 
@@ -152,6 +152,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\export_source.ps1 
 - [License scope map](LICENSES/README.md)
 - [Third-party and model notices](THIRD_PARTY_NOTICES.md)
 - [Security policy](SECURITY.md)
+- [Dependency security and compatibility risks](docs/dependency_security.md)
 - [Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) · [Changelog](CHANGELOG.md)
 
 ## Current scope

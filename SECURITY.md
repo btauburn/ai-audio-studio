@@ -42,6 +42,11 @@ git status --short
 - 模型栈的依赖升级必须经过真实 GPU 模型加载、合成和音频回读验收，不能仅为消除
   扫描提示而跳过兼容性验证。
 
+当前受支持环境中暂时保留的 Torch、Transformers、Protobuf 和 PyTorch Lightning
+告警，以及对应的可达性、缓解措施和退出条件，记录在
+[依赖安全与兼容风险](docs/dependency_security.md)。这些真实告警继续保留在 GitHub
+Dependabot 中，不以“未使用”为由隐藏。
+
 ## 报告漏洞
 
 请使用 GitHub 的[私密漏洞报告](https://github.com/tadashijlu/ai-audio-studio/security/advisories/new)，提供受影响版本、风险、最小复现和建议修复方式。不要先创建公开 Issue，也不要附带真实密钥、私人音频或作品内容。
