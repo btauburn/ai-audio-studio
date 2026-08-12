@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List
 
 import ffmpeg  # type: ignore
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -53,6 +53,62 @@ from dubbing_service.app.storage.production import (
 from dubbing_service.app.storage.projects import load_project
 
 router = APIRouter()
+
+
+def _master_snapshot_uses_asset(snapshot: object, asset_id: str) -> bool:
+    if not isinstance(snapshot, dict):
+        return False
+    clips = snapshot.get("clips")
+    if not isinstance(clips, list):
+        return False
+    return any(
+        isinstance(item, dict) and item.get("asset_id") == asset_id
+        for item in clips
+    )
+
+
+def _adopted_sound_bindings(
+    project_id: str,
+) -> tuple[dict[str, tuple[str | None, str]], dict[str, str]]:
+    """Return clip and asset references even for a half-damaged adoption."""
+
+    from dubbing_service.app.storage.sound_generation import list_sound_plans
+
+    clip_bindings: dict[str, tuple[str | None, str]] = {}
+    asset_bindings: dict[str, str] = {}
+    for plan in list_sound_plans(project_id):
+        for cue in plan.cues:
+            if cue.adopted_clip_id:
+                clip_bindings[cue.adopted_clip_id] = (cue.adopted_asset_id, cue.id)
+            if cue.adopted_asset_id:
+                asset_bindings[cue.adopted_asset_id] = cue.id
+    return clip_bindings, asset_bindings
+
+
+def _damaged_adoption_cues(project_id: str) -> list[str]:
+    """Identify partially populated adoption pointers before broad mutations."""
+
+    from dubbing_service.app.storage.sound_generation import list_sound_plans
+
+    damaged: list[str] = []
+    for plan in list_sound_plans(project_id):
+        for cue in plan.cues:
+            pointers = (
+                cue.selected_candidate_id,
+                cue.adopted_asset_id,
+                cue.adopted_clip_id,
+            )
+            adopted_candidates = [
+                candidate for candidate in cue.candidates
+                if candidate.status.value == "adopted"
+            ]
+            if (any(pointers) or adopted_candidates) and not (
+                all(pointers)
+                and len(adopted_candidates) == 1
+                and adopted_candidates[0].id == cue.selected_candidate_id
+            ):
+                damaged.append(cue.id)
+    return damaged
 
 
 class PronunciationPayload(BaseModel):
@@ -130,12 +186,44 @@ async def api_put_pronunciations(project_id: str, payload: PronunciationPayload)
 async def api_put_sound_design(project_id: str, payload: SoundDesign) -> ProductionSettings:
     _root(project_id)
     with production_lock(project_id):
+        damaged = _damaged_adoption_cues(project_id)
+        if damaged:
+            raise HTTPException(
+                status_code=409,
+                detail=f"SoundPlan cue {damaged[0]} 的采用状态不完整，拒绝普通时间线保存",
+            )
         assets = {item.id: item for item in load_assets(project_id)}
         for clip in payload.clips:
             asset = assets.get(clip.asset_id)
             if asset is None or asset.track != clip.track:
                 raise HTTPException(status_code=400, detail=f"片段 {clip.id} 引用的素材不存在或轨道不匹配")
         settings = load_settings(project_id)
+        current_clips = {item.id: item for item in settings.sound_design.clips}
+        proposed_clips = {item.id: item for item in payload.clips}
+        adopted_clips, _adopted_assets = _adopted_sound_bindings(project_id)
+        for clip_id, (asset_id, cue_id) in adopted_clips.items():
+            current = current_clips.get(clip_id)
+            proposed = proposed_clips.get(clip_id)
+            if current is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"已采用 cue {cue_id} 的时间线状态已损坏，请使用解除采用流程修复",
+                )
+            if proposed is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"已采用 cue {cue_id} 不能从普通声音设计保存中删除；请使用解除采用",
+                )
+            if asset_id is None or proposed.asset_id != asset_id or proposed.track != current.track:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"已采用 cue {cue_id} 不能更换素材或轨道；请先解除采用",
+                )
+            if proposed != current:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"已采用 cue {cue_id} 的位置与混音只能在 SoundPlan cue 编辑器中调整",
+                )
         payload.version = max(settings.sound_design.version + 1, payload.version)
         payload.updated_at = datetime.now(timezone.utc)
         settings.sound_design = payload
@@ -282,12 +370,31 @@ async def api_delete_asset(project_id: str, asset_id: str) -> dict[str, bool]:
             raise HTTPException(status_code=404, detail="素材不存在")
         # Immutable Masters carry the asset hash in their sound-design snapshot.
         from dubbing_service.app.storage.masters import list_masters
-        if any(asset_id in json.dumps(item.sound_design_snapshot or {}) for item in list_masters(project_id)):
+        if any(
+            _master_snapshot_uses_asset(item.sound_design_snapshot, asset_id)
+            for item in list_masters(project_id)
+        ):
             raise HTTPException(status_code=409, detail="素材已被正式 Master 引用，不能删除")
-        save_assets(project_id, [item for item in assets if item.id != asset_id])
-    path = _safe_file(root, asset.audio_file, "production/assets")
-    path.unlink(missing_ok=True)
-    return {"success": True}
+        _adopted_clips, adopted_assets = _adopted_sound_bindings(project_id)
+        if asset_id in adopted_assets:
+            raise HTTPException(status_code=409, detail="素材仍被已采用 SoundPlan cue 引用，请先解除采用")
+        path = _safe_file(root, asset.audio_file, "production/assets")
+        quarantine = path.with_name(f".{path.name}.delete-{uuid.uuid4().hex}.tmp")
+        os.replace(path, quarantine)
+        try:
+            save_assets(project_id, [item for item in assets if item.id != asset_id])
+        except Exception:
+            if quarantine.exists() and not path.exists():
+                try:
+                    os.replace(quarantine, path)
+                except OSError:
+                    pass
+            raise
+        try:
+            quarantine.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return {"success": True}
 
 
 @router.post(
@@ -331,8 +438,11 @@ async def api_upload_cover(project_id: str, file: UploadFile = File(...)) -> Pro
 
 
 @router.get("/projects/{project_id}/quality-check", response_model=QualityReport)
-async def api_quality_check(project_id: str) -> QualityReport:
-    return run_project_quality_checks(project_id, _root(project_id))
+async def api_quality_check(
+    project_id: str,
+    purpose: str = Query(default="preview", pattern="^(preview|master|release)$"),
+) -> QualityReport:
+    return run_project_quality_checks(project_id, _root(project_id), purpose=purpose)
 
 
 def _subtitle_timestamp(seconds: float, *, vtt: bool = False) -> str:
@@ -371,9 +481,54 @@ async def api_create_release_package(project_id: str, master_id: str) -> Release
     master_path = _safe_file(root, master.audio_file, "audio/masters")
     if sha256_file(master_path) != master.audio_sha256:
         raise HTTPException(status_code=409, detail="Master 缺失或校验失败")
-    frozen_quality = master.quality_report or {}
-    if frozen_quality and frozen_quality.get("passed") is False:
-        raise HTTPException(status_code=400, detail="该 Master 的冻结质检未通过，不能生成发布包")
+    frozen_quality = master.quality_report
+    if not isinstance(frozen_quality, dict) or frozen_quality.get("passed") is not True:
+        raise HTTPException(status_code=400, detail="该 Master 的冻结质检缺失、损坏或未通过，不能生成发布包")
+    if frozen_quality.get("project_id") != project_id:
+        raise HTTPException(status_code=400, detail="该 Master 的冻结质检项目归属不一致")
+    if frozen_quality.get("purpose") not in {"master", "release"}:
+        raise HTTPException(status_code=400, detail="该 Master 未经过正式许可质检，请重新制作 Master")
+    for segment in master.segments:
+        voice_license = segment.voice_license_snapshot
+        if not isinstance(voice_license, dict) or voice_license.get("commercial_use") is not True:
+            raise HTTPException(status_code=400, detail="Master 包含缺失或未确认可商用的声音授权快照")
+    frozen_sound_design = master.sound_design_snapshot
+    if not isinstance(frozen_sound_design, dict) or not isinstance(
+        frozen_sound_design.get("clips"), list
+    ):
+        raise HTTPException(status_code=400, detail="Master 的冻结声音设计快照缺失或损坏")
+    frozen_clips = frozen_sound_design["clips"]
+    from dubbing_service.app.services.production import (
+        _current_stable_audio_confirmation,
+        stable_audio_license_snapshot_matches_current,
+    )
+
+    current_confirmation = _current_stable_audio_confirmation()
+    for clip in frozen_clips:
+        if not isinstance(clip, dict):
+            raise HTTPException(status_code=400, detail="Master 的声音设计授权快照损坏")
+        license_snapshot = clip.get("license")
+        if not isinstance(license_snapshot, dict) or license_snapshot.get("commercial_use") is not True:
+            raise HTTPException(status_code=400, detail="Master 包含未确认可商用的声音素材")
+        if clip.get("asset_origin") == "generated" or clip.get("origin") == "generated":
+            generation = clip.get("generation")
+            if not isinstance(generation, dict) or current_confirmation is None:
+                raise HTTPException(status_code=400, detail="Master 的 Stable Audio/Gemma 许可快照缺失或已过期")
+            frozen_license = generation.get("license_snapshot")
+            if (
+                generation.get("commercial_use") is not True
+                or generation.get("audio_sha256") != clip.get("asset_sha256")
+                or not stable_audio_license_snapshot_matches_current(
+                    generation.get("license_confirmation_id"),
+                    frozen_license,
+                    current_confirmation,
+                )
+            ):
+                raise HTTPException(status_code=400, detail="Master 的 Stable Audio/Gemma 许可确认已过期")
+    release_quality = run_project_quality_checks(project_id, root, purpose="release")
+    if not release_quality.passed:
+        errors = [item.message for item in release_quality.issues if item.severity == "error"]
+        raise HTTPException(status_code=400, detail="；".join(errors[:10]))
     settings = load_settings(project_id)
     release_id = uuid.uuid4().hex[:16]
     release_dir = production_root(project_id, ensure=True) / "releases"

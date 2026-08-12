@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("All", "Platform", "Qwen", "CosyVoice")]
+    [ValidateSet("All", "Platform", "Qwen", "CosyVoice", "StableAudio")]
     [string]$Runtime = "All"
 )
 
@@ -13,7 +13,7 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
 }
 
 $env:UV_LINK_MODE = "copy"
-uv python install 3.12.13 3.10.19
+uv python install 3.12.13 3.11.13 3.10.19
 
 if ($Runtime -in @("All", "Platform")) {
     uv sync --locked --all-extras
@@ -28,6 +28,11 @@ if ($Runtime -in @("All", "Qwen")) {
 if ($Runtime -in @("All", "CosyVoice")) {
     uv sync --project (Join-Path $ProjectRoot "environments\cosyvoice") --locked --no-dev
     uv pip check --python (Join-Path $ProjectRoot "environments\cosyvoice\.venv\Scripts\python.exe")
+}
+
+if ($Runtime -in @("All", "StableAudio")) {
+    uv sync --project (Join-Path $ProjectRoot "environments\stableaudio") --locked --no-dev
+    uv pip check --python (Join-Path $ProjectRoot "environments\stableaudio\.venv\Scripts\python.exe")
 }
 
 Write-Host "Environment bootstrap completed. Run scripts\platform_doctor.py before startup."

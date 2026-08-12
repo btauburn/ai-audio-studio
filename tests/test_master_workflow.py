@@ -56,6 +56,17 @@ def test_master_requires_approval_and_freezes_reviewed_take(
             json={"review_status": "approved"},
         )
         assert approved.status_code == 200
+        role_id = approved.json()["role_id"]
+        rights = client.patch(
+            f"/api/v1/projects/{project_id}/roles/{role_id}/voice-profile",
+            json={
+                "voice_source": "self",
+                "voice_license_name": "owned",
+                "voice_commercial_use": True,
+                "voice_rights_note": "recorded by owner",
+            },
+        )
+        assert rights.status_code == 200
         selected_take_id = approved.json()["selected_take_id"]
 
         created = client.post(

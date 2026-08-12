@@ -1,4 +1,4 @@
-"""Process-local coordination for exclusive TTS/GPU operations.
+"""Process-local coordination for exclusive generative-audio/GPU operations.
 
 The platform currently owns one managed TTS worker/GPU execution lane.  A
 batch synthesis operation therefore has to exclude every other batch as well
@@ -15,8 +15,8 @@ from uuid import uuid4
 
 
 @dataclass(frozen=True, slots=True)
-class TTSOperationLease:
-    """Opaque ownership token for one exclusive TTS/GPU operation."""
+class GPUOperationLease:
+    """Opaque ownership token for one exclusive GPU operation."""
 
     token: str
     kind: str
@@ -24,7 +24,7 @@ class TTSOperationLease:
 
 
 _STATE_LOCK = Lock()
-_ACTIVE_OPERATION: TTSOperationLease | None = None
+_ACTIVE_OPERATION: GPUOperationLease | None = None
 _ACTIVE_BATCHES: dict[str, str] = {}
 _ACTIVE_SYNTH_SEGMENTS: dict[tuple[str, str], str] = {}
 _ACTIVE_PROJECT_DELETIONS: dict[str, str] = {}
@@ -32,20 +32,20 @@ _ACTIVE_PROJECT_MUTATIONS: dict[str, set[str]] = {}
 _ACTIVE_PROJECT_EXPORTS: dict[str, str] = {}
 
 
-def _new_lease(kind: str, project_id: str | None = None) -> TTSOperationLease:
-    return TTSOperationLease(
+def _new_lease(kind: str, project_id: str | None = None) -> GPUOperationLease:
+    return GPUOperationLease(
         token=uuid4().hex,
         kind=str(kind).strip() or "tts_operation",
         project_id=project_id,
     )
 
 
-def try_acquire_tts_operation(
+def try_acquire_gpu_operation(
     *,
     kind: str,
     project_id: str | None = None,
-) -> TTSOperationLease | None:
-    """Acquire the single TTS/GPU lane without waiting.
+) -> GPUOperationLease | None:
+    """Acquire the single process-local GPU lane without waiting.
 
     Returning ``None`` is intentional: API entrypoints can fail fast with 409
     rather than leaving a browser request blocked behind a long synthesis job.
@@ -65,7 +65,7 @@ def try_acquire_tts_operation(
         return lease
 
 
-def release_tts_operation(lease: TTSOperationLease) -> None:
+def release_gpu_operation(lease: GPUOperationLease) -> None:
     """Release ``lease`` if it still owns the TTS/GPU lane.
 
     Token matching makes release idempotent and prevents a stale ``finally``
@@ -83,12 +83,12 @@ def release_tts_operation(lease: TTSOperationLease) -> None:
             _ACTIVE_OPERATION = None
 
 
-def has_active_tts_operation() -> bool:
+def has_active_gpu_operation() -> bool:
     with _STATE_LOCK:
         return _ACTIVE_OPERATION is not None
 
 
-def try_register_running_batch(project_id: str) -> TTSOperationLease | None:
+def try_register_running_batch(project_id: str) -> GPUOperationLease | None:
     """Atomically register a batch and acquire the global TTS/GPU lane.
 
     The returned token must be passed to :func:`unregister_running_batch`.
@@ -115,7 +115,7 @@ def try_register_running_batch(project_id: str) -> TTSOperationLease | None:
         return lease
 
 
-def unregister_running_batch(lease: TTSOperationLease) -> None:
+def unregister_running_batch(lease: GPUOperationLease) -> None:
     """Unregister a batch and release only the lease owned by ``lease``."""
 
     global _ACTIVE_OPERATION
@@ -136,7 +136,7 @@ def has_running_batch_for_project(project_id: str) -> bool:
         return project_id in _ACTIVE_BATCHES
 
 
-def try_register_project_deletion(project_id: str) -> TTSOperationLease | None:
+def try_register_project_deletion(project_id: str) -> GPUOperationLease | None:
     """Reserve ``project_id`` for deletion if it has no active synthesis.
 
     This reservation is separate from the global GPU lane: deleting an idle
@@ -149,6 +149,10 @@ def try_register_project_deletion(project_id: str) -> TTSOperationLease | None:
         if (
             project_id in _ACTIVE_PROJECT_DELETIONS
             or project_id in _ACTIVE_BATCHES
+            or (
+                _ACTIVE_OPERATION is not None
+                and _ACTIVE_OPERATION.project_id == project_id
+            )
             or project_id in _ACTIVE_PROJECT_MUTATIONS
             or project_id in _ACTIVE_PROJECT_EXPORTS
             or any(pid == project_id for pid, _sid in _ACTIVE_SYNTH_SEGMENTS)
@@ -159,7 +163,7 @@ def try_register_project_deletion(project_id: str) -> TTSOperationLease | None:
         return lease
 
 
-def unregister_project_deletion(lease: TTSOperationLease) -> None:
+def unregister_project_deletion(lease: GPUOperationLease) -> None:
     """Release a project deletion reservation owned by ``lease``."""
 
     with _STATE_LOCK:
@@ -210,12 +214,16 @@ def try_acquire_project_mutation(
     project_id: str,
     *,
     kind: str = "project_mutation",
-) -> TTSOperationLease | None:
+) -> GPUOperationLease | None:
     """Reserve one project's mutable state without blocking other projects."""
 
     with _STATE_LOCK:
         if (
             project_id in _ACTIVE_PROJECT_EXPORTS
+            or (
+                _ACTIVE_OPERATION is not None
+                and _ACTIVE_OPERATION.project_id == project_id
+            )
             or project_id in _ACTIVE_BATCHES
             or project_id in _ACTIVE_PROJECT_DELETIONS
             or any(pid == project_id for pid, _sid in _ACTIVE_SYNTH_SEGMENTS)
@@ -226,7 +234,7 @@ def try_acquire_project_mutation(
         return lease
 
 
-def release_project_mutation(lease: TTSOperationLease) -> None:
+def release_project_mutation(lease: GPUOperationLease) -> None:
     """Release only the project mutation reservation owned by ``lease``."""
 
     with _STATE_LOCK:
@@ -244,12 +252,16 @@ def try_acquire_project_export(
     project_id: str,
     *,
     kind: str = "project_export",
-) -> TTSOperationLease | None:
+) -> GPUOperationLease | None:
     """Reserve a stable project snapshot for a long read/export operation."""
 
     with _STATE_LOCK:
         if (
             project_id in _ACTIVE_PROJECT_EXPORTS
+            or (
+                _ACTIVE_OPERATION is not None
+                and _ACTIVE_OPERATION.project_id == project_id
+            )
             or project_id in _ACTIVE_PROJECT_MUTATIONS
             or project_id in _ACTIVE_BATCHES
             or project_id in _ACTIVE_PROJECT_DELETIONS
@@ -261,7 +273,7 @@ def try_acquire_project_export(
         return lease
 
 
-def release_project_export(lease: TTSOperationLease) -> None:
+def release_project_export(lease: GPUOperationLease) -> None:
     """Release only the project export reservation owned by ``lease``."""
 
     with _STATE_LOCK:
@@ -277,7 +289,7 @@ def try_register_active_segment(
     segment_id: str,
     *,
     kind: str = "segment_synthesis",
-) -> TTSOperationLease | None:
+) -> GPUOperationLease | None:
     """Token-own one active segment unless the project is being changed/read."""
 
     key = (project_id, segment_id)
@@ -295,7 +307,7 @@ def try_register_active_segment(
 
 
 def unregister_active_segment(
-    lease: TTSOperationLease,
+    lease: GPUOperationLease,
     segment_id: str,
 ) -> None:
     """Release an active-segment marker only when the token still owns it."""
@@ -307,3 +319,12 @@ def unregister_active_segment(
         if _ACTIVE_SYNTH_SEGMENTS.get(key) != lease.token:
             return
         _ACTIVE_SYNTH_SEGMENTS.pop(key, None)
+
+
+# Backwards-compatible names for the existing TTS routes.  New GPU consumers
+# (subtitles, sound generation, and future music generation) should use the
+# generic names above so the resource being coordinated is explicit.
+TTSOperationLease = GPUOperationLease
+try_acquire_tts_operation = try_acquire_gpu_operation
+release_tts_operation = release_gpu_operation
+has_active_tts_operation = has_active_gpu_operation

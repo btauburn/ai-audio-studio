@@ -1,0 +1,179 @@
+{
+  "schema_version": 2,
+  "name": "Stable Audio 3 Small SFX",
+  "source": "Hugging Face stabilityai/stable-audio-3-small-sfx",
+  "revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+  "code_revision": "a0b57f5483c4588f827f3552b7d5c6ca2a9687be",
+  "code_source": {
+    "distribution": "stable-audio-3",
+    "url": "https://github.com/Stability-AI/stable-audio-3.git"
+  },
+  "model_id": "stable_audio_3_small_sfx",
+  "display_name": "Stable Audio 3 Small-SFX",
+  "optional": true,
+  "runtime_policy": {
+    "network_access": "forbidden",
+    "model_root": "models/stable_audio_3/small-sfx"
+  },
+  "sources": {
+    "model": {
+      "provider": "huggingface",
+      "repo_id": "stabilityai/stable-audio-3-small-sfx",
+      "url": "https://huggingface.co/stabilityai/stable-audio-3-small-sfx",
+      "revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "gated": true,
+      "token_env": "HF_TOKEN",
+      "license": "Stability AI Community License plus Google Gemma Terms"
+    }
+  },
+  "license_policy": {
+    "requires_explicit_acceptance": true,
+    "confirmation_text": "I have reviewed and accept the Stability AI Community License or an applicable Enterprise License and the Google Gemma Terms for stabilityai/stable-audio-3-small-sfx at revision ae12755283df9d62ca39a9b050a39a0b607b8c20; I confirm the selected license tier and that Stability registration is complete.",
+    "confirmation_sha256": "4ffeca25eadd41b113dc2893f3526c917413b827a845579530de023d1a37a451",
+    "receipt_path": "models/.license_acceptance/stable_audio_3_small_sfx/4ffeca25eadd41b113dc2893f3526c917413b827a845579530de023d1a37a451.json",
+    "documents": [
+      {
+        "name": "Stability AI Community License Agreement",
+        "url": "https://huggingface.co/stabilityai/stable-audio-3-small-sfx/blob/ae12755283df9d62ca39a9b050a39a0b607b8c20/LICENSE.md",
+        "path": "models/stable_audio_3/small-sfx/LICENSE.md",
+        "sha256": "d6f6b1a4dce5c852bd6d7d9482d002baf0ccdb71e662250b73be9eec8764ee8d"
+      },
+      {
+        "name": "Google Gemma Terms of Use",
+        "url": "https://huggingface.co/stabilityai/stable-audio-3-small-sfx/blob/ae12755283df9d62ca39a9b050a39a0b607b8c20/LICENSE_GEMMA.md",
+        "path": "models/stable_audio_3/small-sfx/LICENSE_GEMMA.md",
+        "sha256": "e77acc0d3163bb7534675045c584b4d04b387b529239fc4b3647da0a01ba4745"
+      }
+    ]
+  },
+  "quality_gate": {
+    "path": "models/stable_audio_3/small-sfx/quality_gate.json",
+    "categories_total": 12,
+    "cases_total": 24,
+    "minimum_categories_passed": 10,
+    "technical_rounds": 5,
+    "technical_runs": 30
+  },
+  "files": [
+    {
+      "group": "license",
+      "path": "models/stable_audio_3/small-sfx/LICENSE.md",
+      "size": 11852,
+      "sha256": "d6f6b1a4dce5c852bd6d7d9482d002baf0ccdb71e662250b73be9eec8764ee8d",
+      "source": "model",
+      "source_path": "LICENSE.md",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "1d9ce2ee1067327543544de197291726e4fc57a4"
+    },
+    {
+      "group": "license",
+      "path": "models/stable_audio_3/small-sfx/LICENSE_GEMMA.md",
+      "size": 10541,
+      "sha256": "e77acc0d3163bb7534675045c584b4d04b387b529239fc4b3647da0a01ba4745",
+      "source": "model",
+      "source_path": "LICENSE_GEMMA.md",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "d483de1f58e5de355d8d184f6a7bf42f05875b63"
+    },
+    {
+      "group": "license",
+      "path": "models/stable_audio_3/small-sfx/NOTICE",
+      "size": 97,
+      "sha256": "66f856d7da72797f528fca46b7c80634ab481f917bfe020960e123d84b19f75f",
+      "source": "model",
+      "source_path": "NOTICE",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "27fe1d325f98f3f4643f3ba5735584cffd2553dd"
+    },
+    {
+      "group": "runtime",
+      "path": "models/stable_audio_3/small-sfx/model_config.json",
+      "size": 10454,
+      "sha256": "a8aa5d45ae3d6524d3cd4e85e0d6e7d8d401267e7c6f28214bca8aae7b77bdeb",
+      "source": "model",
+      "source_path": "model_config.json",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "0321320a34e3e0ceda48e47c2c36b70234df746f"
+    },
+    {
+      "group": "runtime",
+      "path": "models/stable_audio_3/small-sfx/model.safetensors",
+      "size": 2270384940,
+      "sha256": "ed9cf1b6172f1a8c2921a9560c21109ff3239524563ced9dce6dcdef41e2f515",
+      "source": "model",
+      "source_path": "model.safetensors",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "eff880f5df27fa7a6289c737595f169028bea1f8"
+    },
+    {
+      "group": "runtime",
+      "path": "models/stable_audio_3/small-sfx/t5gemma-b-b-ul2/config.json",
+      "size": 2540,
+      "sha256": "575334409716886ac2952f5a275ed92868deef8a0ea560258d9970a431c6fb3a",
+      "source": "model",
+      "source_path": "t5gemma-b-b-ul2/config.json",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "f5282e2a2964d231e0f19cb2a23f39e08de83128"
+    },
+    {
+      "group": "runtime",
+      "path": "models/stable_audio_3/small-sfx/t5gemma-b-b-ul2/generation_config.json",
+      "size": 156,
+      "sha256": "1068b94599a94ceea097dd3936819f108c2e70806d7c6cc5ec425610af347625",
+      "source": "model",
+      "source_path": "t5gemma-b-b-ul2/generation_config.json",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "a1afbdafc25667679ab591fc9aca56d4a0b91c3d"
+    },
+    {
+      "group": "runtime",
+      "path": "models/stable_audio_3/small-sfx/t5gemma-b-b-ul2/model.safetensors",
+      "size": 1183022944,
+      "sha256": "9b05ea5a4f211d023832f706fb2c0e83e4fc721b6da35ab69ceb0b55eb7800d3",
+      "source": "model",
+      "source_path": "t5gemma-b-b-ul2/model.safetensors",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "aeda74048154ca8cf4d76a13591eea664e3062b2"
+    },
+    {
+      "group": "runtime",
+      "path": "models/stable_audio_3/small-sfx/t5gemma-b-b-ul2/special_tokens_map.json",
+      "size": 636,
+      "sha256": "baec30ea10906f16adb8c18af7a34023002c1746542612b8b41c9f09e1351351",
+      "source": "model",
+      "source_path": "t5gemma-b-b-ul2/special_tokens_map.json",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "8d6368f7e735fbe4781bf6e956b7c6ad0586df80"
+    },
+    {
+      "group": "runtime",
+      "path": "models/stable_audio_3/small-sfx/t5gemma-b-b-ul2/tokenizer.json",
+      "size": 34362429,
+      "sha256": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+      "source": "model",
+      "source_path": "t5gemma-b-b-ul2/tokenizer.json",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "55fbda7411a5eb9973350fb98651bf5b8e037bfc"
+    },
+    {
+      "group": "runtime",
+      "path": "models/stable_audio_3/small-sfx/t5gemma-b-b-ul2/tokenizer.model",
+      "size": 4241003,
+      "sha256": "61a7b147390c64585d6c3543dd6fc636906c9af3865a5548f27f31aee1d4c8e2",
+      "source": "model",
+      "source_path": "t5gemma-b-b-ul2/tokenizer.model",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "796efe9ab515c15e146ce7588e6d7b9b8134dbf8"
+    },
+    {
+      "group": "runtime",
+      "path": "models/stable_audio_3/small-sfx/t5gemma-b-b-ul2/tokenizer_config.json",
+      "size": 46437,
+      "sha256": "9546baec0dfefec0e29873edea9488ecde153f846e18c06ea48cb44587bf408f",
+      "source": "model",
+      "source_path": "t5gemma-b-b-ul2/tokenizer_config.json",
+      "source_revision": "ae12755283df9d62ca39a9b050a39a0b607b8c20",
+      "source_blob_id": "4d625a54ce31c6629f25dadcc7d878e771b40ef7"
+    }
+  ]
+}

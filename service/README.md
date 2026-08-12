@@ -1,4 +1,4 @@
-# TTS 工作进程层
+# 推理工作进程层
 
 `service/` 是配音平台内部的推理工作进程，不是用户启动整个平台的入口。正常使用请从根目录运行 `start_platform.bat`，再在“平台配置”中选择并启动一个后端。
 
@@ -8,6 +8,7 @@
 | CosyVoice3 | `cosyvoice_server.py` | `environments/cosyvoice/.venv` | 8002 |
 | Qwen VoiceDesign | `qwen3tts_server.py` | `environments/qwen3tts/.venv` | 8003 |
 | Qwen CustomVoice | `qwen3tts_customvoice_server.py` | `environments/qwen3tts/.venv` | 8004 |
+| Stable Audio 3 Small-SFX | `stableaudio_sfx_server.py` | `environments/stableaudio/.venv` | 8005 |
 
 平台维护的权威命令位于 `dubbing_service/app/core/tts_backends.py`。所有工作进程只绑定 loopback；对外业务入口是 9000 平台。平台同一时刻只托管一个 GPU 模型。
 
@@ -33,9 +34,12 @@ $env:COSYVOICE_WETEXT_DIR=(Resolve-Path .\models\cosyvoice3\wetext)
 .\environments\qwen3tts\.venv\Scripts\python.exe -u .\service\qwen3tts_server.py --host 127.0.0.1 --port 8003 --model_dir .\models\qwen3_tts\Qwen3-TTS-VoiceDesign --device cuda:0 --dtype bfloat16
 
 .\environments\qwen3tts\.venv\Scripts\python.exe -u .\service\qwen3tts_customvoice_server.py --host 127.0.0.1 --port 8004 --model_dir .\models\qwen3_tts\Qwen3-TTS-CustomVoice --device cuda:0 --dtype bfloat16
+
+$env:DUBBING_WORKER_INSTANCE_TOKEN='<一次性随机实例令牌>'
+.\environments\stableaudio\.venv\Scripts\python.exe -u .\service\stableaudio_sfx_server.py --host 127.0.0.1 --port 8005 --model-dir .\models\stable_audio_3\small-sfx --device cuda:0 --dtype float16
 ```
 
-每个服务提供 `/health`、模型 load/unload 和 `/api/v1/tts/synthesize`。诊断结束必须正常停止进程，再回到平台使用。
+TTS 服务提供 `/health`、模型 load/unload 和 `/api/v1/tts/synthesize`。Stable Audio 服务提供带 `X-Dubbing-Worker-Token` 的 `/health`、`/api/v1/sfx/load-model`、`unload-model` 与 `generate`，生成端点只返回 WAV 字节，不接受任意文件路径。诊断结束必须正常停止进程，再回到平台使用。
 
 ## 兼容和旧入口
 

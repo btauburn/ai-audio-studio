@@ -523,6 +523,23 @@ def api_unload_tts_model() -> dict[str, object]:
     }
 
 
+@router.post("/settings/gpu/unload-sfx")
+def api_unload_stable_audio_model() -> dict[str, object]:
+    """Unload the managed Stable Audio model without stopping the platform."""
+
+    from dubbing_service.app.core.sfx_worker import SFXWorkerError, unload_model
+
+    try:
+        data = unload_model()
+    except SFXWorkerError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "success": True,
+        "message": "已请求 Stable Audio SFX worker 卸载模型并释放显存",
+        "response": data,
+    }
+
+
 def _get_tts_params_from_config() -> dict:
     """从配置文件读取 TTS 参数，缺失的使用默认值。"""
     file_cfg = _load_raw_file_config()

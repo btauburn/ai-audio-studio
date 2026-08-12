@@ -4,7 +4,7 @@
 
 ## 1. 系统边界
 
-系统由一个业务平台进程、最多一个由平台托管的本地 GPU TTS 工作进程、一个外部 LLM 服务以及文件系统数据目录组成。
+系统由一个业务平台进程、共享 GPU 租约上的本地 TTS/SFX 工作进程、一个外部 LLM 服务以及文件系统数据目录组成。
 
 ```mermaid
 flowchart LR
@@ -14,18 +14,20 @@ flowchart LR
     R --> C["CosyVoice3 :8002"]
     R --> QV["Qwen3 VoiceDesign :8003"]
     R --> QC["Qwen3 CustomVoice :8004"]
+    R -->|"按生成批次启动"| SFX["Stable Audio 3 Small-SFX :8005"]
     R -->|"OpenAI-compatible HTTPS"| D["DeepSeek V4 Flash / Pro"]
     R --> FS["项目 JSON、文本、音频、字幕"]
     I --> M["项目内 models/"]
     C --> M
     QV --> M
     QC --> M
+    SFX --> M
 ```
 
 关键约束：
 
-- 平台端口固定为 `9000`；本地 TTS 默认端口为 `8001`～`8004`。
-- 平台只托管一个 `_tts_process`。切换后端会先停止旧工作进程，再启动新进程，避免多个大模型同时占用显存。
+- 平台端口固定为 `9000`；本地 TTS 默认端口为 `8001`～`8004`，SFX worker 为 `8005`。
+- TTS 与 SFX 共用生成音频 GPU 租约。SFX 批次前卸载 TTS/Whisper，批次后卸载 SFX 并恢复 TTS，避免多个大模型同时占用显存。
 - WebUI 打开时只查询状态，不自动启动 TTS。模型加载由用户在平台配置页明确触发。
 - `DUBBING_*_BASE_URL` 或 `dubbing_service/config.json` 可以把 Provider 指向外部服务；平台托管的本地工作进程仍按后端注册表中的端口启动。
 - `start_platform.bat` 默认让平台监听 `127.0.0.1:9000`。只有显式传入 `--lan` 才监听 `0.0.0.0:9000`；此模式只能用于受信任 LAN，并应通过 Windows 防火墙限制来源。跨不受信任网络必须增加 TLS、反向代理和独立鉴权层。
@@ -35,13 +37,13 @@ flowchart LR
 | 层 | 位置 | 职责 |
 | --- | --- | --- |
 | 应用入口 | `dubbing_service/app/main.py` | FastAPI 生命周期、路由挂载、静态 WebUI、健康检查、退出时清理 TTS 子进程 |
-| 路由 | `dubbing_service/app/routers/` | 项目、角色、分段、合成、字幕、设置、LLM 配置和 WebSocket 批处理 |
-| Provider | `dubbing_service/app/providers/` | 把业务对象转换为四种 TTS 或 OpenAI-compatible LLM 请求 |
+| 路由 | `dubbing_service/app/routers/` | 项目、角色、分段、合成、音效计划/任务、制作发布、字幕、设置、LLM 配置和 WebSocket 批处理 |
+| Provider | `dubbing_service/app/providers/` | 把业务对象转换为四种 TTS、Stable Audio 或 OpenAI-compatible LLM 请求 |
 | 存储 | `dubbing_service/app/storage/` | 文件系统 JSON、锁、原子写入和自动分段事务 |
 | 数据模型 | `dubbing_service/app/models/` | Pydantic 项目、角色、分段、字幕模型和枚举 |
 | 后端注册表 | `dubbing_service/app/core/tts_backends.py` | 后端 ID、能力、端口、脚本、模型目录和解释器边界的单一事实来源 |
 | WebUI | `dubbing_service/webui/` | Vue 页面、波形编辑、批量任务和平台设置；浏览器依赖固定在 `webui/vendor/` |
-| 工作进程 | `service/*.py` | IndexTTS2、CosyVoice3、Qwen3 VD/CV 的本地 REST 进程；属于内部推理层而非业务入口 |
+| 工作进程 | `service/*.py` | IndexTTS2、CosyVoice3、Qwen3 VD/CV、Stable Audio 的本地 REST 进程；属于内部推理层而非业务入口 |
 | 引擎源码 | `indextts/`、`cosyvoice/` | 上游/派生推理实现；CosyVoice 按 vendored source 管理，修改时必须同时复核对应许可证 |
 
 所有平台业务 API 使用 `/api/v1` 前缀；轻量就绪探针是 `/api/v1/ready`，聚合健康信息是 `/api/v1/health`。
@@ -69,19 +71,22 @@ flowchart LR
 - CosyVoice3：分段情感文本优先于角色风格指令。
 - IndexTTS2：使用角色参考音频和分段情感模式/向量/文本。
 
-## 4. 三个隔离的 uv 环境
+Stable Audio 不是第五个 TTS 后端：它只生成单个 SFX/Ambience 素材，由上层 SoundPlan 决定语义位置，再进入现有四轨混音。
 
-仓库不是一个“把所有 TTS 依赖混在一起”的环境，也不是 uv workspace。三个独立 lockfile/解释器边界如下：
+## 4. 四个隔离的 uv 环境
+
+仓库不是一个“把所有生成音频依赖混在一起”的环境，也不是 uv workspace。四个独立 lockfile/解释器边界如下：
 
 | 环境 | Python | 锁文件 | 用途 |
 | --- | --- | --- | --- |
 | `.venv` | 3.12.13 | 根 `uv.lock` | 平台、IndexTTS2、字幕、测试和维护脚本 |
 | `environments/qwen3tts/.venv` | 3.12.13 | `environments/qwen3tts/uv.lock` | Qwen VoiceDesign 与 CustomVoice 共享运行时 |
 | `environments/cosyvoice/.venv` | 3.10.19 | `environments/cosyvoice/uv.lock` | CosyVoice3 的兼容依赖栈 |
+| `environments/stableaudio/.venv` | 3.11.13 | `environments/stableaudio/uv.lock` | Stable Audio 3 Small-SFX CUDA Worker |
 
 只使用 `scripts/bootstrap.ps1` 创建或修复环境。正常启动直接调用已创建的解释器，不隐式执行 `uv sync`。旧的 `.venv_qwen3tts` 已删除，后端注册表也已移除兼容回退；任一隔离环境缺失时必须明确失败。
 
-隔离的原因不是目录美观，而是存在不可兼容的核心依赖组合，例如不同 Python、PyTorch、Transformers、Pydantic 和 WeText 版本。将三者重新合并会破坏可复现性。
+隔离的原因不是目录美观，而是存在不可兼容的核心依赖组合，例如不同 Python、PyTorch、Transformers、Pydantic 和 WeText 版本。将四者重新合并会破坏可复现性。
 
 ## 5. 配置边界
 
@@ -135,6 +140,15 @@ DeepSeek 是外部云服务，不属于本地离线模型供应链。API Key 只
 
 FFmpeg/ffprobe 负责裁剪、静音、变速、拼接和媒体探测；字幕由 faster-whisper 生成，结果与 SRT 采用原子写入。生成物属于项目数据，不属于源码或模型供应链。
 
+### 6.5 音效生成与四轨制作
+
+1. 现有 LLM 只接收句段 ID、文本、角色、情绪与相邻上下文，起草独立 `SoundPlan`；句段事务不被改写。
+2. 操作者编辑英文 prompt、语义锚点和混音参数并批准 cue；每个 cue 默认生成两个不可变候选。
+3. 持久任务取得共享 GPU 租约，平台托管带实例 token 的 loopback 8005 worker；断开浏览器不取消任务。
+4. 只有人工采用的候选才原子提升为 `AudioAsset` 和语义锚定 `TimelineClip`；解除采用执行补偿事务。
+5. Preview、Master 与 Release 使用同一个锚点解析和四轨渲染入口。对白 Take、变速或交叉淡化变化后按最新时间轴重定位；文本变化令 cue stale。
+6. Master/Release 冻结文件 SHA、模型/代码 revision、prompt、seed、许可快照与当前正式质检；缺失或过期时 fail closed。
+
 ## 7. 文件数据与事务
 
 默认项目根目录是 `dubbing_projects/`，可通过 `DUBBING_PROJECTS_ROOT` 指向独立数据盘。每个项目是一个独立目录：
@@ -148,6 +162,8 @@ FFmpeg/ffprobe 负责裁剪、静音、变速、拼接和媒体探测；字幕�
 ├── audio/segments/
 ├── audio/chapters/
 ├── audio/final/
+├── production/sound_generation/{plans,jobs,candidates}/
+├── production/assets/{sfx,ambience}/
 ├── subtitles/
 └── logs/
 ```
@@ -175,10 +191,10 @@ FFmpeg/ffprobe 负责裁剪、静音、变速、拼接和媒体探测；字幕�
 
 1. 已在项目内且通过大小/SHA256 的目标文件；
 2. manifest 中列出的项目内恢复 blob；
-3. 只有显式传入 `--allow-modelscope-download` 时，才从 manifest 固定的 ModelScope model/revision/file 下载；
+3. 只有显式传入对应联网开关时，才从 manifest 固定的 ModelScope 或门控 Hugging Face model/revision/file 下载；Hugging Face token 只从进程环境读取；
 4. 下载到 staging/cache，校验后原子提升；坏目标进入 `models/.quarantine/`，不直接删除。
 
-运行时设置 `HF_HUB_OFFLINE=1`、`TRANSFORMERS_OFFLINE=1`，不允许启动时隐式联网。供应脚本不使用 Hugging Face 网络端点。IndexTTS2 的 BigVGAN 固定到经过大小与 SHA256 核对的 ModelScope 文件 revision；项目内 recovery blob 仅是可选缓存，不是新机恢复前置条件。
+运行时设置 `HF_HUB_OFFLINE=1`、`TRANSFORMERS_OFFLINE=1`，不允许启动时隐式联网。Stable Audio 只在显式供应阶段访问门控 Hugging Face 源，并要求有效许可回执；运行时从校验后的本地 config/checkpoint/T5Gemma 目录加载。IndexTTS2 的 BigVGAN 固定到经过大小与 SHA256 核对的 ModelScope 文件 revision；项目内 recovery blob 仅是可选缓存，不是新机恢复前置条件。
 
 ## 9. 源码、模型与许可证边界
 
@@ -188,6 +204,7 @@ FFmpeg/ffprobe 负责裁剪、静音、变速、拼接和媒体探测；字幕�
 - IndexTTS2 manifest 中的 MaskGCT 辅助权重标记为 `CC-BY-NC-4.0`，默认含非商业限制；用于商业生产前必须取得适当授权或完成替换与技术验证。
 - `cosyvoice/` 主要源码为 Apache-2.0，但其 `third_party/` 和模型仍需逐项保留并遵守各自声明。
 - Qwen3-TTS 与 CosyVoice3 模型在当前 manifest 中记录为 Apache-2.0；正式发布前仍应以取得模型时的上游 revision 和随附许可证为准。
+- Stable Audio 3 权重适用 Stability AI Community/Enterprise License，T5Gemma 另受 Gemma 条款约束；模型、条款哈希或许可层级变化会使正式流程重新确认或阻断。
 - WebUI 内置的 Vue、WaveSurfer 和 Tailwind 文件分别保留各自 MIT LICENSE 和版本哈希。
 - 自研平台代码没有单独声明一个可以覆盖所有上游组件的统一再许可。不得把“可查看源码”直接等同于“整个发行物可自由商用或再分发”。
 

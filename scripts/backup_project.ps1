@@ -16,7 +16,8 @@ $ExcludedDirectoryNames = [Collections.Generic.HashSet[string]]::new(
         ".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv",
         ".venv_qwen3tts", "__pycache__", "build", "dist", "logs",
         "node_modules", "outputs", "temp", "venv",
-        ".download_cache", ".modelscope_cache", ".quarantine", ".runtime_cache"
+        ".download_cache", ".modelscope_cache", ".quarantine", ".runtime_cache",
+        ".license_acceptance", "benchmark_runs"
     ),
     [StringComparer]::OrdinalIgnoreCase
 )
@@ -192,6 +193,13 @@ function Test-IsExcludedFile {
     )
 
     if ($ExcludedFileExtensions.Contains($File.Extension)) {
+        return $true
+    }
+    if (
+        $RelativePath.StartsWith("models/", [StringComparison]::OrdinalIgnoreCase) -and
+        $File.Name.Equals("quality_gate.json", [StringComparison]::OrdinalIgnoreCase)
+    ) {
+        # A restored machine must repeat the hardware-specific acceptance run.
         return $true
     }
     if (Test-IsSensitiveFile -File $File -RelativePath $RelativePath) {
@@ -392,9 +400,9 @@ foreach ($manifestFile in Get-ChildItem -LiteralPath $manifestDirectory -File -F
         if ($null -ne $manifest.sources -and $null -ne $modelFile.source) {
             $sourceProperty = $manifest.sources.PSObject.Properties[[string]$modelFile.source]
         }
-        $hasModelScopeRecovery = (
+        $hasNetworkRecovery = (
             $null -ne $sourceProperty -and
-            ([string]$sourceProperty.Value.provider).Equals("modelscope", [StringComparison]::OrdinalIgnoreCase)
+            ([string]$sourceProperty.Value.provider) -in @("modelscope", "huggingface")
         )
         if (
             $runtimePath.StartsWith("models/", [StringComparison]::OrdinalIgnoreCase) -and
@@ -414,7 +422,7 @@ foreach ($manifestFile in Get-ChildItem -LiteralPath $manifestDirectory -File -F
                 throw "Project-cache recovery path is outside models/recovery_blobs: $recoveryPath"
             }
             if (-not $SelectedByPath.ContainsKey($recoveryPath)) {
-                if ($hasModelScopeRecovery) {
+                if ($hasNetworkRecovery) {
                     continue
                 }
                 throw "Required non-downloadable recovery blob is missing from the backup selection: $recoveryPath"
@@ -572,6 +580,7 @@ try {
         platform = Join-Path $ProjectRootFull ".venv\Scripts\python.exe"
         qwen3tts = Join-Path $ProjectRootFull "environments\qwen3tts\.venv\Scripts\python.exe"
         cosyvoice = Join-Path $ProjectRootFull "environments\cosyvoice\.venv\Scripts\python.exe"
+        stableaudio = Join-Path $ProjectRootFull "environments\stableaudio\.venv\Scripts\python.exe"
     }
     $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
     if ($null -ne $uvCommand) {
@@ -601,8 +610,8 @@ try {
 # Backup restore notes
 
 - Credentials are intentionally excluded. Recreate local configuration from `dubbing_service/config.example.json` and inject API keys from the operator's secret store.
-- Default backups omit ordinary model weights. Restore those files with the pinned manifests and ModelScope-only provisioning commands in `docs/operations.md`.
-- Any present `models/recovery_blobs/` entries are included and hash-verified as optional local recovery cache. Downloadable model files can also be reconstructed from the pinned ModelScope sources in `models/manifests/*.json`.
+- Default backups omit ordinary model weights. Restore those files with the pinned, explicitly enabled ModelScope or gated Hugging Face provisioning commands in `docs/operations.md`.
+- Any present `models/recovery_blobs/` entries are included and hash-verified as optional local recovery cache. Hugging Face tokens, Stable Audio license receipts, benchmark WAVs, and `quality_gate.json` are excluded even from model-inclusive backups; reconfirm the terms and rerun the real GPU benchmark after restore. Reconfirmation creates a new operator confirmation ID; existing generated-audio provenance keeps its historical ID and remains eligible only when the new valid receipt has the same confirmation SHA256 and Community/Enterprise tier. A changed terms hash or tier remains blocked.
 - User projects, voices, and prompts may contain private data. Keep this backup encrypted and access-controlled.
 - Verify `backup-manifest.json`, then run the project data audit and full platform doctor before using a restored copy.
 '@

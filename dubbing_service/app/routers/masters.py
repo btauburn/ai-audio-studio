@@ -77,12 +77,17 @@ def _master_inputs(project_id: str) -> tuple[list[MasterSegmentSnapshot], str]:
         if unresolved:
             failures.append(f"第 {segment.index + 1} 段仍有未解决问题")
             continue
+        effective_role_id = take.role_id if take.role_id is not None else segment.role_id
+        role = next((item for item in project.roles if item.id == effective_role_id), None)
+        if role is None or role.voice_commercial_use is not True:
+            failures.append(f"第 {segment.index + 1} 段最终 Take 缺少可验证的声音商业授权")
+            continue
         snapshots.append(
             MasterSegmentSnapshot(
                 segment_id=segment.id,
                 index=segment.index,
                 text=segment.text,
-                role_id=segment.role_id,
+                role_id=effective_role_id,
                 take_id=take.id,
                 take_audio_sha256=take.audio_sha256,
                 tts_backend=take.tts_backend,
@@ -95,8 +100,7 @@ def _master_inputs(project_id: str) -> tuple[list[MasterSegmentSnapshot], str]:
                         "commercial_use": role.voice_commercial_use,
                         "rights_note": role.voice_rights_note,
                     }
-                    if (role := next((item for item in project.roles if item.id == segment.role_id), None))
-                    else None
+                    if role is not None else None
                 ),
                 edit_state=(
                     take.edit_state.model_copy(deep=True)
@@ -122,7 +126,7 @@ def _master_inputs(project_id: str) -> tuple[list[MasterSegmentSnapshot], str]:
 async def api_create_master(project_id: str, payload: CreateMasterRequest) -> AudioMaster:
     snapshots, fingerprint = _master_inputs(project_id)
     root = project_root(project_id, ensure_dir=False)
-    quality = run_project_quality_checks(project_id, root)
+    quality = run_project_quality_checks(project_id, root, purpose="master")
     if not quality.passed:
         errors = [item.message for item in quality.issues if item.severity == "error"]
         raise HTTPException(status_code=400, detail="；".join(errors[:10]))
@@ -160,6 +164,14 @@ async def api_create_master(project_id: str, payload: CreateMasterRequest) -> Au
     os.close(fd)
     staged = Path(staged_name)
     timeline_rel: str | None = None
+    dialogue_timeline: object | None = None
+    if export.dialogue_timeline_file:
+        source_timeline = (root / export.dialogue_timeline_file).resolve()
+        if source_timeline.is_relative_to(root.resolve()) and source_timeline.is_file():
+            try:
+                dialogue_timeline = json.loads(source_timeline.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise HTTPException(status_code=500, detail=f"对白时间轴损坏: {exc}") from exc
     try:
         sound_snapshot = render_four_track_master(
             dialogue_path=source_audio,
@@ -168,6 +180,7 @@ async def api_create_master(project_id: str, payload: CreateMasterRequest) -> Au
             settings=latest_settings,
             assets=latest_assets,
             dialogue_duration=_probe_audio_duration_seconds(source_audio),
+            dialogue_timeline=dialogue_timeline,
         )
         os.replace(staged, audio_path)
         if export.dialogue_timeline_file:

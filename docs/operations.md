@@ -5,7 +5,7 @@
 ## 1. 基线与安全原则
 
 - 支持的环境管理工具是 `uv`；不要用全局 pip、Conda 或手工复制 site-packages 修复环境。
-- 模型只从项目内已验证 blob 或 manifest 固定的 ModelScope 源恢复。不要把 Hugging Face 缓存当成生产依赖。
+- 模型只从项目内已验证 blob 或 manifest 固定、显式授权的 ModelScope/Hugging Face 源恢复。不要把 Hugging Face 缓存当成生产依赖。
 - 平台和本地 TTS 默认是单机信任边界，没有业务用户认证。除非已经部署反向代理鉴权和防火墙规则，否则只绑定 `127.0.0.1`。
 - 不要运行两个平台进程写同一个项目数据目录。
 - `config.json`、LLM Provider、声音和项目目录含密钥或个人数据，必须按私密生产数据处理。
@@ -20,8 +20,9 @@
 | 8002 | CosyVoice3 | `environments/cosyvoice/.venv/Scripts/python.exe` |
 | 8003 | Qwen3 VoiceDesign | `environments/qwen3tts/.venv/Scripts/python.exe` |
 | 8004 | Qwen3 CustomVoice | `environments/qwen3tts/.venv/Scripts/python.exe` |
+| 8005 | Stable Audio 3 Small-SFX | `environments/stableaudio/.venv/Scripts/python.exe` |
 
-平台正常情况下只托管一个 8001～8004 工作进程。配置页所显示的“配置后端”和实际“运行后端”可能暂时不同；保存后端配置不会热切换已运行进程，必须停止/重启 TTS。
+平台正常情况下通过同一个 GPU 租约只运行一个 8001～8005 生成工作进程。配置页所显示的“配置后端”和实际“运行后端”可能暂时不同；保存后端配置不会热切换已运行进程，必须停止/重启 TTS。
 
 ## 3. 新机器恢复
 
@@ -36,9 +37,9 @@ ffprobe -version
 nvidia-smi
 ```
 
-本机无需全局 `python`。bootstrap 会通过 uv 安装并固定 Python 3.12.13 与 3.10.19。FFmpeg/ffprobe 必须在 PATH 上；GPU 驱动版本必须支持三个环境锁定的 CUDA PyTorch wheel。
+本机无需全局 `python`。bootstrap 会通过 uv 安装并固定 Python 3.12.13、3.11.13 与 3.10.19。FFmpeg/ffprobe 必须在 PATH 上；GPU 驱动版本必须支持四个环境锁定的 CUDA PyTorch wheel。
 
-### 3.2 重建三个环境
+### 3.2 重建四个环境
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Runtime All
@@ -50,14 +51,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Run
 .\scripts\bootstrap.ps1 -Runtime Platform
 .\scripts\bootstrap.ps1 -Runtime Qwen
 .\scripts\bootstrap.ps1 -Runtime CosyVoice
+.\scripts\bootstrap.ps1 -Runtime StableAudio
 ```
 
-脚本使用三个独立 lockfile 并在每个环境后运行 `uv pip check`。完成后应存在：
+脚本使用四个独立 lockfile 并在每个环境后运行 `uv pip check`。完成后应存在：
 
 ```text
 .venv/Scripts/python.exe
 environments/qwen3tts/.venv/Scripts/python.exe
 environments/cosyvoice/.venv/Scripts/python.exe
+environments/stableaudio/.venv/Scripts/python.exe
 ```
 
 旧 `.venv_qwen3tts` 已删除，后端注册表也没有兼容回退；不要重新创建或向同名目录安装包。
@@ -120,6 +123,7 @@ DeepSeek API          https://api.deepseek.com
 .\.venv\Scripts\python.exe .\scripts\model_preflight.py --manifest .\models\manifests\whisper_large_v3.json
 .\.venv\Scripts\python.exe .\scripts\model_preflight.py --manifest .\models\manifests\whisper_distil_large_v3.json
 .\.venv\Scripts\python.exe .\scripts\model_preflight.py --manifest .\models\manifests\whisperx_zh_alignment.json
+.\.venv\Scripts\python.exe .\scripts\model_preflight.py --manifest .\models\manifests\stable_audio_3_small_sfx.json --require-license-acceptance --require-quality-gate
 ```
 
 缺失或损坏时，先预演，再显式允许 ModelScope 下载。以下以 IndexTTS2 为例，其他后端替换 manifest 路径：
@@ -150,11 +154,38 @@ DeepSeek API          https://api.deepseek.com
 .\.venv\Scripts\python.exe .\scripts\platform_doctor.py --full
 ```
 
+### 3.6 供应并验收 Stable Audio 3 Small-SFX
+
+该可选模型使用官方门控 Hugging Face 来源，不走 ModelScope。先在模型页接受 Stability AI 与 Gemma 条款、完成适用的 Stability 注册，再把 read token 仅放入当前 PowerShell 进程。`Full` profile 会包含 Small-SFX；只安装音效模型可用 `Sfx`：
+
+```powershell
+$env:HF_TOKEN = '<Hugging Face read token>'
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 `
+  -Profile Sfx `
+  -AcceptThirdPartyLicenses `
+  -StableAudioLicenseTier community
+Remove-Item Env:HF_TOKEN
+```
+
+供应固定 commit、逐文件 blob id、大小和 SHA256，目标是 `models/stable_audio_3/small-sfx/`。token 不写入命令参数或磁盘，运行时严格离线。下载成功只代表文件与许可回执就绪；生产启用还要求真实质量门。启动 8005 worker 后运行 12 类 × 2 seed 质量样本和 5 轮 × 6 次技术测试，人工填写评分模板，再执行评估：
+
+```powershell
+$env:DUBBING_WORKER_INSTANCE_TOKEN = '<本次 worker 的随机实例令牌>'
+.\.venv\Scripts\python.exe .\scripts\benchmark_stable_audio_sfx.py --generate `
+  --tts-unload-endpoint http://127.0.0.1:8001/api/v1/tts/unload-model `
+  --tts-load-endpoint http://127.0.0.1:8001/api/v1/tts/load-model `
+  --results-dir .\models\stable_audio_3\small-sfx\benchmark_runs\acceptance-01
+.\.venv\Scripts\python.exe .\scripts\benchmark_stable_audio_sfx.py --evaluate `
+  --results-dir .\models\stable_audio_3\small-sfx\benchmark_runs\acceptance-01
+```
+
+至少 10/12 类质量通过，技术测试 30/30 通过，并且五轮 TTS unload → SFX load/6 runs → SFX unload → TTS load 的显存释放与恢复证据完整时，才原子写 `quality_gate.json`。warm p95 还必须不超过 `max(5 秒, 请求时长)`。示例使用已运行的 IndexTTS2 worker；可把两个 TTS endpoint 换成当前后端或平台代理协调端点。权重、许可回执或 revision 不匹配会在请求 worker 前失败；mock/CI 和仅连续 SFX 请求不生成通过标记。
+
 ## 4. 日常启动与停止
 
 ### 4.1 推荐 Windows 入口
 
-在所有 9000、8001～8004 服务停止时运行：
+在所有 9000、8001～8005 服务停止时运行：
 
 ```bat
 start_platform.bat
@@ -207,6 +238,9 @@ $env:COSYVOICE_WETEXT_DIR=(Resolve-Path .\models\cosyvoice3\wetext)
 .\environments\qwen3tts\.venv\Scripts\python.exe -u .\service\qwen3tts_server.py --host 127.0.0.1 --port 8003 --model_dir .\models\qwen3_tts\Qwen3-TTS-VoiceDesign --device cuda:0 --dtype bfloat16
 
 .\environments\qwen3tts\.venv\Scripts\python.exe -u .\service\qwen3tts_customvoice_server.py --host 127.0.0.1 --port 8004 --model_dir .\models\qwen3_tts\Qwen3-TTS-CustomVoice --device cuda:0 --dtype bfloat16
+
+$env:DUBBING_WORKER_INSTANCE_TOKEN = '<随机实例令牌>'
+.\environments\stableaudio\.venv\Scripts\python.exe -u .\service\stableaudio_sfx_server.py --host 127.0.0.1 --port 8005 --model-dir .\models\stable_audio_3\small-sfx --device cuda:0 --dtype float16
 ```
 
 不要同时启动多个大模型，除非已经测量显存并明确接受资源竞争。手工工作进程不受平台进程生命周期管理，必须自行停止。
@@ -240,14 +274,21 @@ Invoke-RestMethod http://127.0.0.1:8004/health
 
 通过标准不是只有 HTTP 200，还应确认 `backend`、`model_loaded` 和 `device` 与预期一致。平台托管启动还会用随机 `instance_token` 校验本次新进程；若目标端口由旧/orphan 服务占用，平台拒绝启动，不会把旧健康响应误认成新进程。
 
+Stable Audio SFX worker 使用 8005，`/health` 及所有控制/生成接口均要求本次实例 token，避免同机其他进程取得管理权限。通常由平台按生成批次托管；隔离诊断时：
+
+```powershell
+$headers = @{ 'X-Dubbing-Worker-Token' = $env:DUBBING_WORKER_INSTANCE_TOKEN }
+Invoke-RestMethod http://127.0.0.1:8005/health -Headers $headers
+```
+
 ### 5.3 端口与进程定位
 
 ```powershell
-Get-NetTCPConnection -State Listen -LocalPort 9000,8001,8002,8003,8004 |
+Get-NetTCPConnection -State Listen -LocalPort 9000,8001,8002,8003,8004,8005 |
     Select-Object LocalAddress,LocalPort,OwningProcess
 
 Get-CimInstance Win32_Process |
-    Where-Object ProcessId -in (Get-NetTCPConnection -State Listen -LocalPort 9000,8001,8002,8003,8004).OwningProcess |
+    Where-Object ProcessId -in (Get-NetTCPConnection -State Listen -LocalPort 9000,8001,8002,8003,8004,8005).OwningProcess |
     Select-Object ProcessId,Name,CommandLine
 ```
 
@@ -307,13 +348,15 @@ doctor 把端口占用视为启动前失败。如果服务是为了验收而有�
 
 默认备份不含 API Key；恢复时必须从独立密钥存储重新注入，并从 `dubbing_service/config.example.json` 重建本机配置。备份仍可能包含私密声音、prompt 和作品文本，必须加密、限制访问且不能上传公共仓库。
 
+Stable Audio 许可回执有意不进入备份。恢复后必须重新确认当前条款，系统会生成新的 `operator_confirmation_id`；项目内生成素材保留原始 provenance ID，不会被改写。只要新回执仍有效，且 `confirmation_sha256` 与生成时许可文本哈希一致、`license_tier` 仍为同一 Community/Enterprise 层级，旧素材可继续采用并进入 Master/Release；许可文本哈希或层级任一变化都会继续阻断正式输出。
+
 需要连同模型一起制作离线灾备时：
 
 ```powershell
 .\scripts\backup_project.ps1 -IncludeModels -DestinationRoot E:\secure-backups\index-tts
 ```
 
-`-IncludeModels` 会额外纳入运行模型，但仍排除下载缓存、运行缓存与 quarantine。备份脚本使用 `uv pip list --format freeze` 生成不带安装 URL 的三个环境版本快照；恢复时仍以 lockfile + bootstrap 为准，快照只用于审计，不用于重新混装环境。
+`-IncludeModels` 会额外纳入运行模型，但仍排除下载缓存、运行缓存与 quarantine。备份脚本使用 `uv pip list --format freeze` 生成不带安装 URL 的四个环境版本快照；恢复时仍以 lockfile + bootstrap 为准，快照只用于审计，不用于重新混装环境。
 
 如果生产数据根在仓库外，`backup_project.ps1` 不会自动包含它，必须对 `DUBBING_PROJECTS_ROOT` 做独立的卷快照/冷备份，并在恢复演练中同时验证。
 
@@ -341,6 +384,7 @@ doctor 把端口占用视为启动前失败。如果服务是为了验收而有�
 uv pip check --python .\.venv\Scripts\python.exe
 uv pip check --python .\environments\qwen3tts\.venv\Scripts\python.exe
 uv pip check --python .\environments\cosyvoice\.venv\Scripts\python.exe
+uv pip check --python .\environments\stableaudio\.venv\Scripts\python.exe
 
 .\.venv\Scripts\python.exe .\scripts\platform_doctor.py --full
 .\.venv\Scripts\python.exe -m pytest -q
@@ -349,7 +393,7 @@ uv pip check --python .\environments\cosyvoice\.venv\Scripts\python.exe
 
 另外必须人工完成：
 
-- 从空闲状态分别启动四个后端，核对 `/health`，每个后端至少合成一条可听音频；
+- 从空闲状态分别启动四个 TTS 后端，核对 `/health`，每个后端至少合成一条可听音频；启用 SFX 时另做 Stable Audio 生成与 TTS 显存交接验收；
 - 验证创建项目 → 自动分段 → 角色配置 → 单段/批量合成 → 波形编辑 → 整书导出 → 字幕；
 - 用非生产测试项目验证 A/B 切换、失败重试和停止批处理；
 - 恢复一份冷备份到隔离目录并重新运行数据审计；
@@ -387,7 +431,7 @@ uv pip check --python .\environments\cosyvoice\.venv\Scripts\python.exe
 
 ### GPU 显存不足
 
-确认只有一个 8001～8004 工作进程，停止孤儿进程，重新启动所需后端。不要通过把三套依赖合并到同一环境来解决显存问题。
+确认只有一个 8001～8005 生成工作进程，停止孤儿进程，重新启动所需后端。不要通过把四套依赖合并到同一环境来解决显存问题。
 
 ## 10. 恢复顺序
 
@@ -396,12 +440,12 @@ uv pip check --python .\environments\cosyvoice\.venv\Scripts\python.exe
 1. 恢复代码、lockfile、manifest 和私密冷备份；
 2. 恢复外部项目数据根；
 3. 安装 uv、FFmpeg、GPU 驱动；
-4. 用 bootstrap 重建三个环境；
-5. 用 manifest 校验/恢复模型；
+4. 用 bootstrap 重建四个环境；
+5. 用 manifest 校验/恢复模型，并重新确认未进入备份的 Stable Audio 许可回执；
 6. 只读审计 JSON 与音频引用；
 7. 在端口空闲时运行 startup doctor；
 8. 启动 9000，不启动 TTS，先验证 WebUI 与项目读取；
-9. 按 IndexTTS2 → CosyVoice3 → Qwen VD → Qwen CV 逐个做健康与样音；
+9. 按 IndexTTS2 → CosyVoice3 → Qwen VD → Qwen CV 逐个做健康与样音；启用 SFX 时再做 Stable Audio 质量门；
 10. 最后恢复 DeepSeek 连接与真实分段 smoke。
 
 不要恢复旧虚拟环境目录，也不要把模型、项目数据或 API Key 放入源码导出包。

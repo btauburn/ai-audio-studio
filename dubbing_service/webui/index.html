@@ -1393,6 +1393,91 @@
                 请先选择项目，再进行发音校正和声音设计。
               </div>
               <template v-else>
+                <section class="rounded-2xl border border-sky-900/70 bg-slate-900/70 p-4 space-y-3">
+                  <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-sm font-semibold">AI 音效编导 · Stable Audio 3 Small-SFX</h2>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded" :class="soundModelStatus && soundModelStatus.enabled ? 'bg-emerald-900 text-emerald-200' : 'bg-amber-950 text-amber-200'">{{ soundModelStatus && soundModelStatus.enabled ? '真实 CUDA 门已通过' : '运行门未就绪' }}</span>
+                        <span class="text-[10px] text-slate-500">Powered by Stability AI</span>
+                      </div>
+                      <p class="text-[11px] text-slate-400 mt-1">LLM 只起草语义 cue；你批准后，每个 cue 默认生成两个不可变候选。只有手工采用才进入正式素材库。</p>
+                      <p v-if="soundModelStatus && soundModelStatus.error" class="text-[11px] text-amber-300 mt-1">{{ soundModelStatus.error }}</p>
+                    </div>
+                    <div class="flex flex-wrap items-end gap-2 text-xs">
+                      <label class="space-y-1"><span class="text-slate-400">密度</span><select v-model="soundPlanDensity" class="block bg-slate-950 border border-slate-700 rounded px-2 py-1"><option value="conservative">克制 · 约 2/min</option><option value="balanced">均衡 · 约 5/min</option><option value="cinematic">电影化 · 约 8/min</option></select></label>
+                      <button @click="draftSoundPlan()" :disabled="soundGenerationBusy || !segments.length" class="px-3 py-1 rounded bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50">{{ soundGenerationBusy ? '处理中…' : '用现有 LLM 起草' }}</button>
+                      <button @click="loadSoundGenerationWorkspace()" :disabled="soundGenerationBusy" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50">刷新</button>
+                    </div>
+                  </div>
+
+                  <div v-if="soundModelStatus && !soundModelStatus.license_accepted" class="rounded-lg border border-amber-800/70 bg-amber-950/10 p-3 space-y-2 text-[11px]">
+                    <div class="font-medium text-amber-200">首次供应前必须由操作者明确确认许可；令牌不会写入项目、日志或 provenance。</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2 items-center">
+                      <select v-model="soundLicenseForm.license_tier" class="bg-slate-950 border border-slate-700 rounded px-2 py-1"><option value="community">Community（含关联方年营收 &lt; US$1M）</option><option value="enterprise">Enterprise</option></select>
+                      <label class="flex items-center gap-2"><input type="checkbox" v-model="soundLicenseForm.stability_registered" />已完成 Stability 注册</label>
+                      <label class="flex items-center gap-2"><input type="checkbox" v-model="soundLicenseForm.stability_terms_accepted" />接受 Stability 条款</label>
+                      <label class="flex items-center gap-2"><input type="checkbox" v-model="soundLicenseForm.gemma_terms_accepted" />接受 Gemma 条款</label>
+                      <button @click="confirmStableAudioLicense()" class="px-3 py-1 rounded bg-amber-700 hover:bg-amber-600">保存确认回执</button>
+                    </div>
+                  </div>
+
+                  <div v-if="soundPlans.length" class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="text-slate-400">SoundPlan</span>
+                    <select v-model="activeSoundPlanId" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 min-w-64"><option v-for="plan in soundPlans" :key="plan.id" :value="plan.id">{{ plan.id }} · {{ plan.density }} · {{ plan.cues.length }} cues{{ plan.stale ? ' · 已过期' : '' }}</option></select>
+                    <span v-if="soundJobs.length" class="text-slate-500">最近任务：{{ soundJobs[0].status }} · {{ soundJobs[0].completed }}/{{ soundJobs[0].tasks.length }}</span>
+                  </div>
+
+                  <div v-if="activeSoundPlan" class="space-y-2 max-h-[42rem] overflow-auto pr-1">
+                    <article v-for="cue in activeSoundPlan.cues" :key="cue.id" class="rounded-lg border p-3 space-y-2" :class="cue.stale ? 'border-rose-800 bg-rose-950/10' : cue.review_status === 'approved' ? 'border-emerald-900/70 bg-emerald-950/5' : 'border-slate-800 bg-slate-950/40'">
+                      <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                        <span class="px-1.5 py-0.5 rounded bg-slate-800">{{ soundTrackLabel(cue.track) }}</span>
+                        <span :class="cue.review_status === 'approved' ? 'text-emerald-300' : cue.review_status === 'rejected' ? 'text-rose-300' : 'text-amber-300'">{{ cue.review_status }}</span>
+                        <span v-if="cue.stale" class="text-rose-300">文本已变化，正式 Master 将阻断</span>
+                        <span class="text-slate-500 font-mono">{{ cueAnchorLabel(cue) }}</span>
+                      </div>
+                      <div class="grid grid-cols-1 lg:grid-cols-[auto_1fr_2fr_auto_auto] gap-2 items-start text-xs">
+                        <select v-model="cue.track" @change="normalizeSoundCueTrack(cue)" :disabled="cue.adopted_asset_id" class="bg-slate-950 border border-slate-700 rounded px-2 py-1"><option value="sfx">SFX</option><option value="ambience">Ambience</option></select>
+                        <textarea v-model="cue.description_cn" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 min-h-16" placeholder="中文编导说明"></textarea>
+                        <textarea v-model="cue.prompt" :disabled="cue.adopted_asset_id" maxlength="1000" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 min-h-16 font-mono disabled:opacity-50" placeholder="English generation prompt"></textarea>
+                        <label class="space-y-1"><span class="text-slate-400">源时长</span><input type="number" step="0.5" v-model.number="cue.requested_duration_seconds" :disabled="cue.adopted_asset_id" class="w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1 disabled:opacity-50" /></label>
+                        <label class="space-y-1"><span class="text-slate-400">偏移秒</span><input type="number" step="0.05" v-model.number="cue.placement.start.offset_seconds" class="w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1" /></label>
+                      </div>
+                      <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 text-[11px]">
+                        <label class="space-y-1"><span class="text-slate-400">开始句段</span><select v-model="cue.placement.start.segment_id" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1"><option v-for="seg in segments" :key="seg.id" :value="seg.id">#{{ seg.index + 1 }} {{ seg.text.slice(0, 18) }}</option></select></label>
+                        <label class="space-y-1"><span class="text-slate-400">开始边</span><select v-model="cue.placement.start.edge" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1"><option value="start">start</option><option value="end">end</option></select></label>
+                        <template v-if="cue.track === 'ambience' && cue.placement.end">
+                          <label class="space-y-1"><span class="text-slate-400">结束句段</span><select v-model="cue.placement.end.segment_id" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1"><option v-for="seg in segments" :key="seg.id" :value="seg.id">#{{ seg.index + 1 }} {{ seg.text.slice(0, 18) }}</option></select></label>
+                          <label class="space-y-1"><span class="text-slate-400">结束边</span><select v-model="cue.placement.end.edge" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1"><option value="start">start</option><option value="end">end</option></select></label>
+                          <label class="space-y-1"><span class="text-slate-400">结束偏移秒</span><input type="number" step="0.05" v-model.number="cue.placement.end.offset_seconds" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1" /></label>
+                        </template>
+                        <label class="space-y-1"><span class="text-slate-400">增益 dB</span><input type="number" step="0.5" v-model.number="cue.gain_db" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1" /></label>
+                        <label class="space-y-1"><span class="text-slate-400">淡入秒</span><input type="number" step="0.1" min="0" v-model.number="cue.fade_in" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1" /></label>
+                        <label class="space-y-1"><span class="text-slate-400">淡出秒</span><input type="number" step="0.1" min="0" v-model.number="cue.fade_out" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1" /></label>
+                      </div>
+                      <div class="flex flex-wrap gap-2 text-[11px]">
+                        <button @click="saveSoundCue(cue)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">保存编辑</button>
+                        <button @click="saveSoundCue(cue, 'approved')" :disabled="cue.adopted_asset_id" class="px-2 py-1 rounded bg-emerald-800 hover:bg-emerald-700 disabled:opacity-50">批准</button>
+                        <button @click="saveSoundCue(cue, 'rejected')" :disabled="cue.adopted_asset_id" class="px-2 py-1 rounded bg-rose-900 hover:bg-rose-800 disabled:opacity-50">拒绝</button>
+                        <button v-if="cue.adopted_asset_id" @click="unadoptSoundCandidate(cue)" class="px-2 py-1 rounded bg-amber-800 hover:bg-amber-700">解除采用</button>
+                        <button @click="generateCueCandidates(cue, 2)" :disabled="soundGenerationBusy || cue.review_status !== 'approved' || cue.stale || cue.candidates.length >= 4 || !(soundModelStatus && soundModelStatus.enabled)" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 disabled:opacity-50">生成 A/B</button>
+                        <button v-if="cue.candidates.length > 0 && cue.candidates.length < 4" @click="generateCueCandidates(cue, 1)" :disabled="soundGenerationBusy || cue.review_status !== 'approved' || cue.stale || !(soundModelStatus && soundModelStatus.enabled)" class="px-2 py-1 rounded bg-indigo-800 hover:bg-indigo-700 disabled:opacity-50">再生成 1 个</button>
+                      </div>
+                      <div v-if="cue.candidates.length" class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                        <div v-for="candidate in cue.candidates" :key="candidate.id" class="rounded border border-slate-800 bg-slate-900/70 p-2 space-y-1.5">
+                          <div class="flex items-center justify-between gap-2 text-[10px]"><span>{{ candidate.id }} · seed {{ candidate.provenance.seed }}</span><span :class="candidate.status === 'ready' || candidate.status === 'adopted' ? 'text-emerald-300' : candidate.status === 'failed' ? 'text-rose-300' : 'text-amber-300'">{{ candidate.status }}{{ candidate.stale ? ' · stale' : '' }}</span></div>
+                          <canvas v-if="candidate.status === 'ready' || candidate.status === 'adopted'" :ref="el => { if (el) drawCandidateWaveform(el, cue, candidate) }" class="w-full h-10 rounded bg-slate-950"></canvas>
+                          <audio v-if="candidate.status === 'ready' || candidate.status === 'adopted'" :src="soundCandidateAudioUrl(cue, candidate)" controls preload="metadata" class="w-full h-8"></audio>
+                          <div class="flex gap-2 text-[11px]"><button v-if="candidate.status === 'ready'" @click="adoptSoundCandidate(cue, candidate)" :disabled="candidate.stale || cue.adopted_asset_id" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50">采用</button><button v-if="candidate.status === 'ready' || candidate.status === 'failed'" @click="deleteSoundCandidate(cue, candidate)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">清理</button></div>
+                          <p v-if="candidate.error" class="text-[10px] text-rose-300">{{ candidate.error }}</p>
+                        </div>
+                      </div>
+                    </article>
+                    <div v-if="!activeSoundPlan.cues.length" class="rounded border border-dashed border-slate-700 px-3 py-6 text-center text-xs text-slate-500">LLM 没有建议需要添加的音效；可调整密度后重新起草。</div>
+                  </div>
+                  <div v-else class="rounded border border-dashed border-slate-700 px-3 py-6 text-center text-xs text-slate-500">尚无 SoundPlan。先完成句段，再用现有 LLM 起草。</div>
+                </section>
+
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
                   <section class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 space-y-3">
                     <div>
@@ -1473,9 +1558,14 @@
                   </div>
                   <div class="overflow-auto border border-slate-800 rounded-lg">
                     <table class="min-w-full text-xs"><thead class="bg-slate-950"><tr><th class="px-2 py-1">轨道</th><th class="px-2 py-1">素材</th><th class="px-2 py-1">开始</th><th class="px-2 py-1">时长</th><th class="px-2 py-1">增益</th><th class="px-2 py-1">操作</th></tr></thead><tbody>
-                      <tr v-for="clip in productionSettings.sound_design.clips" :key="clip.id" class="border-t border-slate-800"><td class="px-2 py-1 text-center">{{ soundTrackLabel(clip.track) }}</td><td class="px-2 py-1">{{ (audioAssets.find(a => a.id === clip.asset_id) || {}).name || clip.asset_id }}</td><td class="px-2 py-1 text-center">{{ clip.start }}s</td><td class="px-2 py-1 text-center">{{ clip.duration || '自动' }}</td><td class="px-2 py-1 text-center">{{ clip.gain_db }} dB</td><td class="px-2 py-1 text-center"><button @click="removeTimelineClip(clip.id)" class="text-rose-400">移除</button></td></tr>
+                      <tr v-for="clip in productionSettings.sound_design.clips" :key="clip.id" class="border-t border-slate-800"><td class="px-2 py-1 text-center">{{ soundTrackLabel(clip.track) }}</td><td class="px-2 py-1">{{ (audioAssets.find(a => a.id === clip.asset_id) || {}).name || clip.asset_id }}</td><td class="px-2 py-1 text-center">{{ clip.start }}s</td><td class="px-2 py-1 text-center">{{ clip.duration || '自动' }}</td><td class="px-2 py-1 text-center">{{ clip.gain_db }} dB</td><td class="px-2 py-1 text-center"><span v-if="isAdoptedSoundClip(clip.id)" class="text-amber-400">SoundPlan 管理</span><button v-else @click="removeTimelineClip(clip.id)" class="text-rose-400">移除</button></td></tr>
                       <tr v-if="!productionSettings.sound_design.clips.length"><td colspan="6" class="px-3 py-5 text-center text-slate-500">当前只有 Dialogue 轨，尚未安排声音素材。</td></tr>
                     </tbody></table>
+                  </div>
+                  <div class="flex flex-col md:flex-row md:items-center gap-3 border-t border-slate-800 pt-3">
+                    <button @click="createSoundPreview()" :disabled="productionBusy || soundGenerationBusy" class="px-3 py-1 rounded bg-violet-700 hover:bg-violet-600 disabled:opacity-50 text-xs">生成共享四轨 Preview</button>
+                    <audio v-if="soundPreviewAudioUrl" :src="soundPreviewAudioUrl" controls preload="metadata" class="w-full h-9"></audio>
+                    <span v-if="soundPreview" class="text-[11px] text-slate-400">{{ soundPreview.duration_seconds.toFixed(2) }}s · {{ soundPreview.warnings.length }} 项预览提示</span>
                   </div>
                 </section>
               </template>
@@ -4198,7 +4288,7 @@
           if (appLoaded) return;
           appLoaded = true;
           var s = document.createElement('script');
-          s.src = '/web/app.js?v=20260203-qwen3tts-v27&ts=' + Date.now();
+          s.src = '/web/app.js?v=20260812-stableaudio-v020b1&ts=' + Date.now();
           s.onerror = function () {
             setLoadingText('WebUI 脚本加载失败（/web/app.js），请检查后端是否正常启动或刷新重试');
           };

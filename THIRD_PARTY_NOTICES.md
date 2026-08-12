@@ -59,6 +59,13 @@ Users download and accept the applicable model terms themselves.
 | `FunAudioLLM/Fun-CosyVoice3-0.5B-2512` and `pengzhendong/wetext` | `models/manifests/cosyvoice3.json` | Apache-2.0 as recorded by the manifest |
 | Whisper / faster-whisper model sources | `models/manifests/whisper_*.json` | MIT as recorded by each manifest |
 | `jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn` | `models/manifests/whisperx_zh_alignment.json` | Apache-2.0 |
+| `stabilityai/stable-audio-3-small-sfx` plus bundled `t5gemma-b-b-ul2` | `models/manifests/stable_audio_3_small_sfx.json` | Stability AI Community License (or applicable Enterprise License) plus Google Gemma Terms; gated download and explicit acceptance required |
+
+### Stable Audio 3 and T5Gemma boundary
+
+Stable Audio 3 Small-SFX weights are not shipped in Git and are not relicensed under this platform's Apache-2.0 license. The pinned upstream Stability AI Community License allows limited commercial use only within its conditions: the license text identifies an annual aggregate-revenue threshold below US $1,000,000, requires commercial users to register with Stability AI, and directs users outside that scope to an Enterprise License. The bundled T5Gemma text encoder remains separately subject to the Google Gemma Terms and prohibited-use policy. Review the pinned `LICENSE.md`, `LICENSE_GEMMA.md`, and `NOTICE` downloaded with the model; a successful download, benchmark, or generated output is not a legal-clearance determination.
+
+The supply command requires an exact confirmation hash and records only the selected `community` or `enterprise` tier, Stability registration confirmation, acceptance of both term sets, a random operator-confirmation UUID, and the pinned revision. It never records a Hugging Face account or token. Runtime loading is offline and will reject a stale/missing receipt or a quality gate produced for different file hashes.
 
 ### MaskGCT commercial red line
 

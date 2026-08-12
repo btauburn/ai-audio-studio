@@ -24,7 +24,7 @@
 </p>
 
 > [!IMPORTANT]
-> 当前版本为 `0.1.0-beta.1`，面向 Windows + NVIDIA GPU，适合个人本地制作与技术预览。平台自研层由 **TadashiJLU** 以 Apache-2.0 开源；仓库中的 IndexTTS2、CosyVoice、Matcha-TTS、浏览器依赖及另行下载的模型继续适用各自许可证。它们并未被统一重新许可，商业使用前请先阅读[许可证边界](LICENSES/README.md)。
+> 当前版本为 `0.2.0-beta.1`，面向 Windows + NVIDIA GPU，适合个人本地制作与技术预览。平台自研层由 **TadashiJLU** 以 Apache-2.0 开源；仓库中的 IndexTTS2、CosyVoice、Matcha-TTS、浏览器依赖及另行下载的模型继续适用各自许可证。它们并未被统一重新许可，商业使用前请先阅读[许可证边界](LICENSES/README.md)。
 
 AI 有声工作室把零散的 TTS 调用整理成一条可追溯的制作链：
 
@@ -52,7 +52,7 @@ AI 有声工作室把零散的 TTS 调用整理成一条可追溯的制作链：
 | 音色 | 参考音频、全局音色库、角色级后端、Qwen CustomVoice 内置音色、Qwen VoiceDesign 文本音色设计 |
 | 配音审听 | 每段独立 A/B、不可变 Take、历史恢复/固定、最终 Take 选择、人工审听状态、持久任务队列 |
 | 非破坏编辑 | 裁剪、删除区间、静音、音量、变速、淡入淡出、头尾留白；需要固化时渲染为新 Take |
-| 声音设计 | Dialogue / BGM / Ambience / SFX 四轨、素材授权记录、循环、增益、淡化、对白交叉淡化、BGM ducking |
+| 声音设计 | Dialogue / BGM / Ambience / SFX 四轨、Stable Audio 3 句子级音效规划/生成、素材授权记录、循环、增益、淡化、对白交叉淡化、BGM ducking |
 | 导出发布 | Preview、响度/峰值质检、不可变 Master、WAV/MP3、SRT/VTT、章节、封面、元数据、授权清单、ZIP 校验和 |
 
 <details>
@@ -111,13 +111,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Run
 Copy-Item .\dubbing_service\config.example.json .\dubbing_service\config.json
 ```
 
-项目刻意保留三个隔离环境，不能把依赖合并到一个 Python 环境：
+项目刻意保留四个隔离环境，不能把依赖合并到一个 Python 环境：
 
 - `.venv`：平台、IndexTTS2、字幕；
 - `environments/qwen3tts/.venv`：两个 Qwen3-TTS 后端；
 - `environments/cosyvoice/.venv`：CosyVoice3。
+- `environments/stableaudio/.venv`：Stable Audio 3 Small-SFX。
 
-### 3. 从 ModelScope 安装全部模型
+### 3. 从固定来源安装全部模型
 
 先阅读 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和各 manifest 的许可字段。预演不会修改模型文件：
 
@@ -125,12 +126,15 @@ Copy-Item .\dubbing_service\config.example.json .\dubbing_service\config.json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 -Profile Full -DryRun
 ```
 
-确认后下载并逐文件校验：
+`Full` 还包含官方门控的 Stable Audio 3 Small-SFX。先在模型页接受 Stability AI 与 Gemma 条款并完成适用注册，再将 read token 仅放入当前 PowerShell 进程；若暂不启用音效生成，请选择现有的 `Tts` / `Core` / `Subtitles` profile：
 
 ```powershell
+$env:HF_TOKEN = '<Hugging Face read token>'
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 `
   -Profile Full `
-  -AcceptThirdPartyLicenses
+  -AcceptThirdPartyLicenses `
+  -StableAudioLicenseTier community
+Remove-Item Env:HF_TOKEN
 ```
 
 `-AcceptThirdPartyLicenses` 只表示你已阅读相关条款，不会额外授予商业或再分发权利。下载中断后可安全重跑，已有正确文件不会重复恢复。
@@ -173,6 +177,7 @@ doctor 应以 `0 failed` 结束。启动后打开 `http://127.0.0.1:9000/web/`�
 | CosyVoice3 | 8002 | `environments/cosyvoice/.venv` | `models/cosyvoice3/Fun-CosyVoice3-0.5B` |
 | Qwen VoiceDesign | 8003 | `environments/qwen3tts/.venv` | `models/qwen3_tts/Qwen3-TTS-VoiceDesign` |
 | Qwen CustomVoice | 8004 | `environments/qwen3tts/.venv` | `models/qwen3_tts/Qwen3-TTS-CustomVoice` |
+| Stable Audio 3 Small-SFX | 8005 | `environments/stableaudio/.venv` | `models/stable_audio_3/small-sfx` |
 
 更多模块边界、持久化结构和并发约束见[架构说明](docs/architecture.md)。
 
@@ -182,7 +187,7 @@ doctor 应以 `0 failed` 结束。启动后打开 `http://127.0.0.1:9000/web/`�
 
 - `.env`、`dubbing_service/config.json`、`dubbing_service/llm_providers.json`；
 - `models/` 下的权重、下载缓存、运行缓存和隔离区；
-- `.venv*` 以及两个隔离运行环境中的 `.venv`；
+- `.venv*` 以及三个隔离运行环境中的 `.venv`；
 - `dubbing_projects/`、音色库、参考声音、BGM/SFX 和其他作品素材；
 - `outputs/`、`temp/`、日志、字幕中间文件和生成音频。
 
@@ -220,11 +225,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\export_source.ps1 
 ## 当前边界
 
 - 当前重点是单人本地生产，不建设多用户、云同步、平台发布 API 或完整 DAW；
-- BGM/SFX 目前是素材导入、编排、混音与授权记录，不包含即时部署的音乐生成模型；
+- BGM 目前仍是素材导入；SFX 可选用 Stable Audio 3 Small-SFX 本地生成，但必须先通过当前许可回执和真实 12 类/30 次质量门；尚未部署音乐生成模型；
 - GitHub CI 不下载模型、不占用 GPU；真实 TTS、字幕和发布包 E2E 需在本地 GPU 机器验收；
 - 只支持清单固定、SHA256 校验并放在项目目录内的模型；不要用来加载来源不明的
   checkpoint、Transformers 仓库或训练配置；
 - IndexTTS2 当前辅助依赖中的 MaskGCT 具有非商业限制，替换或获得单独许可前不能把该链路视为商业放行。
+- Stable Audio 3 权重适用 Stability AI Community/Enterprise License，bundled T5Gemma 另受 Gemma 条款约束；平台 Apache-2.0 许可不覆盖这些权重。
 
 ## 参与贡献
 

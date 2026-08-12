@@ -44,7 +44,7 @@ wheels = [
 
 [[package]]
 name = "ai-audio-studio"
-version = "0.1.0b1"
+version = "0.2.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "accelerate" },

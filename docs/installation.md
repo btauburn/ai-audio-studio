@@ -9,10 +9,10 @@
 
 | 方式 | 环境与模型 | 启动方式 | 适合场景 |
 | --- | --- | --- | --- |
-| 完整安装（推荐） | 三个 uv 环境、4 个 TTS 后端、4 套字幕/对齐模型 | `start_platform.bat` | 日常制作、完整验收 |
+| 完整安装（推荐） | 四个 uv 环境、4 个 TTS 后端、4 套字幕/对齐模型、可选 SFX 模型 | `start_platform.bat` | 日常制作、完整验收 |
 | 部分开发安装 | 平台环境 + 选定后端环境与模型 | 手工运行 `uvicorn` | 后端开发、节省临时磁盘 |
 
-完整安装的模型最终占用约 31.85 GiB：
+包含可选 Stable Audio 的完整安装最终占用约 35.1 GiB：
 
 | 模型组 | 约占用 |
 | --- | ---: |
@@ -20,8 +20,9 @@
 | CosyVoice3 + WeText | 8.18 GiB |
 | 两个 Qwen3-TTS 模型 | 8.42 GiB |
 | 全部字幕/对齐模型 | 6.99 GiB |
+| Stable Audio 3 Small-SFX | 3.25 GiB |
 
-下载缓存、原子复制临时文件、三个虚拟环境和项目输出还会占用额外空间。完整安装建议至少预留 **80 GiB**；长期制作还应为项目音频和备份单独留空间。
+下载缓存、原子复制临时文件、四个虚拟环境和项目输出还会占用额外空间。完整安装建议至少预留 **80 GiB**；长期制作还应为项目音频和备份单独留空间。
 
 ## 2. 支持范围与硬件基线
 
@@ -33,7 +34,7 @@
 - Git + Git LFS、uv、FFmpeg/ffprobe；
 - 单机使用，或将 Windows 主机作为受信任局域网服务端。
 
-本项目当前实机验证使用 **RTX 4070 Ti SUPER 16 GiB**。三个环境分别锁定 CUDA 12.9、13.0 和 12.4 系 PyTorch wheel；显卡驱动必须能支持其中最新的 wheel。更低显存、较旧驱动、CPU-only、AMD GPU、macOS 推理和 Linux 部署尚未完成本版本验收，不能视为已支持配置。
+本项目当前实机验证使用 **RTX 4070 Ti SUPER 16 GiB**。四个环境分别锁定 CUDA 12.9、13.0、12.4 和 12.8 系 PyTorch wheel；显卡驱动必须能支持其中最新的 wheel。更低显存、较旧驱动、CPU-only、AMD GPU、macOS 推理和 Linux 部署尚未完成本版本验收，不能视为已支持配置。
 
 Mac 可以作为局域网浏览器客户端，但 TTS 工作进程仍运行在 Windows/NVIDIA 主机上。
 
@@ -83,6 +84,7 @@ Copy-Item .\dubbing_service\config.example.json .\dubbing_service\config.json
 | CosyVoice3 | `http://127.0.0.1:8002` |
 | Qwen VoiceDesign | `http://127.0.0.1:8003` |
 | Qwen CustomVoice | `http://127.0.0.1:8004` |
+| Stable Audio 3 Small-SFX | `http://127.0.0.1:8005` |
 | DeepSeek API | `https://api.deepseek.com` |
 
 ## 5. 重建 uv 环境
@@ -94,15 +96,16 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -File .\scripts\bootstrap.ps1 -Runtime All
 ```
 
-脚本会安装固定的 Python 3.12.13 与 3.10.19，创建三个隔离环境，并分别运行 `uv pip check`：
+脚本会安装固定的 Python 3.12.13、3.11.13 与 3.10.19，创建四个隔离环境，并分别运行 `uv pip check`：
 
 ```text
 .venv/                              平台 + IndexTTS2
 environments/qwen3tts/.venv/        Qwen VoiceDesign + CustomVoice
 environments/cosyvoice/.venv/       CosyVoice3
+environments/stableaudio/.venv/      Stable Audio 3 Small-SFX
 ```
 
-看到 `Environment bootstrap completed` 且命令退出码为 0，才继续下载模型。三个环境的 PyTorch、Transformers 和音频依赖存在冲突，不能合并。
+看到 `Environment bootstrap completed` 且命令退出码为 0，才继续下载模型。四个环境的 PyTorch、Transformers 和音频依赖存在冲突，不能合并。
 
 ### 5.2 部分开发安装
 
@@ -117,18 +120,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Run
 
 # 开发 CosyVoice3 时再执行
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Runtime CosyVoice
+
+# 开发 Stable Audio SFX 时再执行
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Runtime StableAudio
 ```
 
 只开发 IndexTTS2 时不需要 Qwen 或 CosyVoice 环境。
 
-## 6. 从 ModelScope 下载模型
+## 6. 从固定来源下载模型
 
 `models/manifests/*.json` 固定了 ModelScope 仓库、revision、目标路径、文件大小和 SHA256。供应器不会在运行时隐式联网；只有显式传入 `--allow-modelscope-download` 才会访问 ModelScope，校验通过后才会把文件原子提升到运行目录。
 
 > [!WARNING]
 > `--allow-modelscope-download` 表示操作者明确允许本次联网下载，**不代表取得额外许可权**。下载前应阅读 manifest、ModelScope 模型页、[多许可证边界](../LICENSES/README.md)和[第三方说明](../THIRD_PARTY_NOTICES.md)。IndexTTS2 的辅助集合包含标记为 `CC-BY-NC-4.0` 的 MaskGCT 权重；用于商业作品前必须替换、取得单独许可或获得适当法律结论。
 
-### 6.1 完整安装：八份 manifest
+### 6.1 完整安装：九份 manifest（含门控 SFX）
 
 统一脚本会先预演全部来源，再下载四个 TTS 后端和四套字幕/对齐模型。预演不会产生模型文件：
 
@@ -138,12 +144,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1
   -DryRun
 ```
 
-阅读相关条款并确认后执行实际下载：
+`Full` 还包含门控的 Stable Audio 3 Small-SFX。先在官方模型页接受 Stability AI 与 Gemma 条款、完成适用注册，并仅在当前 PowerShell 进程设置 Hugging Face read token。若不启用 SFX，请分别使用 `Tts` 和 `Subtitles` profile：
 
 ```powershell
+$env:HF_TOKEN = '<Hugging Face read token>'
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 `
   -Profile Full `
-  -AcceptThirdPartyLicenses
+  -AcceptThirdPartyLicenses `
+  -StableAudioLicenseTier community
+Remove-Item Env:HF_TOKEN
 ```
 
 `-AcceptThirdPartyLicenses` 只记录使用者已阅读条款，不授予任何额外权利。下载中断后可以重新执行同一命令；已通过大小和 SHA256 校验的目标不会重复恢复。损坏的旧目标会进入 `models/.quarantine/`，不要手工把未知缓存覆盖到运行目录。
@@ -167,6 +176,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 `
   -Profile Subtitles `
   -AcceptThirdPartyLicenses
+
+# 仅 Stable Audio SFX（需先接受门控条款并设置 HF_TOKEN）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 `
+  -Profile Sfx `
+  -AcceptThirdPartyLicenses `
+  -StableAudioLicenseTier community
 ```
 
 只开发单个后端时可直接使用平台环境中的 `model_provision.py`：
@@ -211,7 +226,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1
 
 ### 7.1 完整安装
 
-确保平台及 8001～8004 工作进程均已停止，然后运行：
+确保平台及 8001～8005 工作进程均已停止，然后运行：
 
 ```powershell
 .\.venv\Scripts\python.exe .\scripts\platform_doctor.py --startup
@@ -229,7 +244,7 @@ Doctor summary: ... passed, 0 failed
 .\.venv\Scripts\python.exe .\scripts\platform_doctor.py --full
 ```
 
-doctor 会检查三个环境、八份 manifest、本机配置、FFmpeg 和五个端口。端口已被正在运行的平台占用时会失败，这是启动前检查的预期行为。
+doctor 会检查四个环境、九份 manifest、本机配置、FFmpeg 和六个端口；Stable Audio 模型与质量门未安装时作为可选警告并保持 SFX 禁用。端口已被正在运行的平台占用时会失败，这是启动前检查的预期行为。
 
 ### 7.2 部分开发安装
 

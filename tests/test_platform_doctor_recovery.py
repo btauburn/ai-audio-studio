@@ -149,3 +149,125 @@ def test_doctor_plaintext_credential_check_allows_missing_provider_file(
 
     assert result.ok
     assert result.detail == "config fields=0; provider records=0"
+
+
+def test_doctor_reports_uninstalled_optional_model_as_warning(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(platform_doctor, "PROJECT_ROOT", tmp_path)
+    manifest = tmp_path / "models" / "manifests" / "optional.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "model_id": "optional_sfx",
+                "optional": True,
+                "files": [
+                    {
+                        "path": "models/optional/model.bin",
+                        "size": 1,
+                        "sha256": "0" * 64,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    results = platform_doctor._check_manifest(manifest, full_hash=False)
+
+    warning = next(item for item in results if item.label == "optional model:optional_sfx")
+    assert warning.ok is False
+    assert warning.required is False
+    assert "feature remains disabled" in warning.detail
+
+
+def test_doctor_reports_verified_optional_stableaudio_runtime_revision(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(platform_doctor, "PROJECT_ROOT", tmp_path)
+    revision = "a" * 40
+    manifest = {
+        "code_revision": revision,
+        "code_source": {
+            "distribution": "stable-audio-3",
+            "url": "https://github.com/Stability-AI/stable-audio-3.git",
+        },
+    }
+    manifest_path = (
+        tmp_path
+        / "models"
+        / "manifests"
+        / "stable_audio_3_small_sfx.json"
+    )
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(platform_doctor, "load_manifest", lambda _path: manifest)
+
+    runtime_python = (
+        tmp_path
+        / "environments"
+        / "stableaudio"
+        / ".venv"
+        / "Scripts"
+        / "python.exe"
+    )
+    runtime_python.parent.mkdir(parents=True)
+    runtime_python.write_bytes(b"unit-test-python")
+    metadata = (
+        runtime_python.parent.parent
+        / "Lib"
+        / "site-packages"
+        / "stable_audio_3-0.1.0.dist-info"
+    )
+    metadata.mkdir(parents=True)
+    (metadata / "direct_url.json").write_text(
+        json.dumps(
+            {
+                "url": manifest["code_source"]["url"],
+                "vcs_info": {
+                    "vcs": "git",
+                    "commit_id": revision,
+                    "requested_revision": revision,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = platform_doctor._check_stableaudio_runtime_revision()
+
+    assert result.ok is True
+    assert result.required is False
+    assert result.detail == f"verified:{revision}"
+
+
+def test_doctor_warns_when_optional_stableaudio_revision_is_polluted(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(platform_doctor, "PROJECT_ROOT", tmp_path)
+    manifest_path = (
+        tmp_path
+        / "models"
+        / "manifests"
+        / "stable_audio_3_small_sfx.json"
+    )
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text("{}", encoding="utf-8")
+    manifest = {
+        "code_revision": "a" * 40,
+        "code_source": {
+            "distribution": "stable-audio-3",
+            "url": "https://github.com/Stability-AI/stable-audio-3.git",
+        },
+    }
+    monkeypatch.setattr(platform_doctor, "load_manifest", lambda _path: manifest)
+
+    result = platform_doctor._check_stableaudio_runtime_revision()
+
+    assert result.ok is False
+    assert result.required is False
+    assert result.detail == "runtime_python_missing_or_linked"

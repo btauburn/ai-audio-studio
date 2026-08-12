@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import math
 import re
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -20,6 +22,7 @@ from dubbing_service.app.models.production import (
     SoundTrack,
 )
 from dubbing_service.app.services.takes import get_selected_take
+from dubbing_service.app.services.sound_generation import resolve_sound_design
 from dubbing_service.app.storage.masters import list_masters
 from dubbing_service.app.storage.production import load_assets, load_settings
 from dubbing_service.app.storage.segments import load_segments
@@ -91,7 +94,92 @@ def _duration(path: Path) -> float:
         return 0.0
 
 
-def run_project_quality_checks(project_id: str, root: Path) -> QualityReport:
+def _formal_severity(purpose: str) -> str:
+    return "warning" if purpose == "preview" else "error"
+
+
+@dataclass(frozen=True)
+class StableAudioLicenseConfirmation:
+    """Validated current receipt fields used by generated-audio gates."""
+
+    operator_confirmation_id: str
+    confirmation_sha256: str
+    license_tier: str
+
+
+def stable_audio_license_snapshot_matches_current(
+    historical_confirmation_id: object,
+    historical_snapshot: object,
+    current_confirmation: StableAudioLicenseConfirmation | None,
+) -> bool:
+    """Match immutable provenance to the current terms, without binding receipt IDs.
+
+    A restore deliberately creates a new operator confirmation ID.  The old ID
+    remains required in provenance for auditability, while the terms hash and
+    license tier determine whether the new, valid receipt is equivalent.
+    """
+
+    if (
+        current_confirmation is None
+        or not str(historical_confirmation_id or "").strip()
+        or not isinstance(historical_snapshot, dict)
+    ):
+        return False
+    return (
+        historical_snapshot.get("confirmation_sha256")
+        == current_confirmation.confirmation_sha256
+        and historical_snapshot.get("license_tier")
+        == current_confirmation.license_tier
+    )
+
+
+def _current_stable_audio_confirmation() -> StableAudioLicenseConfirmation | None:
+    """Return the identity, terms hash and tier from the current valid receipt."""
+
+    repo_root = Path(__file__).resolve().parents[3]
+    manifest_path = repo_root / "models" / "manifests" / "stable_audio_3_small_sfx.json"
+    if not manifest_path.is_file():
+        return None
+    try:
+        from scripts.model_preflight import (
+            has_license_acceptance,
+            license_receipt_path,
+            load_manifest,
+        )
+
+        manifest = load_manifest(manifest_path)
+        if not has_license_acceptance(manifest, project_root=repo_root):
+            return None
+        receipt_path = license_receipt_path(manifest, project_root=repo_root)
+        if receipt_path is None or not receipt_path.is_file():
+            return None
+        payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt_id = payload.get("operator_confirmation_id")
+        confirmation_sha256 = payload.get("confirmation_sha256")
+        license_tier = payload.get("license_tier")
+        if (
+            not receipt_id
+            or not confirmation_sha256
+            or license_tier not in {"community", "enterprise"}
+        ):
+            return None
+        return StableAudioLicenseConfirmation(
+            operator_confirmation_id=str(receipt_id),
+            confirmation_sha256=str(confirmation_sha256),
+            license_tier=str(license_tier),
+        )
+    except Exception:
+        return None
+
+
+def run_project_quality_checks(
+    project_id: str,
+    root: Path,
+    *,
+    purpose: str = "preview",
+) -> QualityReport:
+    if purpose not in {"preview", "master", "release"}:
+        raise ValueError("purpose 必须为 preview、master 或 release")
     issues: list[QualityIssue] = []
     segments = sorted(load_segments(project_id), key=lambda item: item.index)
     if not segments:
@@ -148,10 +236,21 @@ def run_project_quality_checks(project_id: str, root: Path) -> QualityReport:
                 message=f"第 {segment.index + 1} 段与上一段文本重复",
             ))
         previous_text = normalized_text
-        role = roles.get(segment.role_id or "")
-        if role is not None and role.voice_commercial_use is not True:
+        # A Take freezes the role used for synthesis. Legacy Takes without that
+        # field fall back to the segment's current role; an explicit missing or
+        # deleted role must never make formal voice-rights checks disappear.
+        effective_role_id = take.role_id if take.role_id is not None else segment.role_id
+        role = roles.get(effective_role_id or "")
+        if role is None:
             issues.append(QualityIssue(
-                code="voice_license_unconfirmed", severity="warning", segment_id=segment.id,
+                code="voice_license_missing",
+                severity=_formal_severity(purpose),
+                segment_id=segment.id,
+                message=f"第 {segment.index + 1} 段最终 Take 无法解析生成时的声音授权角色",
+            ))
+        elif role.voice_commercial_use is not True:
+            issues.append(QualityIssue(
+                code="voice_license_unconfirmed", severity=_formal_severity(purpose), segment_id=segment.id,
                 message=f"角色“{role.name}”的声音商业授权尚未明确确认",
             ))
         if segment.review_status != SegmentReviewStatus.APPROVED:
@@ -202,9 +301,102 @@ def run_project_quality_checks(project_id: str, root: Path) -> QualityReport:
             ))
         if asset.license.commercial_use is not True:
             issues.append(QualityIssue(
-                code="license_unconfirmed", severity="warning", asset_id=asset.id,
+                code="license_unconfirmed", severity=_formal_severity(purpose), asset_id=asset.id,
                 message=f"素材“{asset.name}”尚未明确确认可商用",
             ))
+
+        if getattr(asset.origin, "value", asset.origin) == "generated":
+            provenance = asset.generation
+            confirmation = _current_stable_audio_confirmation()
+            if provenance is None:
+                issues.append(QualityIssue(
+                    code="generated_provenance_missing",
+                    severity=_formal_severity(purpose),
+                    asset_id=asset.id,
+                    message=f"生成素材“{asset.name}”缺少模型 provenance",
+                ))
+            elif (
+                provenance.commercial_use is not True
+                or not stable_audio_license_snapshot_matches_current(
+                    provenance.license_confirmation_id,
+                    provenance.license_snapshot,
+                    confirmation,
+                )
+                or provenance.audio_sha256 != asset.audio_sha256
+            ):
+                issues.append(QualityIssue(
+                    code="generated_license_stale",
+                    severity=_formal_severity(purpose),
+                    asset_id=asset.id,
+                    message=f"生成素材“{asset.name}”的 Stable Audio/Gemma 许可确认缺失或已过期",
+                ))
+
+    referenced_assets = {clip.asset_id for clip in settings.sound_design.clips}
+    try:
+        from dubbing_service.app.services.sound_generation import refresh_sound_plan_staleness
+        from dubbing_service.app.storage.sound_generation import list_sound_plans
+
+        settings_clips = {clip.id: clip for clip in settings.sound_design.clips}
+        for plan in list_sound_plans(project_id):
+            refreshed = refresh_sound_plan_staleness(plan, segments)
+            for cue in refreshed.cues:
+                pointers = (
+                    cue.selected_candidate_id,
+                    cue.adopted_asset_id,
+                    cue.adopted_clip_id,
+                )
+                selected = next(
+                    (item for item in cue.candidates if item.id == cue.selected_candidate_id),
+                    None,
+                )
+                adopted_asset = assets.get(cue.adopted_asset_id or "")
+                adopted_clip = settings_clips.get(cue.adopted_clip_id or "")
+                adopted_candidates = [
+                    item for item in cue.candidates if item.status.value == "adopted"
+                ]
+                adoption_inconsistent = (any(pointers) or adopted_candidates) and (
+                    not all(pointers)
+                    or len(adopted_candidates) != 1
+                    or adopted_candidates[0].id != cue.selected_candidate_id
+                    or selected is None
+                    or selected.status.value != "adopted"
+                    or adopted_asset is None
+                    or adopted_clip is None
+                    or adopted_clip.asset_id != cue.adopted_asset_id
+                    or adopted_clip.track.value != cue.track.value
+                    or adopted_asset.track.value != cue.track.value
+                    or adopted_clip.semantic_placement != cue.placement
+                    or adopted_clip.duration
+                    != (cue.playback_duration_seconds or selected.duration_seconds)
+                    or adopted_clip.gain_db != cue.gain_db
+                    or adopted_clip.fade_in != cue.fade_in
+                    or adopted_clip.fade_out != cue.fade_out
+                    or adopted_clip.loop != cue.loop
+                    or adopted_asset.audio_sha256 != selected.audio_sha256
+                    or adopted_asset.generation != selected.provenance
+                )
+                if adoption_inconsistent:
+                    issues.append(QualityIssue(
+                        code="sound_adoption_inconsistent",
+                        severity=_formal_severity(purpose),
+                        asset_id=cue.adopted_asset_id,
+                        segment_id=cue.segment_id,
+                        message=f"已采用音效 cue“{cue.description_cn or cue.id}”与候选、素材或时间线绑定不一致",
+                    ))
+                if cue.adopted_asset_id in referenced_assets and cue.stale:
+                    issues.append(QualityIssue(
+                        code="sound_cue_stale",
+                        severity=_formal_severity(purpose),
+                        asset_id=cue.adopted_asset_id,
+                        segment_id=cue.segment_id,
+                        message=f"已采用音效 cue“{cue.description_cn or cue.id}”与当前对白文本不一致",
+                    ))
+    except Exception as exc:
+        issues.append(QualityIssue(
+            code="sound_plan_check_failed",
+            severity=_formal_severity(purpose),
+            message=f"无法验证 SoundPlan 语义锚点与许可状态: {exc}",
+        ))
 
     for master in list_masters(project_id):
         path = _safe_file(root, master.audio_file, "audio/masters")
@@ -227,6 +419,7 @@ def run_project_quality_checks(project_id: str, root: Path) -> QualityReport:
             ))
     return QualityReport(
         project_id=project_id,
+        purpose=purpose,
         passed=not any(item.severity == "error" for item in issues),
         issues=issues,
     )
@@ -241,6 +434,68 @@ def _mix_many(streams: Iterable, *, duration: str = "longest"):
     return ffmpeg.filter(items, "amix", inputs=len(items), duration=duration, dropout_transition=0, normalize=0)
 
 
+@dataclass(frozen=True)
+class AmbienceLoopPlan:
+    source_duration: float
+    output_duration: float
+    repetitions: int
+    crossfade_seconds: float
+
+
+def plan_ambience_crossfade_loop(
+    source_duration: float,
+    output_duration: float,
+    *,
+    crossfade_seconds: float = 1.0,
+) -> AmbienceLoopPlan:
+    """Plan the minimum overlapping repetitions required for an ambience bed."""
+
+    if not math.isfinite(source_duration) or source_duration <= 0:
+        raise ValueError("环境声源时长必须大于 0")
+    if not math.isfinite(output_duration) or output_duration <= 0:
+        raise ValueError("环境声输出时长必须大于 0")
+    if not math.isfinite(crossfade_seconds) or crossfade_seconds <= 0:
+        raise ValueError("环境声循环交叉淡化时长必须大于 0")
+    if output_duration <= source_duration:
+        return AmbienceLoopPlan(source_duration, output_duration, 1, 0.0)
+    overlap = min(crossfade_seconds, source_duration / 2.0)
+    effective_step = source_duration - overlap
+    repetitions = max(2, math.ceil((output_duration - overlap) / effective_step))
+    return AmbienceLoopPlan(source_duration, output_duration, repetitions, overlap)
+
+
+def _ambience_loop_stream(
+    asset_path: Path,
+    *,
+    source_offset: float,
+    source_duration: float,
+    output_duration: float,
+):
+    plan = plan_ambience_crossfade_loop(source_duration, output_duration)
+    source = (
+        ffmpeg.input(str(asset_path)).audio
+        .filter("atrim", start=source_offset, duration=source_duration)
+        .filter("asetpts", "PTS-STARTPTS")
+        .filter("aresample", 48000)
+        .filter("aformat", channel_layouts="stereo")
+    )
+    if plan.repetitions == 1:
+        parts = [source]
+    else:
+        split = source.filter_multi_output("asplit", plan.repetitions)
+        parts = [split[index] for index in range(plan.repetitions)]
+    stream = parts[0]
+    for part in parts[1:]:
+        stream = ffmpeg.filter(
+            [stream, part],
+            "acrossfade",
+            d=plan.crossfade_seconds,
+            c1="tri",
+            c2="tri",
+        )
+    return stream.filter("atrim", duration=output_duration).filter("asetpts", "PTS-STARTPTS"), plan
+
+
 def render_four_track_master(
     *,
     dialogue_path: Path,
@@ -249,11 +504,21 @@ def render_four_track_master(
     settings: ProductionSettings,
     assets: list[AudioAsset],
     dialogue_duration: float,
+    dialogue_timeline: object | None = None,
 ) -> dict[str, object]:
     """Render Dialogue plus BGM/Ambience/SFX, returning the frozen sound snapshot."""
 
     by_id = {item.id: item for item in assets}
-    mix = settings.sound_design.mix
+    sound_design = settings.sound_design
+    if any(item.semantic_placement is not None for item in sound_design.clips):
+        if dialogue_timeline is None:
+            timeline_path = root / "dialogue_timeline.json"
+            try:
+                dialogue_timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError("存在语义定位音效，但最新 dialogue_timeline 不可用") from exc
+        sound_design = resolve_sound_design(sound_design, dialogue_timeline)
+    mix = sound_design.mix
     dialogue = (
         ffmpeg.input(str(dialogue_path)).audio
         .filter("aresample", 48000)
@@ -273,7 +538,7 @@ def render_four_track_master(
         )
     dialogue = dialogue.filter("volume", f"{mix.dialogue_gain_db}dB")
     needs_sidechain = mix.bgm_ducking and any(
-        item.track == SoundTrack.BGM for item in settings.sound_design.clips
+        item.track == SoundTrack.BGM for item in sound_design.clips
     )
     if needs_sidechain:
         dialogue_parts = dialogue.filter_multi_output("asplit", 2)
@@ -286,7 +551,7 @@ def render_four_track_master(
     snapshot_clips: list[dict[str, object]] = []
     total_duration = dialogue_duration
 
-    for clip in settings.sound_design.clips:
+    for clip in sound_design.clips:
         asset = by_id.get(clip.asset_id)
         if asset is None or asset.track != clip.track:
             raise ValueError(f"时间线片段 {clip.id} 的素材不存在或轨道类型不匹配")
@@ -296,10 +561,19 @@ def render_four_track_master(
         available = max(asset.duration_seconds - clip.source_offset, 0.01)
         duration = clip.duration
         if duration is None:
-            duration = max(dialogue_duration - clip.start, available) if clip.loop else available
-        input_kwargs = {"stream_loop": -1} if clip.loop else {}
-        stream = ffmpeg.input(str(asset_path), **input_kwargs).audio
-        stream = stream.filter("atrim", start=clip.source_offset, duration=duration).filter("asetpts", "PTS-STARTPTS")
+            duration = max(dialogue_duration - clip.start, 0.01) if clip.loop else available
+        ambience_loop_plan: AmbienceLoopPlan | None = None
+        if clip.track == SoundTrack.AMBIENCE and clip.loop:
+            stream, ambience_loop_plan = _ambience_loop_stream(
+                asset_path,
+                source_offset=clip.source_offset,
+                source_duration=available,
+                output_duration=duration,
+            )
+        else:
+            input_kwargs = {"stream_loop": -1} if clip.loop else {}
+            stream = ffmpeg.input(str(asset_path), **input_kwargs).audio
+            stream = stream.filter("atrim", start=clip.source_offset, duration=duration).filter("asetpts", "PTS-STARTPTS")
         if clip.fade_in > 0:
             stream = stream.filter("afade", type="in", start_time=0, duration=min(clip.fade_in, duration))
         if clip.fade_out > 0:
@@ -320,7 +594,23 @@ def render_four_track_master(
             "asset_name": asset.name,
             "asset_file": asset.audio_file,
             "asset_sha256": asset.audio_sha256,
+            "asset_origin": asset.origin.value,
             "license": asset.license.model_dump(mode="json"),
+            "origin": asset.origin.value,
+            "generation": (
+                asset.generation.model_dump(mode="json")
+                if asset.generation is not None
+                else None
+            ),
+            "semantic_resolved": clip.semantic_placement is not None,
+            "ambience_loop": (
+                {
+                    "repetitions": ambience_loop_plan.repetitions,
+                    "crossfade_seconds": ambience_loop_plan.crossfade_seconds,
+                }
+                if ambience_loop_plan is not None
+                else None
+            ),
         })
 
     mixed_inputs = [dialogue_main]
@@ -357,7 +647,7 @@ def render_four_track_master(
     )
     ffmpeg.run(output, overwrite_output=True, capture_stdout=True, capture_stderr=True)
     return {
-        "timeline_version": settings.sound_design.version,
+        "timeline_version": sound_design.version,
         "clips": snapshot_clips,
         "mix": mix.model_dump(mode="json"),
     }

@@ -1243,6 +1243,25 @@ createApp({
     const assetFileInput = ref(null);
     const coverFileInput = ref(null);
     const timelineDraft = ref({ asset_id: "", start: 0, duration: null, gain_db: 0, fade_in: 0, fade_out: 0, loop: false });
+    const soundModelStatus = ref(null);
+    const soundPlans = ref([]);
+    const activeSoundPlanId = ref("");
+    const soundJobs = ref([]);
+    const soundGenerationBusy = ref(false);
+    const soundPlanDensity = ref("balanced");
+    const soundLicenseForm = ref({
+      license_tier: "community",
+      stability_registered: false,
+      stability_terms_accepted: false,
+      gemma_terms_accepted: false,
+    });
+    const soundPreview = ref(null);
+    const soundPreviewAudioUrl = ref("");
+    let soundJobPollTimer = null;
+    const activeSoundPlan = computed(() => {
+      const selected = soundPlans.value.find((item) => item.id === activeSoundPlanId.value);
+      return selected || soundPlans.value[0] || null;
+    });
     const subtitleTask = ref("transcribe");
     const subtitleLanguage = ref("zh");
     const subtitleModel = ref("large-v3-turbo");
@@ -5868,6 +5887,7 @@ createApp({
         productionSettings.value = productionDefaults(settings);
         audioAssets.value = Array.isArray(assets) ? assets : [];
         releasePackages.value = Array.isArray(releases) ? releases : [];
+        await loadSoundGenerationWorkspace();
       } catch (e) {
         console.error("加载声音制作工作区失败:", e);
         showToast("加载声音制作工作区失败: " + e.message);
@@ -6003,6 +6023,312 @@ createApp({
       return ({ bgm: "BGM", ambience: "Ambience", sfx: "SFX" })[track] || track;
     }
 
+    function replaceSoundPlan(plan) {
+      if (!plan || !plan.id) return;
+      const index = soundPlans.value.findIndex((item) => item.id === plan.id);
+      if (index >= 0) soundPlans.value.splice(index, 1, plan);
+      else soundPlans.value.unshift(plan);
+      activeSoundPlanId.value = plan.id;
+    }
+
+    function clearSoundJobPolling() {
+      if (soundJobPollTimer) {
+        clearInterval(soundJobPollTimer);
+        soundJobPollTimer = null;
+      }
+    }
+
+    function hasActiveSoundJob() {
+      return soundJobs.value.some((job) => ["queued", "running", "cancelling"].includes(job.status));
+    }
+
+    async function refreshSoundJobs(options = {}) {
+      const projectId = currentProject.value && currentProject.value.id;
+      if (!projectId) return;
+      try {
+        const jobs = await fetchJson(`/api/v1/projects/${projectId}/sound-jobs`);
+        if (!currentProject.value || currentProject.value.id !== projectId) return;
+        const wasActive = hasActiveSoundJob();
+        soundJobs.value = Array.isArray(jobs) ? jobs : [];
+        const isActive = hasActiveSoundJob();
+        soundGenerationBusy.value = isActive;
+        if (!isActive) {
+          clearSoundJobPolling();
+          if (wasActive || options.reloadPlan) {
+            const plans = await fetchJson(`/api/v1/projects/${projectId}/sound-plans`);
+            soundPlans.value = Array.isArray(plans) ? plans : [];
+            if (!soundPlans.value.some((item) => item.id === activeSoundPlanId.value)) {
+              activeSoundPlanId.value = soundPlans.value[0] ? soundPlans.value[0].id : "";
+            }
+          }
+        } else if (!soundJobPollTimer) {
+          soundJobPollTimer = setInterval(() => void refreshSoundJobs(), 1500);
+        }
+      } catch (e) {
+        console.error("刷新音效生成任务失败:", e);
+      }
+    }
+
+    async function loadSoundGenerationWorkspace() {
+      const projectId = currentProject.value && currentProject.value.id;
+      if (!projectId) return;
+      try {
+        const [model, plans, jobs] = await Promise.all([
+          fetchJson("/api/v1/sound-generation/model"),
+          fetchJson(`/api/v1/projects/${projectId}/sound-plans`),
+          fetchJson(`/api/v1/projects/${projectId}/sound-jobs`),
+        ]);
+        if (!currentProject.value || currentProject.value.id !== projectId) return;
+        soundModelStatus.value = model;
+        soundPlans.value = Array.isArray(plans) ? plans : [];
+        soundJobs.value = Array.isArray(jobs) ? jobs : [];
+        if (!soundPlans.value.some((item) => item.id === activeSoundPlanId.value)) {
+          activeSoundPlanId.value = soundPlans.value[0] ? soundPlans.value[0].id : "";
+        }
+        if (activeSoundPlan.value && activeSoundPlan.value.density) {
+          soundPlanDensity.value = activeSoundPlan.value.density;
+        } else {
+          soundPlanDensity.value = productionSettings.value.content_mode === "story" ? "balanced" : "conservative";
+        }
+        soundGenerationBusy.value = hasActiveSoundJob();
+        if (soundGenerationBusy.value && !soundJobPollTimer) {
+          soundJobPollTimer = setInterval(() => void refreshSoundJobs(), 1500);
+        }
+      } catch (e) {
+        console.error("加载 Stable Audio 工作区失败:", e);
+        showToast("加载音效生成工作区失败: " + e.message);
+      }
+    }
+
+    async function confirmStableAudioLicense() {
+      const form = soundLicenseForm.value;
+      if (!(form.stability_registered && form.stability_terms_accepted && form.gemma_terms_accepted)) {
+        showToast("请逐项确认 Stability 注册、Stability 条款和 Gemma 条款");
+        return;
+      }
+      try {
+        await fetchJson("/api/v1/sound-generation/license-confirmation", {
+          method: "POST",
+          body: JSON.stringify(form),
+        });
+        soundModelStatus.value = await fetchJson("/api/v1/sound-generation/model");
+        showToast("Stable Audio 许可确认已绑定当前许可哈希");
+      } catch (e) {
+        showToast("保存许可确认失败: " + e.message);
+      }
+    }
+
+    async function draftSoundPlan() {
+      if (!currentProject.value || soundGenerationBusy.value) return;
+      soundGenerationBusy.value = true;
+      try {
+        const plan = await fetchJson(
+          `/api/v1/projects/${currentProject.value.id}/sound-plans`,
+          {
+            method: "POST",
+            body: JSON.stringify({ density: soundPlanDensity.value }),
+          },
+        );
+        replaceSoundPlan(plan);
+        showToast(`SoundPlan 已起草：${plan.cues.length} 个 cue，需逐条人工批准`);
+      } catch (e) {
+        showToast("起草 SoundPlan 失败: " + e.message);
+      } finally {
+        soundGenerationBusy.value = false;
+      }
+    }
+
+    async function saveSoundCue(cue, reviewStatus = null) {
+      if (!currentProject.value || !activeSoundPlan.value || !cue) return;
+      const payload = {
+        track: cue.track,
+        description_cn: cue.description_cn || null,
+        prompt: cue.prompt,
+        placement: cue.placement,
+        requested_duration_seconds: Number(cue.requested_duration_seconds),
+        playback_duration_seconds: cue.playback_duration_seconds ? Number(cue.playback_duration_seconds) : null,
+        gain_db: Number(cue.gain_db || 0),
+        fade_in: Number(cue.fade_in || 0),
+        fade_out: Number(cue.fade_out || 0),
+        loop: Boolean(cue.loop),
+        enabled: Boolean(cue.enabled),
+      };
+      if (reviewStatus) payload.review_status = reviewStatus;
+      try {
+        const plan = await fetchJson(
+          `/api/v1/projects/${currentProject.value.id}/sound-plans/${activeSoundPlan.value.id}/cues/${cue.id}`,
+          { method: "PATCH", body: JSON.stringify(payload) },
+        );
+        replaceSoundPlan(plan);
+        if (cue.adopted_asset_id) {
+          const settings = await fetchJson(
+            `/api/v1/projects/${currentProject.value.id}/production`,
+          );
+          productionSettings.value = productionDefaults(settings);
+        }
+        showToast(reviewStatus === "approved" ? "cue 已批准" : reviewStatus === "rejected" ? "cue 已拒绝" : "cue 已保存；生成参数变化会要求重新批准");
+      } catch (e) {
+        showToast("保存 cue 失败: " + e.message);
+      }
+    }
+
+    function normalizeSoundCueTrack(cue) {
+      if (!cue || !cue.placement) return;
+      if (cue.track === "ambience") {
+        if (!cue.placement.end) {
+          const fallbackId = cue.placement.start.segment_id || (segments.value[0] && segments.value[0].id);
+          cue.placement.end = { segment_id: fallbackId, edge: "end", offset_seconds: 0 };
+        }
+        cue.requested_duration_seconds = Math.min(60, Math.max(20, Number(cue.requested_duration_seconds || 20)));
+        cue.loop = true;
+      } else {
+        cue.placement.end = null;
+        cue.requested_duration_seconds = Math.min(15, Math.max(1, Number(cue.requested_duration_seconds || 4)));
+        cue.loop = false;
+      }
+    }
+
+    async function generateCueCandidates(cue, count = 2) {
+      if (!currentProject.value || !activeSoundPlan.value || !cue || soundGenerationBusy.value) return;
+      if (!soundModelStatus.value || !soundModelStatus.value.enabled) {
+        showToast("Stable Audio 模型、许可或真实 CUDA 质量门尚未就绪");
+        return;
+      }
+      soundGenerationBusy.value = true;
+      try {
+        const job = await fetchJson(
+          `/api/v1/projects/${currentProject.value.id}/sound-plans/${activeSoundPlan.value.id}/jobs`,
+          { method: "POST", body: JSON.stringify({ cue_ids: [cue.id], candidate_count: count }) },
+        );
+        soundJobs.value.unshift(job);
+        if (!soundJobPollTimer) soundJobPollTimer = setInterval(() => void refreshSoundJobs(), 1500);
+        showToast("候选生成已启动；关闭浏览器不会中止任务");
+      } catch (e) {
+        soundGenerationBusy.value = false;
+        showToast("启动候选生成失败: " + e.message);
+      }
+    }
+
+    function soundCandidateAudioUrl(cue, candidate) {
+      if (!currentProject.value || !activeSoundPlan.value || !cue || !candidate) return "";
+      return `/api/v1/projects/${currentProject.value.id}/sound-plans/${activeSoundPlan.value.id}/cues/${cue.id}/candidates/${candidate.id}/audio`;
+    }
+
+    async function drawCandidateWaveform(canvas, cue, candidate) {
+      if (!canvas || !candidate || !["ready", "adopted"].includes(candidate.status)) return;
+      const url = soundCandidateAudioUrl(cue, candidate);
+      if (!url || canvas.dataset.waveUrl === url) return;
+      canvas.dataset.waveUrl = url;
+      const context = canvas.getContext("2d");
+      const width = Math.max(240, canvas.clientWidth || 240);
+      const height = 38;
+      canvas.width = width;
+      canvas.height = height;
+      context.clearRect(0, 0, width, height);
+      context.strokeStyle = "#334155";
+      context.beginPath(); context.moveTo(0, height / 2); context.lineTo(width, height / 2); context.stroke();
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(response.statusText);
+        const bytes = await response.arrayBuffer();
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const buffer = await audioContext.decodeAudioData(bytes.slice(0));
+        const samples = buffer.getChannelData(0);
+        const block = Math.max(1, Math.floor(samples.length / width));
+        context.strokeStyle = "#38bdf8";
+        context.beginPath();
+        for (let x = 0; x < width; x += 1) {
+          let peak = 0;
+          const start = x * block;
+          const end = Math.min(samples.length, start + block);
+          for (let i = start; i < end; i += 1) peak = Math.max(peak, Math.abs(samples[i]));
+          const amplitude = Math.max(1, peak * (height / 2));
+          context.moveTo(x, height / 2 - amplitude);
+          context.lineTo(x, height / 2 + amplitude);
+        }
+        context.stroke();
+        await audioContext.close();
+      } catch (e) {
+        canvas.dataset.waveUrl = "";
+        console.debug("候选波形解码失败:", e);
+      }
+    }
+
+    async function adoptSoundCandidate(cue, candidate) {
+      if (!currentProject.value || !activeSoundPlan.value) return;
+      try {
+        const plan = await fetchJson(
+          `/api/v1/projects/${currentProject.value.id}/sound-plans/${activeSoundPlan.value.id}/cues/${cue.id}/candidates/${candidate.id}/adopt`,
+          { method: "POST" },
+        );
+        replaceSoundPlan(plan);
+        await loadProductionWorkspace();
+        showToast("候选已原子注册为正式素材，并按语义锚点加入时间线");
+      } catch (e) {
+        showToast("采用候选失败: " + e.message);
+      }
+    }
+
+    async function unadoptSoundCandidate(cue) {
+      if (!currentProject.value || !activeSoundPlan.value || !cue || !cue.adopted_asset_id) return;
+      if (!confirm("解除采用会从当前时间线和素材库移除正式副本，但保留候选 WAV，是否继续？")) return;
+      try {
+        const plan = await fetchJson(
+          `/api/v1/projects/${currentProject.value.id}/sound-plans/${activeSoundPlan.value.id}/cues/${cue.id}/adoption`,
+          { method: "DELETE" },
+        );
+        replaceSoundPlan(plan);
+        await loadProductionWorkspace();
+        showToast("已解除采用；候选仍可重新采用或清理");
+      } catch (e) {
+        showToast("解除采用失败: " + e.message);
+      }
+    }
+
+    async function deleteSoundCandidate(cue, candidate) {
+      if (!currentProject.value || !activeSoundPlan.value || !confirm("清理这个未采用候选及其 WAV？")) return;
+      try {
+        await fetchJson(
+          `/api/v1/projects/${currentProject.value.id}/sound-plans/${activeSoundPlan.value.id}/cues/${cue.id}/candidates/${candidate.id}`,
+          { method: "DELETE" },
+        );
+        const plan = await fetchJson(`/api/v1/projects/${currentProject.value.id}/sound-plans/${activeSoundPlan.value.id}`);
+        replaceSoundPlan(plan);
+        showToast("未采用候选已清理");
+      } catch (e) {
+        showToast("清理候选失败: " + e.message);
+      }
+    }
+
+    async function createSoundPreview() {
+      if (!currentProject.value || productionBusy.value) return;
+      productionBusy.value = true;
+      try {
+        if (!(await saveSoundDesign())) return;
+        soundPreview.value = await fetchJson(
+          `/api/v1/projects/${currentProject.value.id}/sound-preview`,
+          { method: "POST" },
+        );
+        soundPreviewAudioUrl.value = `${soundPreview.value.audio_url}?sha=${soundPreview.value.audio_sha256}`;
+        showToast(`四轨 Preview 已生成，含 ${soundPreview.value.warnings.length} 项非阻断提示`);
+      } catch (e) {
+        showToast("生成四轨 Preview 失败: " + e.message);
+      } finally {
+        productionBusy.value = false;
+      }
+    }
+
+    function cueAnchorLabel(cue) {
+      if (!cue || !cue.placement || !cue.placement.start) return "未设置";
+      const start = cue.placement.start;
+      const end = cue.placement.end;
+      const offset = Number(start.offset_seconds || 0);
+      const startText = `${start.segment_id}:${start.edge}${offset >= 0 ? "+" : ""}${offset.toFixed(2)}s`;
+      if (!end) return startText;
+      const endOffset = Number(end.offset_seconds || 0);
+      return `${startText} → ${end.segment_id}:${end.edge}${endOffset >= 0 ? "+" : ""}${endOffset.toFixed(2)}s`;
+    }
+
     async function deleteSoundAsset(asset) {
       if (!currentProject.value || !asset || !confirm(`删除素材“${asset.name}”？`)) return;
       try {
@@ -6015,7 +6341,7 @@ createApp({
     }
 
     async function saveSoundDesign() {
-      if (!currentProject.value) return;
+      if (!currentProject.value) return false;
       productionBusy.value = true;
       try {
         const settings = await fetchJson(
@@ -6024,8 +6350,10 @@ createApp({
         );
         productionSettings.value = productionDefaults(settings);
         showToast("四轨时间线与混音设置已保存");
+        return true;
       } catch (e) {
         showToast("保存声音设计失败: " + e.message);
+        return false;
       } finally {
         productionBusy.value = false;
       }
@@ -6051,6 +6379,12 @@ createApp({
     async function removeTimelineClip(id) {
       productionSettings.value.sound_design.clips = productionSettings.value.sound_design.clips.filter((item) => item.id !== id);
       await saveSoundDesign();
+    }
+
+    function isAdoptedSoundClip(id) {
+      return soundPlans.value.some((plan) =>
+        (plan.cues || []).some((cue) => cue.adopted_clip_id === id),
+      );
     }
 
     async function runQualityCheck() {
@@ -6456,6 +6790,14 @@ createApp({
       audioAssets.value = [];
       qualityReport.value = null;
       releasePackages.value = [];
+      soundModelStatus.value = null;
+      soundPlans.value = [];
+      activeSoundPlanId.value = "";
+      soundJobs.value = [];
+      soundGenerationBusy.value = false;
+      soundPreview.value = null;
+      soundPreviewAudioUrl.value = "";
+      clearSoundJobPolling();
       subtitles.value = [];
       llm.value.text = "";
       resetWaveforms();
@@ -9772,6 +10114,7 @@ createApp({
       document.removeEventListener("visibilitychange", onVisibilityChangeForTtsPolling);
       clearTtsServicePollTimer();
       clearWaveformPersistTimer();
+      clearSoundJobPolling();
       cleanupSynthesisSockets();
     });
 
@@ -9842,6 +10185,16 @@ createApp({
       assetFileInput,
       coverFileInput,
       timelineDraft,
+      soundModelStatus,
+      soundPlans,
+      activeSoundPlanId,
+      activeSoundPlan,
+      soundJobs,
+      soundGenerationBusy,
+      soundPlanDensity,
+      soundLicenseForm,
+      soundPreview,
+      soundPreviewAudioUrl,
       subtitleTask,
       subtitleLanguage,
       subtitleModel,
@@ -9956,6 +10309,20 @@ createApp({
       saveSoundDesign,
       addTimelineClip,
       removeTimelineClip,
+      isAdoptedSoundClip,
+      loadSoundGenerationWorkspace,
+      confirmStableAudioLicense,
+      draftSoundPlan,
+      saveSoundCue,
+      normalizeSoundCueTrack,
+      generateCueCandidates,
+      soundCandidateAudioUrl,
+      drawCandidateWaveform,
+      adoptSoundCandidate,
+      unadoptSoundCandidate,
+      deleteSoundCandidate,
+      createSoundPreview,
+      cueAnchorLabel,
       runQualityCheck,
       saveReleaseMetadata,
       uploadReleaseCover,

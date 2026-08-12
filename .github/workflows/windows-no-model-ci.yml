@@ -73,6 +73,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           uv lock --check --project environments/qwen3tts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          uv lock --check --project environments/stableaudio
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify WebUI npm lockfile
         run: npm ci --ignore-scripts --no-audit --no-fund --prefix dubbing_service/webui

@@ -6,10 +6,10 @@
 
 - [ ] 当前分支或版本标签明确，`git status --short` 没有不认识的改动；
 - [ ] `ffmpeg -version`、`uv --version`、`nvidia-smi` 均可运行；
-- [ ] `.venv`、`environments/qwen3tts/.venv`、`environments/cosyvoice/.venv` 均存在；
+- [ ] `.venv`、`environments/qwen3tts/.venv`、`environments/cosyvoice/.venv`、`environments/stableaudio/.venv` 均存在；
 - [ ] 模型、作品目录和目标磁盘有足够空间；
 - [ ] 重要项目已用 `scripts/backup_project.ps1` 做冷备份；
-- [ ] 9000、8001～8004 没有残留的旧平台或 worker。
+- [ ] 9000、8001～8005 没有残留的旧平台或 worker。
 
 平台与 worker 均停止时执行：
 
@@ -17,7 +17,7 @@
 .\.venv\Scripts\python.exe .\scripts\platform_doctor.py --startup
 ```
 
-验收标准：汇总为 `0 failed`。默认一键启动要求八份模型 manifest 全部满足。
+验收标准：汇总为 `0 failed`。八份 TTS/字幕 manifest 是基础边界；第九份 Stable Audio manifest、许可回执和质量门未就绪时会警告并保持 SFX 禁用。
 
 ## 2. 启动平台
 
@@ -39,7 +39,7 @@
 在“平台配置”中选择本次生产所需后端并点击启动/加载模型：
 
 - [ ] 页面顶部显示正确后端和“已加载”；
-- [ ] 当前只运行一个 8001～8004 worker；
+- [ ] 当前只运行一个 8001～8005 GPU 生成 worker；
 - [ ] 切换后端后旧 worker 已释放；
 - [ ] 用无敏感内容的短句完成一次样音合成；
 - [ ] 样音可播放，无削波、异常静音、截断或明显重复。
@@ -61,6 +61,7 @@ IndexTTS2 当前辅助供应链包含标记为 `CC-BY-NC-4.0` 的 MaskGCT。未�
 - [ ] 关键分段已标记“已通过”，问题备注已关闭；
 - [ ] 非破坏编辑预览与编辑导出一致，原始 Take 仍可恢复；
 - [ ] BGM / Ambience / SFX 的来源、许可证、商业使用范围和备注完整；
+- [ ] 使用生成 SFX 时，cue 已人工批准并采用，当前许可回执与真实质量门有效；
 - [ ] Dialogue 优先级、BGM ducking、淡入淡出和峰值听感合理；
 - [ ] 完整质检通过后再生成不可变 Master。
 

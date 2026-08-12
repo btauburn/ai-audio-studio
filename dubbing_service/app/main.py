@@ -42,6 +42,7 @@ from dubbing_service.app.routers import ws_synthesis as ws_synthesis_router
 from dubbing_service.app.routers import jobs as jobs_router
 from dubbing_service.app.routers import masters as masters_router
 from dubbing_service.app.routers import production as production_router
+from dubbing_service.app.routers import sound_generation as sound_generation_router
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """应用生命周期：启动时初始化日志，关闭时清理 TTS 子进程。"""
     setup_logging()
     logger.info("Dubbing service starting up")
+    # A browser request is not the owner of a sound-generation job.  Jobs are
+    # durable, but Python threads are not; make an interrupted restart explicit
+    # instead of leaving a project permanently stuck in "running".
+    try:
+        from dubbing_service.app.storage.projects import list_projects
+        from dubbing_service.app.storage.sound_jobs import recover_interrupted_sound_jobs
+
+        for project in list_projects():
+            recover_interrupted_sound_jobs(project.id)
+    except Exception:
+        logger.warning("Failed to recover interrupted sound-generation jobs", exc_info=True)
     yield
     # ── Shutdown ──────────────────────────────────────────────────────
     logger.info("Dubbing service shutting down, cleaning up ...")
@@ -86,6 +98,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Subtitle model caches cleaned up")
     except Exception:
         logger.warning("Failed to clean up subtitle model caches", exc_info=True)
+    try:
+        from dubbing_service.app.services.sound_jobs import shutdown_sound_jobs
+
+        shutdown_sound_jobs()
+        logger.info("Stable Audio SFX worker cleaned up")
+    except Exception:
+        logger.warning("Failed to clean up Stable Audio SFX worker", exc_info=True)
 
 
 def create_app() -> FastAPI:
@@ -116,6 +135,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router.router, prefix=API_V1, tags=["jobs"])
     app.include_router(masters_router.router, prefix=API_V1, tags=["masters"])
     app.include_router(production_router.router, prefix=API_V1, tags=["production"])
+    app.include_router(sound_generation_router.router, prefix=API_V1, tags=["sound-generation"])
 
     # Web 管理界面静态文件（使用绝对路径，避免受当前工作目录影响）
     webui_dir = Path(__file__).resolve().parents[1] / "webui"

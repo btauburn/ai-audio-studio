@@ -68,7 +68,10 @@ $AllowedExtensions = [Collections.Generic.HashSet[string]]::new(
 )
 
 $AllowedExtensionlessNames = [Collections.Generic.HashSet[string]]::new(
-    [string[]]@("COPYING", "Dockerfile", "LICENSE", "NOTICE"),
+    [string[]]@(
+        ".gitattributes", ".gitignore", ".python-version", "COPYING",
+        "DISCLAIMER", "Dockerfile", "LICENSE", "MANIFEST.in", "NOTICE"
+    ),
     [StringComparer]::OrdinalIgnoreCase
 )
 
@@ -236,6 +239,19 @@ foreach ($relative in $AllowedRootFiles) {
     }
 }
 
+# An entry in AllowedRootFiles is an explicit release contract.  Do not let a
+# filename/extension policy silently omit an existing root file from exports.
+foreach ($relative in $AllowedRootFiles) {
+    $candidate = Join-Path $ProjectRoot $relative
+    if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+        continue
+    }
+    $normalized = Convert-ToRelativePath -FullName (Get-Item -LiteralPath $candidate -Force).FullName
+    if (-not $selectedByPath.ContainsKey($normalized)) {
+        throw "Explicitly allowed root file was not selected for source export: $normalized"
+    }
+}
+
 foreach ($tree in $AllowedTrees) {
     $sourceRoot = Join-Path $ProjectRoot $tree
     if (-not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
@@ -315,6 +331,7 @@ $manifest = [ordered]@{
     files = $manifestFiles
     excluded_by_design = @(
         "model weights and model caches",
+        "model license receipts, benchmark evidence and quality-gate state",
         "virtual environments and dependency caches",
         "API keys, .env files, config.json and provider configuration",
         "dubbing projects, voices, prompts, generated audio and logs",

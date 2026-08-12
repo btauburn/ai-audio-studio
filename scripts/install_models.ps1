@@ -1,9 +1,12 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("Full", "Tts", "Core", "Subtitles")]
+    [ValidateSet("Full", "Tts", "Core", "Subtitles", "Sfx")]
     [string]$Profile = "Full",
 
     [switch]$AcceptThirdPartyLicenses,
+
+    [ValidateSet("community", "enterprise")]
+    [string]$StableAudioLicenseTier = "community",
 
     [switch]$DryRun
 )
@@ -27,7 +30,8 @@ $profiles = @{
         "whisper_distil_large_v3.json",
         "whisper_large_v3.json",
         "whisper_large_v3_turbo.json",
-        "whisperx_zh_alignment.json"
+        "whisperx_zh_alignment.json",
+        "stable_audio_3_small_sfx.json"
     )
     Tts = @(
         "index_tts2.json",
@@ -46,6 +50,9 @@ $profiles = @{
         "whisper_large_v3_turbo.json",
         "whisperx_zh_alignment.json"
     )
+    Sfx = @(
+        "stable_audio_3_small_sfx.json"
+    )
 }
 
 $manifestNames = $profiles[$Profile]
@@ -58,7 +65,7 @@ $manifestPaths = foreach ($name in $manifestNames) {
 }
 
 Write-Host "Model profile: $Profile ($($manifestPaths.Count) manifests)"
-Write-Host "Model files are downloaded from manifest-pinned ModelScope sources and verified by size and SHA256."
+Write-Host "Model files are downloaded only from manifest-pinned sources and verified by size and SHA256."
 Write-Host "Model licenses are independent from the platform source license."
 Write-Host "IndexTTS2 currently includes MaskGCT material marked CC-BY-NC-4.0."
 
@@ -73,10 +80,19 @@ if (-not $DryRun -and -not $AcceptThirdPartyLicenses) {
 Write-Host ""
 Write-Host "Preflight: validating all approved download sources..."
 foreach ($manifest in $manifestPaths) {
-    & $Python $Provisioner `
-        --manifest $manifest `
-        --allow-modelscope-download `
-        --dry-run
+    $manifestData = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+    if ($manifestData.sources.model.provider -eq "huggingface") {
+        & $Python $Provisioner `
+            --manifest $manifest `
+            --allow-huggingface-gated-download `
+            --dry-run
+    }
+    else {
+        & $Python $Provisioner `
+            --manifest $manifest `
+            --allow-modelscope-download `
+            --dry-run
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "Model preflight failed: $(Split-Path -Leaf $manifest)"
     }
@@ -93,9 +109,20 @@ Write-Host "Provisioning models. Interrupted downloads can be retried safely."
 foreach ($manifest in $manifestPaths) {
     Write-Host ""
     Write-Host "==> $(Split-Path -Leaf $manifest)"
-    & $Python $Provisioner `
-        --manifest $manifest `
-        --allow-modelscope-download
+    $manifestData = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+    if ($manifestData.sources.model.provider -eq "huggingface") {
+        $confirmationHash = $manifestData.license_policy.confirmation_sha256
+        & $Python $Provisioner `
+            --manifest $manifest `
+            --allow-huggingface-gated-download `
+            --accept-license-hash $confirmationHash `
+            --license-tier $StableAudioLicenseTier
+    }
+    else {
+        & $Python $Provisioner `
+            --manifest $manifest `
+            --allow-modelscope-download
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "Model provisioning failed: $(Split-Path -Leaf $manifest)"
     }

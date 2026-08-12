@@ -1887,6 +1887,11 @@ def api_export_full_project_with_edits(project_id: str) -> ExportFullResponse:
     timeline_items: list[dict[str, object]] = []
     cursor = 0.0
     invalid_duration_segments: list[Segment] = []
+    try:
+        from dubbing_service.app.storage.production import load_settings as _load_production_settings
+        dialogue_crossfade = _load_production_settings(project_id).sound_design.mix.dialogue_crossfade_seconds
+    except Exception:
+        dialogue_crossfade = 0.0
 
     try:
         for idx, (seg, audio_path) in enumerate(playable):

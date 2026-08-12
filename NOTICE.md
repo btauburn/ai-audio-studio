@@ -30,6 +30,12 @@ their source terms. The current IndexTTS2 manifest includes MaskGCT material
 recorded as CC-BY-NC-4.0; it is not cleared for commercial use merely because
 the Apache-2.0 platform code can load it.
 
+The optional Stable Audio 3 Small-SFX weights and bundled T5Gemma text encoder
+are downloaded separately from a gated source. They remain subject to the
+Stability AI Community License (or an applicable Enterprise License) and the
+Google Gemma Terms. The platform's license receipt and quality gate are
+technical controls, not a grant of rights or legal clearance.
+
 See `LICENSES/README.md` for the authoritative path-to-license map and
 `THIRD_PARTY_NOTICES.md` for component, model, media and commercial-use
 boundaries. This notice does not replace any included license and is not legal

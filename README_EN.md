@@ -23,7 +23,7 @@
 </p>
 
 > [!IMPORTANT]
-> `0.1.0-beta.1` targets Windows with an NVIDIA GPU. The TadashiJLU-authored platform layer is open-sourced under Apache-2.0. IndexTTS2, CosyVoice, Matcha-TTS, browser vendors, and separately downloaded models retain their own licenses; they are not relicensed as one Apache-2.0 work. Review the [path-level license map](LICENSES/README.md) before redistribution or commercial use.
+> `0.2.0-beta.1` targets Windows with an NVIDIA GPU. The TadashiJLU-authored platform layer is open-sourced under Apache-2.0. IndexTTS2, CosyVoice, Matcha-TTS, browser vendors, and separately downloaded models retain their own licenses; they are not relicensed as one Apache-2.0 work. Review the [path-level license map](LICENSES/README.md) before redistribution or commercial use.
 
 AI Audio Studio turns isolated TTS calls into a traceable production pipeline:
 
@@ -36,7 +36,7 @@ AI Audio Studio turns isolated TTS calls into a traceable production pipeline:
 - **Independent A/B and immutable Takes** — generating a new version never silently destroys the other slot; history remains until explicitly removed.
 - **Non-destructive editing** — trims, silence, gain, speed, fades, and padding are stored as recipes; the source Take is preserved.
 - **Human review** — per-segment review states, issue notes, final Take selection, and resumable synthesis jobs.
-- **Four-track sound design** — Dialogue, BGM, Ambience, and SFX with licensing metadata, gain, looping, fades, crossfades, and music ducking.
+- **Four-track sound design** — Dialogue, BGM, Ambience, and SFX with Stable Audio 3 sentence-level SFX planning/generation, licensing metadata, gain, looping, fades, crossfades, and music ducking.
 - **Release-grade output** — loudness and peak QC, immutable Masters, WAV/MP3, SRT/VTT, chapters, metadata, rights manifests, checksums, and ZIP packages.
 - **Local-first boundaries** — projects, voices, secrets, models, and generated media stay outside Git by default.
 
@@ -49,7 +49,7 @@ AI Audio Studio turns isolated TTS calls into a traceable production pipeline:
 | Qwen3-TTS VoiceDesign | Designing a voice from natural language | Text voice descriptions | Weights are downloaded separately; review the model page terms |
 | CosyVoice3 | Natural-language style and delivery control | Reference voice and instruction control | Vendored code is Apache-2.0; model weights retain their model-page terms |
 
-Model weights, API keys, reference voices, and user projects are never shipped in this repository. Provisioning uses manifest-pinned ModelScope sources and verifies size and SHA256 before promotion into the project model directory.
+Model weights, API keys, reference voices, and user projects are never shipped in this repository. Provisioning uses manifest-pinned sources and verifies revisions, file metadata, size, and SHA256 before promotion into the project model directory.
 
 ## Full installation
 
@@ -57,7 +57,7 @@ Model weights, API keys, reference voices, and user projects are never shipped i
 
 - Windows 10/11, an NVIDIA GPU, and a compatible driver;
 - verified baseline: RTX 4070 Ti SUPER with 16 GiB VRAM; lower-memory configurations are not yet part of a supported matrix;
-- at least **80 GiB** free disk space for approximately 31.86 GiB of models, download cache, and three uv environments;
+- at least **80 GiB** free disk space for approximately 35.2 GiB of models, download cache, and four uv environments;
 - internet access for first-time provisioning; routine inference uses project-local offline model paths.
 
 Install the system tools in PowerShell:
@@ -81,16 +81,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Run
 Copy-Item .\dubbing_service\config.example.json .\dubbing_service\config.json
 ```
 
-The three Python environments are intentionally isolated: the root `.venv` hosts the platform, IndexTTS2, and subtitles; the Qwen and CosyVoice runtimes live under `environments/`.
+The four Python environments are intentionally isolated: the root `.venv` hosts the platform, IndexTTS2, and subtitles; the Qwen, CosyVoice, and Stable Audio runtimes live under `environments/`.
 
-Review [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), then preflight and provision all eight manifests from ModelScope:
+Review [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), then preflight all nine manifests. `Full` includes gated Stable Audio 3 Small-SFX: accept the Stability AI and Gemma terms on the official model page, complete the applicable Stability registration, and expose a read token only in the current PowerShell process:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 -Profile Full -DryRun
 
+$env:HF_TOKEN = '<Hugging Face read token>'
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_models.ps1 `
   -Profile Full `
-  -AcceptThirdPartyLicenses
+  -AcceptThirdPartyLicenses `
+  -StableAudioLicenseTier community
+Remove-Item Env:HF_TOKEN
 ```
 
 The acceptance switch records acknowledgement only; it grants no additional commercial or redistribution rights. Interrupted downloads can be retried safely.
@@ -131,6 +134,7 @@ The platform manages only one GPU TTS worker at a time, releasing the previous p
 | CosyVoice3 | 8002 | `environments/cosyvoice/.venv` | `models/cosyvoice3/Fun-CosyVoice3-0.5B` |
 | Qwen VoiceDesign | 8003 | `environments/qwen3tts/.venv` | `models/qwen3_tts/Qwen3-TTS-VoiceDesign` |
 | Qwen CustomVoice | 8004 | `environments/qwen3tts/.venv` | `models/qwen3_tts/Qwen3-TTS-CustomVoice` |
+| Stable Audio 3 Small-SFX | 8005 | `environments/stableaudio/.venv` | `models/stable_audio_3/small-sfx` |
 
 ## Privacy and source boundaries
 
@@ -158,10 +162,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\export_source.ps1 
 ## Current scope
 
 - Single-user local production is the priority; multi-user accounts, cloud sync, publishing-platform APIs, analytics, and a full DAW are out of scope.
-- BGM/SFX currently covers asset import, arrangement, mixing, and rights records; no music-generation model is deployed.
+- BGM remains asset-import only. SFX can optionally use local Stable Audio 3 Small-SFX after current license-receipt and real 12-category/30-run quality gates pass; no music-generation model is deployed.
 - GitHub CI is model-free and GPU-free. Real TTS, subtitle, and release-package E2E must be accepted on a local GPU machine.
 - Only manifest-pinned, SHA256-verified models stored inside the project are supported. Do not load untrusted checkpoints, Transformers repositories, or training configurations.
 - The IndexTTS2 path is not commercially cleared while its current MaskGCT dependency remains non-commercial without separate permission.
+- Stable Audio 3 weights retain the Stability AI Community/Enterprise License and bundled T5Gemma retains the Gemma Terms; the platform Apache-2.0 license does not cover those weights.
 
 ## Contributing and security
 

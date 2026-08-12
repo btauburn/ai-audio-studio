@@ -8,11 +8,18 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+from dubbing_service.app.models.sound_generation import GenerationProvenance, SemanticPlacement
+
 
 class SoundTrack(str, Enum):
     BGM = "bgm"
     AMBIENCE = "ambience"
     SFX = "sfx"
+
+
+class AudioAssetOrigin(str, Enum):
+    UPLOADED = "uploaded"
+    GENERATED = "generated"
 
 
 class PronunciationEntry(BaseModel):
@@ -41,6 +48,8 @@ class AudioAsset(BaseModel):
     tags: List[str] = Field(default_factory=list)
     favorite: bool = False
     license: AssetLicense = Field(default_factory=AssetLicense)
+    origin: AudioAssetOrigin = AudioAssetOrigin.UPLOADED
+    generation: Optional[GenerationProvenance] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -55,6 +64,7 @@ class TimelineClip(BaseModel):
     fade_in: float = Field(default=0.0, ge=0.0, le=30.0)
     fade_out: float = Field(default=0.0, ge=0.0, le=30.0)
     loop: bool = False
+    semantic_placement: Optional[SemanticPlacement] = None
 
 
 class MixSettings(BaseModel):
@@ -116,6 +126,7 @@ class QualityIssue(BaseModel):
 
 class QualityReport(BaseModel):
     project_id: str
+    purpose: str = Field(default="preview", pattern="^(preview|master|release)$")
     passed: bool
     issues: List[QualityIssue] = Field(default_factory=list)
     checked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

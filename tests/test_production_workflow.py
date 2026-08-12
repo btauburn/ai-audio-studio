@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from dubbing_service.app.core.config import clear_config_caches
 from dubbing_service.app.main import create_app
 from dubbing_service.app.services.production import apply_pronunciation_dictionary
+from dubbing_service.app.storage.masters import load_master, save_master
 from tests.audio_test_utils import make_wav_bytes
 
 
@@ -34,6 +35,16 @@ def _approved_project(client: TestClient, projects_root: Path) -> tuple[str, str
     assert client.patch(
         f"/api/v1/projects/{project_id}/segments/{segment_id}/review",
         json={"review_status": "approved"},
+    ).status_code == 200
+    role_id = client.get(f"/api/v1/projects/{project_id}/segments").json()[0]["role_id"]
+    assert client.patch(
+        f"/api/v1/projects/{project_id}/roles/{role_id}/voice-profile",
+        json={
+            "voice_source": "self",
+            "voice_license_name": "owned",
+            "voice_commercial_use": True,
+            "voice_rights_note": "recorded by owner",
+        },
     ).status_code == 200
     return project_id, segment_id
 
@@ -168,6 +179,188 @@ def test_four_track_master_qc_and_release_package(tmp_path: Path, monkeypatch) -
         assert download.status_code == 200
         assert download.content == archive.read_bytes()
     clear_config_caches()
+
+
+def test_release_accepts_restored_receipt_id_but_rejects_changed_terms_or_tier(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    projects_root = tmp_path / "projects"
+    monkeypatch.setenv("DUBBING_PROJECTS_ROOT", str(projects_root))
+    clear_config_caches()
+    try:
+        with TestClient(create_app()) as client:
+            project_id, _ = _approved_project(client, projects_root)
+            created = client.post(
+                f"/api/v1/projects/{project_id}/masters",
+                json={"name": "restored-license-master"},
+            )
+            assert created.status_code == 200, created.text
+            master = load_master(project_id, created.json()["id"])
+            historical_receipt_id = "00000000-0000-4000-8000-000000000001"
+            restored_receipt_id = "00000000-0000-4000-8000-000000000002"
+            confirmation_hash = "c" * 64
+            asset_hash = "a" * 64
+            frozen_sound_design = dict(master.sound_design_snapshot or {})
+            frozen_sound_design["clips"] = [{
+                "id": "generated-frozen-clip",
+                "asset_origin": "generated",
+                "asset_sha256": asset_hash,
+                "license": {"commercial_use": True},
+                "generation": {
+                    "commercial_use": True,
+                    "audio_sha256": asset_hash,
+                    "license_confirmation_id": historical_receipt_id,
+                    "license_snapshot": {
+                        "confirmation_sha256": confirmation_hash,
+                        "license_tier": "community",
+                    },
+                },
+            }]
+            master.sound_design_snapshot = frozen_sound_design
+            save_master(master)
+
+            receipt = tmp_path / "restored-license-receipt.json"
+
+            def write_receipt(*, terms_hash: str, tier: str) -> None:
+                receipt.write_text(json.dumps({
+                    "operator_confirmation_id": restored_receipt_id,
+                    "confirmation_sha256": terms_hash,
+                    "license_tier": tier,
+                }), encoding="utf-8")
+
+            monkeypatch.setattr(
+                "scripts.model_preflight.has_license_acceptance",
+                lambda *_a, **_k: True,
+            )
+            monkeypatch.setattr(
+                "scripts.model_preflight.license_receipt_path",
+                lambda *_a, **_k: receipt,
+            )
+
+            for terms_hash, tier in (
+                ("d" * 64, "community"),
+                (confirmation_hash, "enterprise"),
+            ):
+                write_receipt(terms_hash=terms_hash, tier=tier)
+                blocked = client.post(
+                    f"/api/v1/projects/{project_id}/release-packages/{master.id}",
+                )
+                assert blocked.status_code == 400, blocked.text
+
+            write_receipt(terms_hash=confirmation_hash, tier="community")
+            released = client.post(
+                f"/api/v1/projects/{project_id}/release-packages/{master.id}",
+            )
+            assert released.status_code == 200, released.text
+            archive = projects_root / project_id / released.json()["archive_file"]
+            with zipfile.ZipFile(archive) as bundle:
+                credits = json.loads(bundle.read("credits_and_licenses.json"))
+            frozen_generation = credits["sound_design"]["clips"][0]["generation"]
+            assert frozen_generation["license_confirmation_id"] == historical_receipt_id
+    finally:
+        clear_config_caches()
+
+
+def test_release_checks_frozen_master_rights_and_deleted_role_cannot_bypass_voice_qc(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    projects_root = tmp_path / "projects"
+    monkeypatch.setenv("DUBBING_PROJECTS_ROOT", str(projects_root))
+    clear_config_caches()
+    try:
+        with TestClient(create_app()) as client:
+            project_id, _ = _approved_project(client, projects_root)
+            segment = client.get(f"/api/v1/projects/{project_id}/segments").json()[0]
+            role_id = segment["role_id"]
+            created = client.post(
+                f"/api/v1/projects/{project_id}/masters",
+                json={"name": "frozen-rights-master"},
+            )
+            assert created.status_code == 200, created.text
+            master_id = created.json()["id"]
+            original = load_master(project_id, master_id).model_copy(deep=True)
+            assert original.quality_report["purpose"] == "master"
+            assert original.quality_report["passed"] is True
+            assert original.segments[0].voice_license_snapshot["commercial_use"] is True
+
+            preview_only = original.model_copy(deep=True)
+            preview_only.quality_report = {
+                **preview_only.quality_report,
+                "purpose": "preview",
+                "passed": True,
+            }
+            save_master(preview_only)
+            blocked_preview_snapshot = client.post(
+                f"/api/v1/projects/{project_id}/release-packages/{master_id}",
+            )
+            assert blocked_preview_snapshot.status_code == 400, blocked_preview_snapshot.text
+
+            missing_passed = original.model_copy(deep=True)
+            missing_passed.quality_report.pop("passed")
+            save_master(missing_passed)
+            blocked_damaged_quality = client.post(
+                f"/api/v1/projects/{project_id}/release-packages/{master_id}",
+            )
+            assert blocked_damaged_quality.status_code == 400, blocked_damaged_quality.text
+
+            missing_sound_snapshot = original.model_copy(deep=True)
+            missing_sound_snapshot.sound_design_snapshot = None
+            save_master(missing_sound_snapshot)
+            blocked_missing_sound_snapshot = client.post(
+                f"/api/v1/projects/{project_id}/release-packages/{master_id}",
+            )
+            assert blocked_missing_sound_snapshot.status_code == 400, blocked_missing_sound_snapshot.text
+
+            unlicensed_snapshot = original.model_copy(deep=True)
+            unlicensed_snapshot.segments[0].voice_license_snapshot = {
+                **unlicensed_snapshot.segments[0].voice_license_snapshot,
+                "commercial_use": False,
+            }
+            save_master(unlicensed_snapshot)
+            blocked_voice_snapshot = client.post(
+                f"/api/v1/projects/{project_id}/release-packages/{master_id}",
+            )
+            assert blocked_voice_snapshot.status_code == 400, blocked_voice_snapshot.text
+
+            save_master(original)
+            deleted = client.delete(f"/api/v1/projects/{project_id}/roles/{role_id}")
+            assert deleted.status_code == 200, deleted.text
+            assert client.get(f"/api/v1/projects/{project_id}/segments").json()[0][
+                "role_id"
+            ] is None
+
+            for purpose, expected_severity in {
+                "preview": "warning",
+                "master": "error",
+                "release": "error",
+            }.items():
+                quality = client.get(
+                    f"/api/v1/projects/{project_id}/quality-check?purpose={purpose}",
+                )
+                assert quality.status_code == 200, quality.text
+                issues = [
+                    item for item in quality.json()["issues"]
+                    if item["code"] == "voice_license_missing"
+                ]
+                assert issues, quality.text
+                assert {item["severity"] for item in issues} == {expected_severity}
+
+            blocked_master = client.post(
+                f"/api/v1/projects/{project_id}/masters",
+                json={"name": "must-not-bypass-deleted-role"},
+            )
+            assert blocked_master.status_code == 400, blocked_master.text
+            # A previously frozen Master still contains its positive rights
+            # snapshot, but release also re-runs formal project QC so deleting
+            # the source role cannot erase the current missing-rights signal.
+            blocked_release = client.post(
+                f"/api/v1/projects/{project_id}/release-packages/{master_id}",
+            )
+            assert blocked_release.status_code == 400, blocked_release.text
+    finally:
+        clear_config_caches()
 
 
 def test_voice_finishing_recipe_is_non_destructive(tmp_path: Path, monkeypatch) -> None:
