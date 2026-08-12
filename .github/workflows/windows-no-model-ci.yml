@@ -55,13 +55,13 @@ jobs:
       - name: Install no-model test dependencies
         run: python -m pip install --disable-pip-version-check --requirement .github/requirements-ci.txt
 
-      - name: Provide FFmpeg for audio pipeline tests
+      - name: Provide pinned FFmpeg for audio pipeline tests
+        uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6 # v3.1
+        with:
+          ffmpeg-version: "9.0.1"
+
+      - name: Verify FFmpeg tools
         run: |
-          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue) -or -not (Get-Command ffprobe -ErrorAction SilentlyContinue)) {
-            choco install ffmpeg --version=9.0.0 --yes --no-progress
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            $env:PATH = "C:\ProgramData\chocolatey\bin;$env:PATH"
-          }
           ffmpeg -version | Select-Object -First 1
           ffprobe -version | Select-Object -First 1
 
