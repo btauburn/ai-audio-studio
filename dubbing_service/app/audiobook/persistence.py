@@ -36,12 +36,20 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
+from dubbing_service.app.audiobook import takes as takes_module
+from dubbing_service.app.audiobook.fingerprint import SynthesisRequirement
 from dubbing_service.app.core.config import safe_project_root
-from dubbing_service.app.models.project import Project, Segment
+from dubbing_service.app.models.project import Project, Segment, SegmentTake
+from dubbing_service.app.services.takes import normalize_slot
 from dubbing_service.app.storage.projects import project_meta_lock
-from dubbing_service.app.storage.segments import project_segments_lock
+from dubbing_service.app.storage.segments import load_segments, project_segments_lock
+
+# The staleness rule, shaped exactly like ``takes.mark_stale_for_requirement``:
+# it is handed a Take so an utterance that declares no engine of its own can be
+# evaluated against the identity that Take recorded.
+RequirementFactory = Callable[[Segment, SegmentTake], Optional[SynthesisRequirement]]
 
 MARKER_PREFIX = ".commit-"
 MARKER_SUFFIX = ".json"
@@ -60,6 +68,38 @@ class CommitReport:
 
     def as_dict(self) -> Dict[str, object]:
         return {"transaction_id": self.transaction_id, "targets": list(self.targets)}
+
+
+@dataclass
+class MergeReport:
+    """What one worker's synthesized result actually changed in canonical state.
+
+    ``stored`` is the artifact the worker owns (it always keeps that); ``selected``
+    is the claim it made on shared pointers.  ``stored and not selected`` is not a
+    failure — synthesis succeeded and lost an optimistic race, which the caller has
+    to be able to report instead of reporting an engine error.
+    """
+
+    segment_id: str
+    take_id: str
+    stored: bool = False
+    selected: bool = False
+    stale: bool = False
+    stale_components: List[str] = field(default_factory=list)
+    concurrent_edit: bool = False
+    reason: str = ""
+
+    def as_dict(self) -> Dict[str, object]:
+        return {
+            "segment_id": self.segment_id,
+            "take_id": self.take_id,
+            "stored": self.stored,
+            "selected": self.selected,
+            "stale": self.stale,
+            "stale_components": list(self.stale_components),
+            "concurrent_edit": self.concurrent_edit,
+            "reason": self.reason,
+        }
 
 
 @dataclass
@@ -98,6 +138,10 @@ class RecoveryReport:
 
 def _json_bytes(value: object) -> bytes:
     return (json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
+def _segments_bytes(segments: Sequence[Segment]) -> bytes:
+    return _json_bytes([segment.model_dump(mode="json") for segment in segments])
 
 
 def _fsync_dir(path: Path) -> None:
@@ -355,14 +399,124 @@ def commit_project_state(
     root = safe_project_root(project_id)
     files = [
         (root / "project.json", _json_bytes(project.model_dump(mode="json"))),
-        (
-            root / "segments.json",
-            _json_bytes([segment.model_dump(mode="json") for segment in segments]),
-        ),
+        (root / "segments.json", _segments_bytes(segments)),
     ]
     with project_meta_lock(project_id):
         with project_segments_lock(project_id):
             return commit_files(files, root=root)
+
+
+def commit_take_result(
+    project_id: str,
+    *,
+    segment_id: str,
+    take: SegmentTake,
+    requirement_for: RequirementFactory,
+    slot: str = "a",
+    promote: bool = True,
+    allow_blocking_qa: bool = False,
+    observed_selected_take_id: Optional[str] = None,
+    observed_slot_take_id: Optional[str] = None,
+) -> MergeReport:
+    """Merge one worker's Take into canonical state under a short write lock.
+
+    The worker may append the artifact it produced, but it may not overwrite
+    newer canonical metadata it did not own.  Canonical state is re-read inside
+    the lock — never taken from the snapshot the worker started with — so an edit
+    that landed while synthesis was running is still there when the result is
+    written.  Sibling segments, segment text, speaker assignment, review notes,
+    slot pointers and other Takes are therefore never written from a stale copy,
+    which is what made a long render able to resurrect them after the fact.
+
+    The Take may also claim the shared pointers (its slot and the selection) only
+    when both hold:
+
+    * the requirement re-read from canonical state still matches the Take, using
+      the same per-Take rule :func:`dubbing_service.app.audiobook.pipeline.refresh_staleness`
+      applies, so a text/voice/engine edit that landed mid-render marks the Take
+      stale instead of promoting audio that no longer matches the text.  Metadata
+      outside the fingerprint (a review note, a book title) leaves the requirement
+      unchanged, so it never strands a good candidate;
+    * the slot and the selection are still the ones the worker observed before it
+      started, so an explicit newer choice is not overwritten.
+
+    A refused claim is not a failure: the Take is retained as history and stays
+    unselected, and the report says so.
+    """
+
+    root = safe_project_root(project_id)
+    with project_segments_lock(project_id):
+        segments = load_segments(project_id)
+        report = MergeReport(segment_id=segment_id, take_id=take.id)
+        target = next((item for item in segments if item.id == segment_id), None)
+
+        if target is None:
+            # The utterance was removed or re-identified while it was rendering.
+            # Attaching to nothing would resurrect it, so the result is reported
+            # as the stale artifact it is.
+            report.stale = True
+            report.concurrent_edit = True
+            report.reason = "utterance is no longer in the project"
+            return report
+
+        requirement = requirement_for(target, take)
+        stale, changed = (
+            takes_module.take_is_stale(take, requirement)
+            if requirement is not None
+            else (False, [])
+        )
+
+        takes_module.ensure_take_state(target)
+        slot_name = normalize_slot(slot)
+        claim = (
+            promote
+            and not stale
+            and target.take_slots[slot_name].take_id == observed_slot_take_id
+            and target.selected_take_id == observed_selected_take_id
+        )
+        concurrent_edit = not claim and (
+            target.take_slots[slot_name].take_id != observed_slot_take_id
+            or target.selected_take_id != observed_selected_take_id
+        )
+
+        if claim:
+            takes_module.attach_take(target, take, slot=slot_name, promote=False)
+        elif not any(item.id == take.id for item in target.takes):
+            # Append-only: the Take is real history even when it lost the race,
+            # but the pointers it would move belong to a newer edit.
+            target.takes.append(take)
+
+        # Recompute staleness over canonical state, not over the worker's
+        # snapshot: this is the rule
+        # :func:`...pipeline.refresh_staleness` already applies, evaluated against
+        # the state that is actually on disk inside the lock.
+        takes_module.mark_stale_for_requirement(segments, requirement_for)
+
+        if claim:
+            try:
+                takes_module.promote_take(
+                    target,
+                    take.id,
+                    requirement=requirement,
+                    allow_blocking_qa=allow_blocking_qa,
+                )
+                report.selected = True
+            except takes_module.PromotionError as exc:
+                report.reason = str(exc)
+        elif stale:
+            report.reason = report.reason or "stale result retained as a candidate"
+        else:
+            report.reason = report.reason or "a newer edit owns the target slot"
+
+        report.stored = True
+        report.stale = bool(take.stale)
+        report.stale_components = list(take.stale_components) if stale else list(changed)
+        report.concurrent_edit = concurrent_edit or report.stale
+
+        commit_files(
+            [(root / "segments.json", _segments_bytes(segments))], root=root
+        )
+        return report
 
 
 def verify_project_state(project_id: str) -> Tuple[bool, List[str]]:

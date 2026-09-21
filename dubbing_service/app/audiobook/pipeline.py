@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
-from dubbing_service.app.models.project import Project, Role, Segment
+from dubbing_service.app.models.project import Project, Role, Segment, SegmentTake
 from dubbing_service.app.services.takes import take_is_selectable
 from dubbing_service.app.storage.projects import load_project
 from dubbing_service.app.storage.segments import load_segments
@@ -50,6 +50,10 @@ class RenderRecord:
     selected: bool = False
     error: Optional[str] = None
     stale_components: List[str] = field(default_factory=list)
+    # A candidate that lost an optimistic race is not a failed render: the
+    # engine produced audio, and the state refused to promote it.  Callers need
+    # both facts, so they are separate fields rather than one error string.
+    stale: bool = False
     # A Take that was written but is refused by blocking QA stays visible as a
     # candidate: the refusal is a property of the state, not of this return
     # value, so callers get the exact checks that refused it.
@@ -244,29 +248,66 @@ def render_segment(
     return record
 
 
+def _requirement_for_take(
+    project: Project,
+    segment: Segment,
+    take: SegmentTake,
+    *,
+    renderer_id: Optional[str] = None,
+) -> Optional[fingerprint_module.SynthesisRequirement]:
+    """The live requirement of one Take — the single staleness rule.
+
+    An utterance with no declared backend keeps the engine identity recorded on
+    each Take, so re-running this cannot invent staleness on its own; only a real
+    content or declared-configuration change does.  ``None`` means the engine is
+    unknown, which is not a staleness claim.
+    """
+
+    try:
+        return requirement_for(
+            project,
+            segment,
+            renderer_id=renderer_id,
+            reference_engine_id=getattr(take, "engine_id", None),
+            reference_renderer_id=getattr(take, "renderer_id", None),
+        )
+    except Exception:  # noqa: BLE001 - unknown engine is not a staleness claim
+        return None
+
+
+def _canonical_requirement_factory(
+    project_id: str,
+) -> persistence_module.RequirementFactory:
+    """A per-Take staleness rule that reads the project from disk on first use.
+
+    The merge calls it inside its write lock, so a worker's Take is judged against
+    the state being committed — including role voice configuration, which is
+    project-level and therefore not visible in the segment the worker rendered.
+    """
+
+    loaded: List[Project] = []
+
+    def requirement_for_take(
+        segment: Segment, take: SegmentTake
+    ) -> Optional[fingerprint_module.SynthesisRequirement]:
+        if not loaded:
+            loaded.append(load_project(project_id))
+        return _requirement_for_take(loaded[0], segment, take)
+
+    return requirement_for_take
+
+
 def refresh_staleness(
     project: Project, segments: Sequence[Segment], *, renderer_id: Optional[str] = None
 ) -> Dict[str, List[str]]:
-    """Recompute and record staleness for every Take, without touching audio.
+    """Recompute and record staleness for every Take, without touching audio."""
 
-    An utterance with no declared backend keeps the engine identity recorded on
-    each Take, so re-running this pass cannot invent staleness on its own; only a
-    real content or declared-configuration change does.
-    """
-
-    def requirement_for_take(segment: Segment, take: object):
-        try:
-            return requirement_for(
-                project,
-                segment,
-                renderer_id=renderer_id,
-                reference_engine_id=getattr(take, "engine_id", None),
-                reference_renderer_id=getattr(take, "renderer_id", None),
-            )
-        except Exception:  # noqa: BLE001 - unknown engine is not a staleness claim
-            return None
-
-    return takes_module.mark_stale_for_requirement(segments, requirement_for_take)
+    return takes_module.mark_stale_for_requirement(
+        segments,
+        lambda segment, take: _requirement_for_take(
+            project, segment, take, renderer_id=renderer_id
+        ),
+    )
 
 
 def render_utterances(
@@ -278,33 +319,64 @@ def render_utterances(
     promote: bool = True,
     run_qa: bool = True,
 ) -> List[RenderRecord]:
-    """Render a bounded set of utterances and persist the result."""
+    """Render a bounded set of utterances and merge each result into canonical state.
+
+    Each result is merged under a short write lock against state re-read at that
+    moment, so an edit that landed while the engine was running survives the
+    render's commit instead of being overwritten by it.  Synthesis never holds the
+    project lock: only the merge does, and only for the length of one commit.
+    """
 
     project = load_project(project_id)
-    segments = load_segments(project_id)
     root = project_root(project_id)
+    requirement_for = _canonical_requirement_factory(project_id)
     records: List[RenderRecord] = []
 
     for utterance_id in utterance_ids:
+        segments = load_segments(project_id)
         segment = next((item for item in segments if item.id == utterance_id), None)
         if segment is None:
             raise PipelineError(f"utterance not found: {utterance_id}")
-        records.append(
-            render_segment(
-                project,
-                segment,
-                renderer=renderer,
-                root=root,
-                slot=slot,
-                promote=promote,
-                run_qa=run_qa,
-            )
-        )
 
-    refresh_staleness(project, segments)
-    persistence_module.commit_project_state(
-        project_id, project=project, segments=segments
-    )
+        # What canonical state held when this utterance was read.  The merge
+        # refuses to move a pointer that no longer holds these values, which is
+        # how an explicit newer choice survives a render that started earlier.
+        observed_selected = segment.selected_take_id
+        observed_slot = takes_module.slot_take_id(segment, slot)
+
+        # Promotion is decided at the merge, not here: the render pass only
+        # produces the artifact, and the state decides whether it may be claimed.
+        record = render_segment(
+            project,
+            segment,
+            renderer=renderer,
+            root=root,
+            slot=slot,
+            promote=False,
+            run_qa=run_qa,
+        )
+        if not record.success:
+            records.append(record)
+            continue
+
+        merge = persistence_module.commit_take_result(
+            project_id,
+            segment_id=utterance_id,
+            take=takes_module.find_take(segment, record.take_id),
+            requirement_for=requirement_for,
+            slot=slot,
+            promote=promote,
+            allow_blocking_qa=bool(not run_qa),
+            observed_selected_take_id=observed_selected,
+            observed_slot_take_id=observed_slot,
+        )
+        record.selected = merge.selected
+        record.stale = merge.stale
+        record.stale_components = list(merge.stale_components)
+        if not merge.selected and merge.reason:
+            record.error = record.error or merge.reason
+        records.append(record)
+
     return records
 
 
