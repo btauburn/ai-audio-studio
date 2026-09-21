@@ -305,9 +305,26 @@ def _default_runner(payload: Dict[str, Any], interpreter: Path) -> Dict[str, Any
             "Audiobooker 分析失败: " + (detail[-1] if detail else str(completed.returncode))
         )
     try:
-        return json.loads(completed.stdout or "{}")
+        payload_out = json.loads(completed.stdout or "{}")
     except json.JSONDecodeError as exc:
         raise AdapterError(f"Audiobooker 返回的 JSON 无效: {exc}") from exc
+    if isinstance(payload_out, dict):
+        # audiobooker reports its real quality caveats on stderr — "42% of
+        # DIALOGUE lines ... were inferred by alternating turns — a guess, not a
+        # reading".  Dropping them on a successful exit hid the fact that a
+        # large share of the attributions were guesses, so they are folded into
+        # the analysis instead of discarded.
+        diagnostics = [
+            line.strip()
+            for line in (completed.stderr or "").splitlines()
+            if line.strip()
+        ]
+        if diagnostics:
+            warnings = payload_out.get("warnings")
+            if not isinstance(warnings, list):
+                warnings = []
+            payload_out["warnings"] = warnings + diagnostics
+    return payload_out if isinstance(payload_out, dict) else {}
 
 
 @dataclass
@@ -437,7 +454,7 @@ class AudiobookerAdapter:
         result = ImportResult(project_id=project_id)
         existing_roles = {role.name: role for role in project.roles}
         role_by_speaker: Dict[str, Role] = {}
-        for speaker in analysis.speakers:
+        for speaker in _declared_speakers(analysis):
             name = speaker.strip() or "未指定"
             role = existing_roles.get(name)
             if role is None:
@@ -601,6 +618,34 @@ def _narrator_role(project: Project, existing_roles: Dict[str, Role]) -> Role:
     project.roles.append(role)
     existing_roles["Narrator"] = role
     return role
+
+
+def _declared_speakers(analysis: BookAnalysis) -> List[str]:
+    """Every speaker name that must own a role, in first-seen order.
+
+    ``analysis.speakers`` is the provider's *casting table*, which is not
+    guaranteed to list the characters its own attributions name — audiobooker
+    3.0.0 discovers character names during ``compile()`` but leaves the casting
+    table holding only the narrator.  A speaker named by an utterance but
+    missing from the casting table would get no role, and an unrouted utterance
+    cannot be cast, so it could never be rendered with that character's voice.
+    Declared and attributed speakers are therefore unioned.
+    """
+
+    names: List[str] = []
+    seen: Set[str] = set()
+    attributed = [
+        utterance.speaker
+        for chapter in analysis.chapters
+        for utterance in chapter.utterances
+    ]
+    for raw in list(analysis.speakers) + attributed:
+        name = (raw or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        names.append(name)
+    return names
 
 
 def _merge_utterance(

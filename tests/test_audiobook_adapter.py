@@ -352,6 +352,154 @@ def test_import_keeps_every_utterance_when_the_text_repeats(studio):
     )
 
 
+def test_import_registers_a_role_for_every_attributed_speaker(studio):
+    """An utterance must never be attributed to a speaker that has no role.
+
+    Audiobooker discovers character names while compiling but leaves its casting
+    table holding only the narrator.  Building roles from the casting table
+    alone left every character-attributed utterance unroutable, so it could not
+    be cast or rendered with that character's voice.
+    """
+
+    analysis = adapter.BookAnalysis.from_dict(
+        {
+            "schema": adapter.ADAPTER_SCHEMA_VERSION,
+            "title": "Casting table gap",
+            "speakers": ["narrator"],
+            "chapters": [
+                {
+                    "index": 0,
+                    "title": "Chapter 1",
+                    "utterances": [
+                        {
+                            "text": "The harbour was empty.",
+                            "speaker": "narrator",
+                            "utterance_type": "narration",
+                            "chapter_index": 0,
+                            "line_index": 0,
+                            "attribution_source": "unknown",
+                            "confidence": None,
+                        },
+                        {
+                            "text": "You moved the chairs.",
+                            "speaker": "Mara",
+                            "utterance_type": "dialogue",
+                            "chapter_index": 0,
+                            "line_index": 1,
+                            "attribution_source": "tag",
+                            "confidence": 0.95,
+                        },
+                        {
+                            "text": "Only one of them.",
+                            "speaker": "Tomas",
+                            "utterance_type": "dialogue",
+                            "chapter_index": 0,
+                            "line_index": 2,
+                            "attribution_source": "turn",
+                            "confidence": 0.25,
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+    result = adapter.AudiobookerAdapter().reconcile_into_project(
+        analysis, project_name="Casting table gap"
+    )
+    project, segments = _reload(result.project_id)
+
+    assert {role.name for role in project.roles} >= {"narrator", "Mara", "Tomas"}
+    assert all(segment.role_id for segment in segments), (
+        "every attributed utterance must be routed to a role"
+    )
+    by_name = {role.name: role.id for role in project.roles}
+    routed = {segment.text: segment.role_id for segment in segments}
+    assert routed["You moved the chairs."] == by_name["Mara"]
+    assert routed["Only one of them."] == by_name["Tomas"]
+
+
+def test_declared_speakers_unions_casting_and_attributions_without_duplicates(studio):
+    analysis = adapter.BookAnalysis.from_dict(
+        {
+            "schema": adapter.ADAPTER_SCHEMA_VERSION,
+            "title": "Union",
+            "speakers": ["Narrator", "Mara", ""],
+            "chapters": [
+                {
+                    "index": 0,
+                    "title": "Chapter 1",
+                    "utterances": [
+                        {
+                            "text": "One.",
+                            "speaker": "Mara",
+                            "utterance_type": "dialogue",
+                            "chapter_index": 0,
+                            "line_index": 0,
+                            "attribution_source": "tag",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "text": "Two.",
+                            "speaker": "  Tomas  ",
+                            "utterance_type": "dialogue",
+                            "chapter_index": 0,
+                            "line_index": 1,
+                            "attribution_source": "tag",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "text": "Three.",
+                            "speaker": None,
+                            "utterance_type": "narration",
+                            "chapter_index": 0,
+                            "line_index": 2,
+                            "attribution_source": "unknown",
+                            "confidence": None,
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert adapter._declared_speakers(analysis) == ["Narrator", "Mara", "Tomas"]
+
+
+def test_runner_diagnostics_are_folded_into_analysis_warnings(studio, monkeypatch):
+    """A successful analysis must not swallow audiobooker's quality caveats.
+
+    audiobooker reports guess-based attributions on stderr ("40% of DIALOGUE
+    lines ... inferred by alternating turns — a guess, not a reading").  Reading
+    stderr only on a non-zero exit meant a run that succeeded looked clean.
+    """
+
+    import subprocess as subprocess_module
+
+    class _Completed:
+        returncode = 0
+        stdout = '{"schema": "audiobooker-adapter-v1", "chapters": [], "warnings": ["kept"]}'
+        stderr = (
+            "Chapter 1: 40/96 DIALOGUE lines (42%) have no attribution in the text "
+            "and were inferred by alternating turns.\n\n"
+        )
+
+    monkeypatch.setattr(
+        subprocess_module, "run", lambda *a, **k: _Completed()
+    )
+
+    payload = adapter._default_runner(
+        {"scratch_dir": ""}, Path(adapter.sys.executable)
+    )
+
+    assert payload["warnings"][0] == "kept"
+    joined = " ".join(payload["warnings"])
+    assert "inferred by alternating turns" in joined
+    assert all(line.strip() for line in payload["warnings"]), (
+        "blank stderr lines must not become warnings"
+    )
+
+
 def test_import_never_overwrites_a_human_corrected_utterance(studio):
     analysis = adapter.analyze_text_offline(SAMPLE, title="Sample")
     imported = adapter.AudiobookerAdapter().reconcile_into_project(
