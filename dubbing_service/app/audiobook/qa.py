@@ -20,9 +20,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
-from dubbing_service.app.models.audiobook import QaCheckResult, TakeQaReport
+from dubbing_service.app.models.audiobook import (
+    QaCheckResult,
+    QaCoverageProfile,
+    TakeQaReport,
+)
 
 QA_CHECK_VERSION = "tier1-v1"
+
+# Version of the duration-window implementation itself.  A report records it so
+# that a re-audit can tell "this Take was judged English" from "this Take was
+# judged by the English window as it existed then".
+COVERAGE_PROFILE_VERSION = "coverage-v1"
 
 DEFAULT_ANOMALY_RATIO = 2.5
 DEFAULT_SILENCE_RATIO = 0.98
@@ -504,6 +513,17 @@ def similarity_ratio(expected: str, actual: str) -> float:
     return 1.0 - (previous[-1] / max(len(left), len(right)))
 
 
+def coverage_profile_identity(language: Optional[str]) -> QaCoverageProfile:
+    """The persisted identity of the window ``coverage_plausible`` will apply."""
+
+    profile = coverage_profile_for(language)
+    return QaCoverageProfile(
+        language=language,
+        profile=profile.name,
+        profile_version=COVERAGE_PROFILE_VERSION,
+    )
+
+
 def build_report(
     take_id: str,
     output_audio_hash: Optional[str],
@@ -511,6 +531,7 @@ def build_report(
     *,
     tier: int = 1,
     notes: Optional[str] = None,
+    coverage_profile: Optional[QaCoverageProfile] = None,
 ) -> TakeQaReport:
     """Bind the check results to the exact bytes that were evaluated."""
 
@@ -522,6 +543,7 @@ def build_report(
         tier=tier,
         results=results,
         notes=notes,
+        coverage_profile=coverage_profile,
     )
     executed = [item for item in results if item.status != "skipped"]
     report.passed = bool(executed) and not report.blocking_failures()
@@ -545,6 +567,8 @@ def qa_take_audio(
 
     ``language`` is the language of the spoken text and selects the duration
     window; ``tier2_language`` is the recognizer's language and is unrelated.
+    The window that governed ``coverage_plausible`` is recorded on the report as
+    an identity, so a later re-audit can prove which profile was applied.
     """
 
     checks = run_tier1_checks(
@@ -571,4 +595,46 @@ def qa_take_audio(
         )
         report_tier = 2
 
-    return build_report(take_id, sha, checks, tier=report_tier, notes=notes)
+    return build_report(
+        take_id,
+        sha,
+        checks,
+        tier=report_tier,
+        notes=notes,
+        coverage_profile=coverage_profile_identity(language),
+    )
+
+
+def reaudit_take(
+    *,
+    take_id: str,
+    audio_path: Path | str,
+    text: str,
+    language: Optional[str],
+    expected_sha256: Optional[str] = None,
+    notes: Optional[str] = None,
+    tier2_text: Optional[str] = None,
+    tier2_model: str = "tiny",
+    tier2_language: Optional[str] = None,
+) -> TakeQaReport:
+    """Re-run Tier 1 for an existing Take from *its own* evidence.
+
+    ``language`` must be the value persisted on the Take, never the current role
+    or segment setting: a role edited after the audio was generated would
+    otherwise silently re-interpret history under a different duration window.
+
+    ``expected_sha256`` should likewise be the Take's recorded ``audio_sha256``,
+    which is what makes the new report comparable with the original one.
+    """
+
+    return qa_take_audio(
+        take_id=take_id,
+        audio_path=audio_path,
+        text=text,
+        expected_sha256=expected_sha256,
+        notes=notes,
+        tier2_text=tier2_text,
+        tier2_model=tier2_model,
+        tier2_language=tier2_language,
+        language=language,
+    )

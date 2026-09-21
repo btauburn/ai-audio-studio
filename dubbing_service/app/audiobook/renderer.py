@@ -142,6 +142,11 @@ class RenderRequest:
     idempotency_key: str = ""
     synthesis_text: Optional[str] = None
     take_id: Optional[str] = None
+    language: Optional[str] = None
+    # Resolved language for this transaction, decided once by the caller.
+    # ``None`` means nothing declared a language; the provider then applies its
+    # own configured default exactly as before.  When it is set, it is the value
+    # the engine is given, so the Take that records it records what happened.
 
 
 @dataclass
@@ -364,6 +369,11 @@ class BackendRenderer:
         provider = self._get_provider()
         chunk_segment = request.segment.model_copy(deep=True)
         chunk_segment.text = text
+        # The language was resolved once for the whole transaction.  Presenting
+        # it here is what makes the Take's recorded language the value the engine
+        # actually received, instead of the provider re-deriving its own.
+        if request.language is not None:
+            chunk_segment.qwen3_language = request.language
         result = provider.synthesize_segment(
             request.project_id, request.role, chunk_segment
         )

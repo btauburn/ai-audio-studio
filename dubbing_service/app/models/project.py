@@ -184,6 +184,14 @@ class SegmentTake(BaseModel):
     tts_backend: Optional[str] = None
     qwen3_speaker: Optional[str] = None
     qwen3_language: Optional[str] = None
+    language: Optional[str] = Field(
+        default=None,
+        description=(
+            "本次合成实际解析出的语言快照（即呈现给渲染器的取值，见"
+            " audiobook.language.resolve_synthesis_language）。为空表示当时"
+            "没有任何声明，来源不可考，而不是回退成某个猜测"
+        ),
+    )
     emotion_mode: EmotionMode = EmotionMode.TEXT
     emotion_text: Optional[str] = None
     emotion_vector: Optional[List[float]] = None

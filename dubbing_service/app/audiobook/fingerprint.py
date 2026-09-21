@@ -19,6 +19,7 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from pydantic import BaseModel
 
+from dubbing_service.app.audiobook import language as language_module
 from dubbing_service.app.models.audiobook import AttributionSource
 from dubbing_service.app.models.enums import EmotionMode
 from dubbing_service.app.models.project import Role, Segment, SegmentTake
@@ -296,16 +297,23 @@ def requirement_for_segment(
     seed: Optional[int] = None,
     pitch: Optional[float] = None,
     emphasis: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> SynthesisRequirement:
-    """Gather the live requirement for one utterance from canonical state."""
+    """Gather the live requirement for one utterance from canonical state.
+
+    ``language`` lets a caller carry in the value it already resolved for this
+    transaction instead of resolving a second time; when it is omitted the one
+    shared rule (``language.resolve_synthesis_language``) is used, so the
+    requirement can never disagree with the renderer or QA about the language.
+    """
 
     effective_role = role
     style_instruction = effective_role.style_instruction if effective_role else None
     builtin_speaker = (
         (segment.qwen3_speaker or (effective_role.qwen3_speaker if effective_role else None))
     )
-    language = segment.qwen3_language or (
-        effective_role.qwen3_language if effective_role else None
+    language = language_module.normalize_language(language) or (
+        language_module.resolve_synthesis_language(segment, effective_role)
     )
     return build_requirement(
         utterance_id=segment.id,

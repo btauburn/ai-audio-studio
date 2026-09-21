@@ -26,6 +26,7 @@ from dubbing_service.app.storage.projects import load_project
 from dubbing_service.app.storage.segments import load_segments
 
 from dubbing_service.app.audiobook import fingerprint as fingerprint_module
+from dubbing_service.app.audiobook import language as language_module
 from dubbing_service.app.audiobook import persistence as persistence_module
 from dubbing_service.app.audiobook import qa as qa_module
 from dubbing_service.app.audiobook import release as release_module
@@ -144,12 +145,18 @@ def render_segment(
     if role is None and not allow_missing_role:
         raise PipelineError(f"utterance {segment.id} has no role to render with")
 
+    # Resolved once, here: the requirement, the renderer, QA and the Take all
+    # receive this exact value.  Resolving again in any of them is how the
+    # renderer and QA came to disagree about what language a Take was made in.
+    language = language_module.resolve_synthesis_language(segment, role)
+
     requirement = requirement or requirement_for(
         project,
         segment,
         role=role,
         renderer_id=getattr(renderer, "renderer_id", None),
         engine_id=getattr(renderer, "engine_id", None),
+        language=language,
         **(extra_requirement or {}),
     )
     take_id = renderer_module.new_take_id()
@@ -163,6 +170,7 @@ def render_segment(
         requirement_fingerprint=requirement.fingerprint(),
         requirement_components=requirement.components(),
         take_id=take_id,
+        language=language,
     )
 
     outcome = renderer_module.reassemble_with_retry(renderer, request)
@@ -192,6 +200,7 @@ def render_segment(
         source_text_hash=fingerprint_module.text_sha256(segment.text),
         synthesis_text=request.synthesis_text or segment.text,
         chunk_map=outcome.chunk_map(),
+        language=language,
     )
     takes_module.attach_take(segment, take, slot=slot, promote=False)
 
@@ -211,8 +220,7 @@ def render_segment(
             audio_path=audio_path,
             text=segment.text,
             expected_sha256=audio_sha,
-            language=segment.qwen3_language
-            or (role.qwen3_language if role else None),
+            language=language,
         )
         takes_module.attach_qa_report(segment, take_id, report)
         record.qa_passed = report.passed
@@ -361,6 +369,99 @@ def blocked_utterances(segments: Sequence[Segment]) -> List[Dict[str, object]]:
             }
         )
     return blocked
+
+
+def reaudit_take(
+    project_id: str, segment_id: str, take_id: str
+) -> qa_module.TakeQaReport:
+    """Re-run Tier-1 QA on a stored Take from that Take's own evidence.
+
+    The language is read from the Take, never from the role or segment: either may
+    have been edited after the audio was generated, and letting current state
+    decide how history is interpreted is exactly the defect this closes.  A Take
+    with no recorded language re-audits under the same fallback policy it was
+    created with, and the report says so rather than inventing a language.
+    """
+
+    segments = load_segments(project_id)
+    segment = next((item for item in segments if item.id == segment_id), None)
+    if segment is None:
+        raise PipelineError(f"utterance not found: {segment_id}")
+    take = takes_module.find_take(segment, take_id)
+
+    notes = None
+    if take.language is None:
+        notes = (
+            "这次 Take 没有记录语言来源（旧 Take 或当时没有任何声明），"
+            "按既有回退策略复核，未推断语言"
+        )
+    return qa_module.reaudit_take(
+        take_id=take.id,
+        audio_path=Path(project_root(project_id)) / take.audio_file,
+        text=take.text or segment.text,
+        language=take.language,
+        expected_sha256=take.audio_sha256,
+        notes=notes,
+    )
+
+
+def language_evidence_report(project_id: str) -> Dict[str, object]:
+    """What every stored Take can prove about its own language, from itself.
+
+    Replaces the earlier corpus re-audit, which had to assume a language from the
+    role or the default.  Nothing here reads a role: ``persisted_language`` is the
+    Take's own snapshot, and a Take that has none says so explicitly instead of
+    inheriting today's setting.
+    """
+
+    segments = load_segments(project_id)
+    root = Path(project_root(project_id))
+    rows: List[Dict[str, object]] = []
+    for segment in segments:
+        for take in segment.takes:
+            profile = take.qa_report.coverage_profile if take.qa_report else None
+            facts = qa_module.read_audio_facts(root / take.audio_file)
+            if take.language:
+                recorded = take.language
+            elif take.input_fingerprint:
+                recorded = "undeclared"
+            else:
+                recorded = "legacy_unknown"
+            rows.append(
+                {
+                    "take_id": take.id,
+                    "utterance_id": segment.id,
+                    "persisted_language": recorded,
+                    "coverage_profile": (
+                        None
+                        if profile is None
+                        else {
+                            "language": profile.language,
+                            "profile": profile.profile,
+                            "profile_version": profile.profile_version,
+                        }
+                    ),
+                    "chars": len((take.text or "").strip()),
+                    "duration_ms": facts.duration_ms if facts else 0,
+                    "qa_passed": None if take.qa_report is None else take.qa_report.passed,
+                    "selected": segment.selected_take_id == take.id,
+                    "stale": take.stale,
+                }
+            )
+
+    def _count(value: str) -> int:
+        return sum(1 for row in rows if row["persisted_language"] == value)
+
+    return {
+        "project_id": project_id,
+        "takes": rows,
+        "counts": {
+            "takes": len(rows),
+            "with_language": len(rows) - _count("undeclared") - _count("legacy_unknown"),
+            "undeclared": _count("undeclared"),
+            "legacy_unknown": _count("legacy_unknown"),
+        },
+    }
 
 
 def status_report(project_id: str) -> Dict[str, object]:

@@ -155,6 +155,22 @@ class QaCheckResult(BaseModel):
     blocking: bool = True
 
 
+class QaCoverageProfile(BaseModel):
+    """Identity of the duration window that governed ``coverage_plausible``.
+
+    Only the identity is stored, never the profile itself: a re-audit needs to
+    know *which* window was applied ("that Take was judged as English"), not a
+    redundant copy of the numbers, which belong to the code that measured them.
+    """
+
+    language: Optional[str] = Field(
+        default=None,
+        description="QA 当时使用的语言（Take 上记录的解析值），为空表示未声明",
+    )
+    profile: str = Field(..., description="实际生效的时长窗口名，如 english/chinese")
+    profile_version: str = Field(..., description="窗口实现的版本，用于判定可比性")
+
+
 class TakeQaReport(BaseModel):
     """QA evaluation of one Take's exact bytes.
 
@@ -170,6 +186,13 @@ class TakeQaReport(BaseModel):
     passed: bool = False
     evaluated_at: datetime = Field(default_factory=utcnow)
     notes: Optional[str] = None
+    coverage_profile: Optional[QaCoverageProfile] = Field(
+        default=None,
+        description=(
+            "coverage_plausible 所使用的语言/窗口身份；旧报告为空，"
+            "表示当时没有记录，而不是使用了默认窗口"
+        ),
+    )
 
     def matches(self, take_id: str, output_audio_hash: Optional[str]) -> bool:
         """True only when this report was produced from exactly these bytes."""

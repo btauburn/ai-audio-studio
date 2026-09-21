@@ -66,8 +66,15 @@ def build_take(
     synthesis_text: Optional[str] = None,
     chunk_map: Optional[Sequence[ChunkRecord]] = None,
     generation_metadata: Optional[dict] = None,
+    language: Optional[str] = None,
 ) -> SegmentTake:
-    """Build (but do not attach) a Take bound to one synthesis requirement."""
+    """Build (but do not attach) a Take bound to one synthesis requirement.
+
+    ``language`` is the value the renderer was given for this Take; it is stored
+    as-is (including ``None``, which means nothing declared a language).  It is
+    never re-derived here from the segment, because by the time a Take exists the
+    segment may already have been edited.
+    """
 
     components = requirement.components()
     return SegmentTake(
@@ -81,6 +88,7 @@ def build_take(
         tts_backend=segment.tts_backend,
         qwen3_speaker=segment.qwen3_speaker,
         qwen3_language=segment.qwen3_language,
+        language=language,
         emotion_mode=segment.emotion_mode,
         emotion_text=segment.emotion_text,
         emotion_vector=list(segment.emotion_vector) if segment.emotion_vector else None,
