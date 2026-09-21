@@ -306,7 +306,8 @@ async def ws_batch_synthesis(websocket: WebSocket, project_id: str) -> None:
         providers = _create_providers()
         default_backend = _get_default_backend()
 
-        sorted_segments = sorted(segments, key=lambda s: s.index)
+        # load_segments 已按章节顺序 + 章节内行号返回，直接用于上下文映射
+        sorted_segments = segments
         seg_index_map = {s.id: i for i, s in enumerate(sorted_segments)}
 
         succeeded = 0

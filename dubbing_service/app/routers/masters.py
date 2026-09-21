@@ -65,7 +65,7 @@ def _master_inputs(project_id: str) -> tuple[list[MasterSegmentSnapshot], str]:
         raise HTTPException(status_code=400, detail="项目没有可制作 Master 的分段")
     snapshots = []
     failures = []
-    for segment in sorted(segments, key=lambda item: item.index):
+    for segment in segments:
         if segment.review_status != SegmentReviewStatus.APPROVED:
             failures.append(f"第 {segment.index + 1} 段尚未通过审听")
             continue

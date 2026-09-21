@@ -65,6 +65,7 @@ from dubbing_service.app.storage.projects import (
 from dubbing_service.app.storage.segments import (
     SegmentStorageError,
     load_segments,
+    order_segments,
     save_segments,
     project_segments_lock,
 )
@@ -1468,8 +1469,8 @@ def api_batch_synthesize_segments(
         }
         results: List[SegmentSynthesisResult] = []
 
-        # 上下文注入：构建分段索引映射，用于查找前一分段的文本。
-        sorted_segments = sorted(segments, key=lambda s: s.index)
+        # 上下文注入：构建分段索引映射，用于查找前一分段的文本。load_segments 已按章节顺序 + 章节内行号返回。
+        sorted_segments = segments
         seg_index_map = {s.id: i for i, s in enumerate(sorted_segments)}
 
         for seg in targets:
@@ -1618,6 +1619,21 @@ def api_batch_synthesize_segments(
         unregister_running_batch(batch_lease)
 
 
+def _ordered_segments(project_id: str, segments: list[Segment]) -> list[Segment]:
+    """Return ``segments`` in canonical reading order for export.
+
+    ``Segment.index`` counts lines inside its own chapter, so the order must be
+    driven by the chapter order first; sorting by ``index`` alone interleaves
+    the chapters of a multi-chapter project.
+    """
+
+    try:
+        chapters = load_project(project_id).chapters
+    except ProjectStorageError:
+        return segments
+    return order_segments(segments, chapters)
+
+
 @router.post(
     "/projects/{project_id}/export/full",
     response_model=ExportFullResponse,
@@ -1645,7 +1661,7 @@ def api_export_full_project(project_id: str) -> ExportFullResponse:
     playable: list[tuple[Segment, Path]] = []
     missing_segments: list[Segment] = []
     project_root_resolved = project_root.resolve()
-    for seg in sorted(segments, key=lambda s: s.index):
+    for seg in _ordered_segments(project_id, segments):
         export_seg = _selected_take_projection(seg)
         if not export_seg.audio_file:
             missing_segments.append(seg)
@@ -1843,7 +1859,7 @@ def api_export_full_project_with_edits(project_id: str) -> ExportFullResponse:
     playable: list[tuple[Segment, Path]] = []
     missing_segments: list[Segment] = []
     project_root_resolved = project_root.resolve()
-    for seg in sorted(segments, key=lambda s: s.index):
+    for seg in _ordered_segments(project_id, segments):
         export_seg = _selected_take_projection(seg)
         if not export_seg.audio_file:
             missing_segments.append(seg)
@@ -2864,8 +2880,8 @@ async def api_synthesize_alt(
     providers = _create_providers()
     default_backend = _get_default_backend()
 
-    # 获取前一分段文本（上下文）
-    sorted_segs = sorted(segments, key=lambda s: s.index)
+    # 获取前一分段文本（上下文）；load_segments 已按章节顺序 + 章节内行号返回
+    sorted_segs = segments
     seg_index_map = {s.id: i for i, s in enumerate(sorted_segs)}
     previous_text: Optional[str] = None
     current_idx = seg_index_map.get(seg.id)

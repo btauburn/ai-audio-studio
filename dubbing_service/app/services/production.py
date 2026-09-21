@@ -93,15 +93,20 @@ def _duration(path: Path) -> float:
 
 def run_project_quality_checks(project_id: str, root: Path) -> QualityReport:
     issues: list[QualityIssue] = []
-    segments = sorted(load_segments(project_id), key=lambda item: item.index)
+    segments = load_segments(project_id)
     if not segments:
         issues.append(QualityIssue(code="no_segments", severity="error", message="项目没有分段"))
     last_index = -1
+    last_chapter_id: str | None = None
     previous_mean: float | None = None
     previous_text: str | None = None
     project = load_project(project_id)
     roles = {item.id: item for item in project.roles}
     for segment in segments:
+        # 分段序号只在章节内部递增，换章节时必须重置，否则会误报顺序倒置
+        if segment.chapter_id != last_chapter_id:
+            last_chapter_id = segment.chapter_id
+            last_index = -1
         if segment.index <= last_index:
             issues.append(QualityIssue(
                 code="segment_order", severity="error", segment_id=segment.id,

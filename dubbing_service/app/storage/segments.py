@@ -15,16 +15,33 @@ from pydantic import ValidationError
 
 from dubbing_service.app.core.config import safe_project_root
 from dubbing_service.app.core.path_safety import validate_simple_component_id
-from dubbing_service.app.models.project import Segment
+from dubbing_service.app.models.project import Chapter, Segment
 from dubbing_service.app.services.takes import (
     adopt_legacy_audio_references,
     capture_active_legacy_settings,
     ensure_take_state,
 )
+from dubbing_service.app.storage.projects import ProjectStorageError, load_project
 
 
 class SegmentStorageError(Exception):
     """与段落存储相关的异常。"""
+
+
+def order_segments(segments: List[Segment], chapters: List[Chapter]) -> List[Segment]:
+    """把分段排成规范的阅读顺序（先章节顺序，再章节内行号）。
+
+    ``Segment.index`` 只在所属章节内部计数，每个章节都从 0 重新开始，因此
+    只按 ``index`` 排序会把多章节项目的章节交错在一起。
+    """
+
+    ordered_chapters = sorted(chapters, key=lambda chapter: chapter.index)
+    rank = {chapter.id: position for position, chapter in enumerate(ordered_chapters)}
+    unranked = len(rank)
+    return sorted(
+        segments,
+        key=lambda segment: (rank.get(segment.chapter_id or "", unranked), segment.index),
+    )
 
 
 # 项目级别的锁，防止同一项目的读-改-写竞态条件
@@ -107,7 +124,15 @@ def load_segments(project_id: str) -> List[Segment]:
     if len(segment_ids) != len(set(segment_ids)):
         raise SegmentStorageError("segments.json 包含重复的分段 ID")
 
-    # 按 index 排序，保证顺序稳定
+    # 按章节顺序 + 章节内行号排序，保证多章节项目的顺序是真实阅读顺序
+    try:
+        chapters = load_project(project_id).chapters
+    except ProjectStorageError:
+        chapters = []
+
+    if chapters:
+        return order_segments(segments, chapters)
+
     segments.sort(key=lambda s: s.index)
     return segments
 

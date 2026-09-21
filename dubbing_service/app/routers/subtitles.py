@@ -295,7 +295,7 @@ def _generate_subtitle_from_final_exclusive(
 
             if segments:
                 playable_texts: list[str] = []
-                for seg in sorted(segments, key=lambda s: s.index):
+                for seg in segments:
                     if not getattr(seg, "audio_file", None):
                         continue
                     try:
