@@ -26,7 +26,7 @@ import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set
 
 from dubbing_service.app.core.config import get_config
 from dubbing_service.app.models.audiobook import (
@@ -451,6 +451,12 @@ class AudiobookerAdapter:
         segments = load_segments(project_id)
         by_id = {segment.id: segment for segment in segments}
         chapter_by_index = {chapter.index: chapter for chapter in project.chapters}
+        # Position is identity: each analyzed utterance binds to a segment at
+        # most once per import pass.  Without this, two utterances that happen
+        # to share the same text (scene breaks, ``said Haoyu.``) both resolve to
+        # the first one's unanchored segment, and the later speaker is silently
+        # dropped from the project.
+        claimed: Set[str] = set()
         for chapter in analysis.chapters:
             target = chapter_by_index.get(chapter.index)
             if target is None:
@@ -476,6 +482,7 @@ class AudiobookerAdapter:
                     default_role=narrator_role,
                     source_revision_id=source_revision_id,
                     result=result,
+                    claimed=claimed,
                 )
 
         persistence_module.commit_project_state(
@@ -545,11 +552,17 @@ def _lookup_segment(
     *,
     chapter: Chapter,
     utterance: AnalyzedUtterance,
+    claimed: "Set[str]",
 ) -> Optional[Segment]:
     """Find the segment an analyzed utterance belongs to.
 
     Position first, then the recorded anchor, then an unanchored text match so
     projects imported before anchors existed still reconcile in place.
+
+    A segment already resolved by an earlier utterance in this same pass is
+    never re-matched by text: text is not identity, so the target position gets
+    its own segment instead of the earlier position's segment being reused and
+    the utterance lost.
     """
 
     position_id = _segment_id(chapter, utterance.line_index)
@@ -565,7 +578,7 @@ def _lookup_segment(
     for candidate in segments:
         if candidate.chapter_id != chapter.id or candidate.source_anchor is not None:
             continue
-        if candidate.text == utterance.text:
+        if candidate.text == utterance.text and candidate.id not in claimed:
             return candidate
     return None
 
@@ -600,10 +613,11 @@ def _merge_utterance(
     default_role: Optional[Role],
     source_revision_id: Optional[str],
     result: ImportResult,
+    claimed: "Set[str]",
 ) -> None:
     segment_id = _segment_id(chapter, utterance.line_index)
     existing = _lookup_segment(
-        segments, by_id, chapter=chapter, utterance=utterance
+        segments, by_id, chapter=chapter, utterance=utterance, claimed=claimed
     )
     role = role_by_speaker.get(utterance.speaker or "", None)
     if role is None and not utterance.speaker:
@@ -647,6 +661,10 @@ def _merge_utterance(
                 existing.role_id = role.id
             result.utterances_updated += 1
         existing.index = utterance.line_index
+
+    # Either way this position now owns this segment: a later utterance with the
+    # same text must not be able to claim it back through the text fallback.
+    claimed.add(existing.id)
 
     if source_revision_id:
         existing.source_anchor = SourceAnchor(

@@ -277,6 +277,81 @@ def test_import_is_idempotent_and_keeps_utterance_identity(studio):
     assert second.roles_created == 0
 
 
+def test_import_keeps_every_utterance_when_the_text_repeats(studio):
+    """Position is identity; identical text is two utterances, not one.
+
+    Real books repeat text verbatim — scene-break markers (``******``) and
+    short dialogue tags (``said Haoyu.``).  A text-based fallback lookup must
+    never let a later occurrence reuse (and so silently swallow) an earlier
+    occurrence's segment.
+    """
+
+    analysis = adapter.BookAnalysis.from_dict(
+        {
+            "schema": adapter.ADAPTER_SCHEMA_VERSION,
+            "title": "Repeated text",
+            "chapters": [
+                {
+                    "index": 0,
+                    "title": "Chapter 1",
+                    "utterances": [
+                        {
+                            "text": "******",
+                            "speaker": None,
+                            "utterance_type": "narration",
+                            "chapter_index": 0,
+                            "line_index": 0,
+                            "attribution_source": "unknown",
+                            "confidence": 0.0,
+                        },
+                        {
+                            "text": "Alden waved.",
+                            "speaker": None,
+                            "utterance_type": "narration",
+                            "chapter_index": 0,
+                            "line_index": 1,
+                            "attribution_source": "unknown",
+                            "confidence": 0.0,
+                        },
+                        {
+                            "text": "******",
+                            "speaker": None,
+                            "utterance_type": "narration",
+                            "chapter_index": 0,
+                            "line_index": 2,
+                            "attribution_source": "unknown",
+                            "confidence": 0.0,
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+
+    first = adapter.AudiobookerAdapter().reconcile_into_project(
+        analysis, project_name="Repeated text"
+    )
+    _project, segments = _reload(first.project_id)
+
+    assert first.utterances_created == analysis.utterance_count()
+    assert first.utterances_updated == 0
+    assert len(segments) == analysis.utterance_count()
+    assert [segment.text for segment in segments].count("******") == 2
+    assert sorted(segment.index for segment in segments) == [0, 1, 2]
+    assert len({segment.id for segment in segments}) == 3
+
+    ids_before = sorted(segment.id for segment in segments)
+    second = adapter.AudiobookerAdapter().reconcile_into_project(
+        analysis, project_id=first.project_id
+    )
+    _project, after = _reload(first.project_id)
+
+    assert second.utterances_created == 0
+    assert sorted(segment.id for segment in after) == ids_before, (
+        "re-importing repeated text must not mint new segments"
+    )
+
+
 def test_import_never_overwrites_a_human_corrected_utterance(studio):
     analysis = adapter.analyze_text_offline(SAMPLE, title="Sample")
     imported = adapter.AudiobookerAdapter().reconcile_into_project(
