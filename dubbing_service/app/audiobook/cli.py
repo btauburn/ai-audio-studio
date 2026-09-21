@@ -175,8 +175,15 @@ def cmd_render(args: argparse.Namespace) -> int:
         return 1
 
     failures = [record for record in records if not record.success]
+    # A Take that was written but refused by blocking QA is not a success: it
+    # stays on disk as a candidate, and the aggregate says so.
+    blocked = [
+        record
+        for record in records
+        if record.success and not record.selected and record.blocking_qa
+    ]
     payload = {
-        "ok": not failures,
+        "ok": not failures and not blocked,
         "operation": "render",
         "project_id": args.project_id,
         "requested_renderer": args.renderer,
@@ -184,18 +191,33 @@ def cmd_render(args: argparse.Namespace) -> int:
         "engine": getattr(renderer, "engine_id", None),
         "rendered": len(records),
         "succeeded": len(records) - len(failures),
+        "qa_blocked": len(blocked),
         "takes": [
             {
                 "segment_id": record.segment_id,
                 "take_id": record.take_id,
+                "rendered": True,
+                "candidate_created": record.candidate_created,
                 "qa_passed": record.qa_passed,
+                "selected": record.selected,
+                "blocking_qa": list(record.blocking_qa),
                 "duration_ms": record.duration_ms,
                 "chunked": record.chunked,
-                "selected": record.selected,
                 "stale_components": list(record.stale_components),
             }
             for record in records
             if record.success
+        ],
+        "blocked": [
+            {
+                "segment_id": record.segment_id,
+                "take_id": record.take_id,
+                "selected": record.selected,
+                "qa_passed": record.qa_passed,
+                "blocking_qa": list(record.blocking_qa),
+                "error": record.error,
+            }
+            for record in blocked
         ],
         "failed": [
             {"segment_id": record.segment_id, "error": record.error}
@@ -205,8 +227,12 @@ def cmd_render(args: argparse.Namespace) -> int:
     }
     if failures:
         payload["error"] = f"{len(failures)} of {len(records)} renders failed"
+    elif blocked:
+        payload["error"] = (
+            f"{len(blocked)} of {len(records)} renders were refused by blocking QA"
+        )
     _emit(payload)
-    return 0 if not failures else 1
+    return 0 if not failures and not blocked else 1
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -264,11 +290,16 @@ def cmd_select(args: argparse.Namespace) -> int:
 
 def cmd_verify(args: argparse.Namespace) -> int:
     from dubbing_service.app.audiobook import persistence as persistence_module
+    from dubbing_service.app.audiobook import pipeline as pipeline_module
 
     recovery: Optional[Dict[str, object]] = None
     if args.recover:
         recovery = persistence_module.recover_project_state(args.project_id).as_dict()
     ok, problems = persistence_module.verify_project_state(args.project_id)
+    try:
+        status = pipeline_module.status_report(args.project_id)
+    except Exception as exc:  # noqa: BLE001 - verify reports, it does not crash
+        status = {"coverage": None, "release_ready": False, "error": str(exc)}
     _emit(
         {
             "ok": ok,
@@ -277,6 +308,12 @@ def cmd_verify(args: argparse.Namespace) -> int:
             "problems": problems,
             "pending_markers": persistence_module.pending_markers(args.project_id),
             "recovery": recovery,
+            # State integrity alone must never read as "ready to release": a
+            # live utterance whose Takes are all QA-blocked is reported here.
+            "coverage": status.get("coverage"),
+            "release_ready": status.get("release_ready", False),
+            "qa_blocked": status.get("qa_blocked", 0),
+            "blocked_utterances": status.get("blocked_utterances", []),
         }
     )
     return 0 if ok else 1

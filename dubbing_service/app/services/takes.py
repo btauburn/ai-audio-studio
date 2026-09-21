@@ -32,6 +32,20 @@ def other_slot(slot: TakeSlotName) -> TakeSlotName:
     return "a" if slot == "b" else "b"
 
 
+class TakeNotSelectable(ValueError):
+    """Raised when a Take may not become the selected result.
+
+    The reason code is kept so callers can distinguish a refusal ("the Take
+    exists but blocking QA failed") from a lookup failure without parsing the
+    message.
+    """
+
+    def __init__(self, take_id: str, reason: str, message: str) -> None:
+        self.take_id = take_id
+        self.reason = reason
+        super().__init__(f"{message}，不能选用: {take_id}")
+
+
 def _copy_edit_state(value: SegmentEditState | None) -> SegmentEditState | None:
     return value.model_copy(deep=True) if value is not None else None
 
@@ -79,6 +93,76 @@ def _find_take_unchecked(segment: Segment, take_id: str | None) -> SegmentTake |
     if not take_id:
         return None
     return next((item for item in segment.takes if item.id == take_id), None)
+
+
+def take_is_selectable(
+    take: SegmentTake | None,
+    *,
+    allow_stale: bool = False,
+    allow_blocking_qa: bool = False,
+) -> tuple[str, str] | None:
+    """The single rule for "may this Take be the selected result?".
+
+    Every path that can write ``selected_take_id`` asks this question: explicit
+    selection, promotion, state repair, legacy adoption and QA attachment.
+    Sharing one rule is what makes a refusal durable — a path that only knew
+    about slots used to re-select a candidate another path had just rejected.
+
+    Returns ``None`` when the Take may be selected, otherwise a
+    ``(reason_code, message)`` pair.
+    """
+
+    if take is None:
+        return ("missing_take", "Take 不存在")
+    if take.missing or not take.audio_file:
+        return ("missing_audio", "Take 没有音频文件")
+    if take.archived_at is not None:
+        return ("rejected_take", "Take 已被拒绝或归档")
+    if take.stale and not allow_stale:
+        return (
+            "stale_take",
+            f"Take 已过期（依赖变化: {', '.join(take.stale_components) or 'unknown'}）",
+        )
+    report = take.qa_report
+    if report is not None:
+        if (
+            report.output_audio_hash
+            and take.audio_sha256
+            and report.output_audio_hash != take.audio_sha256
+        ):
+            return ("qa_report_mismatch", "QA 报告与 Take 音频哈希不匹配")
+        blocking = report.blocking_failures()
+        if blocking and not allow_blocking_qa:
+            checks = ", ".join(item.check_id for item in blocking)
+            return ("blocking_qa", f"QA 阻断项未通过（{checks}）")
+    return None
+
+
+def take_selection_refusal(segment: Segment) -> tuple[str, str] | None:
+    """Why the currently selected Take must not stay selected, or ``None``."""
+
+    if not segment.selected_take_id:
+        return None
+    return take_is_selectable(_find_take_unchecked(segment, segment.selected_take_id))
+
+
+def withdraw_unselectable_selection(segment: Segment) -> str | None:
+    """Drop a selection the shared rule no longer allows.
+
+    The selection is part of the committed state, so a refusal has to clear it
+    *before* the next save.  A refusal that only lives in a caller's return
+    value is undone by the next load that only knows about slots.
+
+    Returns the reason code, or ``None`` when the selection is still valid.
+    """
+
+    refusal = take_selection_refusal(segment)
+    if refusal is None:
+        return None
+    segment.selected_take_id = None
+    if segment.take_slots:
+        sync_legacy_projection(segment)
+    return refusal[0]
 
 
 def adopt_legacy_audio_references(segment: Segment) -> Segment:
@@ -150,7 +234,9 @@ def adopt_legacy_audio_references(segment: Segment) -> Segment:
         state.needs_synthesis = False
         adopted = True
     if adopted and segment.selected_take_id is None:
-        segment.selected_take_id = segment.take_slots[active].take_id
+        candidate = _find_take_unchecked(segment, segment.take_slots[active].take_id)
+        if candidate is not None and take_is_selectable(candidate) is None:
+            segment.selected_take_id = candidate.id
     if adopted:
         sync_legacy_projection(segment)
     return segment
@@ -220,12 +306,16 @@ def ensure_take_state(segment: Segment) -> Segment:
         if state.take_id and _find_take_unchecked(segment, state.take_id) is None:
             state.take_id = None
 
-    if segment.selected_take_id and _find_take_unchecked(
-        segment, segment.selected_take_id
-    ) is None:
-        segment.selected_take_id = None
+    # A selected Take that vanished is withdrawn with everything else the
+    # shared rule refuses.
+    withdraw_unselectable_selection(segment)
+    # Repairs only ever adopt a Take the shared rule still allows: a
+    # QA-rejected candidate stays in its slot as history, but the refusal must
+    # never be silently undone by a later load or commit.
     if segment.selected_take_id is None:
-        segment.selected_take_id = segment.take_slots[active].take_id
+        candidate = _find_take_unchecked(segment, segment.take_slots[active].take_id)
+        if candidate is not None and take_is_selectable(candidate) is None:
+            segment.selected_take_id = candidate.id
 
     sync_legacy_projection(segment)
     return segment
@@ -382,7 +472,12 @@ def create_take(
         previous.archived_at = datetime.now(timezone.utc)
 
     if segment.selected_take_id in {None, previous_id}:
-        segment.selected_take_id = take.id
+        # A brand new Take carries no QA verdict yet, so it is adopted as the
+        # selection; the rule is asked anyway so this path can never select a
+        # Take that is already unusable.
+        segment.selected_take_id = (
+            take.id if take_is_selectable(take) is None else None
+        )
     segment.active_version = slot_name
     segment.review_status = SegmentReviewStatus.TO_REVIEW
     segment.reviewed_at = None
@@ -404,7 +499,14 @@ def clear_slot(segment: Segment, slot: object) -> SegmentTake | None:
     ):
         old.archived_at = datetime.now(timezone.utc)
     if segment.selected_take_id == old_id:
-        segment.selected_take_id = segment.take_slots[other_slot(slot_name)].take_id
+        fallback = _find_take_unchecked(
+            segment, segment.take_slots[other_slot(slot_name)].take_id
+        )
+        segment.selected_take_id = (
+            fallback.id
+            if fallback is not None and take_is_selectable(fallback) is None
+            else None
+        )
     segment.review_status = (
         SegmentReviewStatus.NEEDS_REVISION
         if any(item.take_id for item in segment.take_slots.values())
@@ -419,6 +521,9 @@ def select_take(segment: Segment, take_id: str) -> SegmentTake:
     take = get_take(segment, take_id)
     if take is None:
         raise ValueError(f"Take 不存在: {take_id}")
+    refusal = take_is_selectable(take)
+    if refusal is not None:
+        raise TakeNotSelectable(take_id, *refusal)
     if segment.selected_take_id != take.id:
         segment.selected_take_id = take.id
         segment.review_status = SegmentReviewStatus.TO_REVIEW
@@ -442,7 +547,9 @@ def restore_take_to_slot(segment: Segment, take_id: str, slot: object) -> Segmen
     ):
         current.archived_at = datetime.now(timezone.utc)
     if segment.selected_take_id in {None, current_id}:
-        segment.selected_take_id = take.id
+        segment.selected_take_id = (
+            take.id if take_is_selectable(take) is None else None
+        )
     segment.active_version = slot_name
     segment.review_status = SegmentReviewStatus.TO_REVIEW
     segment.reviewed_at = None

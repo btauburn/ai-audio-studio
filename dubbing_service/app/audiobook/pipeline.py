@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 from dubbing_service.app.models.project import Project, Role, Segment
+from dubbing_service.app.services.takes import take_is_selectable
 from dubbing_service.app.storage.projects import load_project
 from dubbing_service.app.storage.segments import load_segments
 
@@ -48,6 +49,11 @@ class RenderRecord:
     selected: bool = False
     error: Optional[str] = None
     stale_components: List[str] = field(default_factory=list)
+    # A Take that was written but is refused by blocking QA stays visible as a
+    # candidate: the refusal is a property of the state, not of this return
+    # value, so callers get the exact checks that refused it.
+    candidate_created: bool = False
+    blocking_qa: List[str] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, object]:
         return dict(self.__dict__)
@@ -193,6 +199,7 @@ def render_segment(
         segment_id=segment.id,
         take_id=take_id,
         success=True,
+        candidate_created=True,
         audio_sha256=audio_sha,
         duration_ms=outcome.duration_ms,
         chunked=outcome.chunked,
@@ -209,6 +216,9 @@ def render_segment(
         )
         takes_module.attach_qa_report(segment, take_id, report)
         record.qa_passed = report.passed
+        record.blocking_qa = [
+            item.check_id for item in report.blocking_failures()
+        ]
 
     if promote:
         try:
@@ -300,6 +310,59 @@ def release_report(project_id: str) -> release_module.CoverageReport:
     )
 
 
+def blocked_utterances(segments: Sequence[Segment]) -> List[Dict[str, object]]:
+    """Live utterances that blocking QA left without a usable selection.
+
+    An utterance that already has a selectable Take is *not* blocked: the
+    refused candidate stays in its slot as history.  Derived from the committed
+    Takes rather than from one command's return value, because the refusal is
+    durable state that has to survive a restart.
+    """
+
+    blocked: List[Dict[str, object]] = []
+    for segment in segments:
+        if not release_module.is_live(segment):
+            continue
+        selection = next(
+            (take for take in segment.takes if take.id == segment.selected_take_id),
+            None,
+        )
+        if selection is not None and take_is_selectable(selection) is None:
+            continue
+        refused: Dict[str, List[str]] = {}
+        for take in segment.takes:
+            report = take.qa_report
+            if report is None:
+                continue
+            failures = [item.check_id for item in report.blocking_failures()]
+            if failures:
+                refused[take.id] = sorted(failures)
+        if not refused:
+            continue
+        checks = sorted({check for ids in refused.values() for check in ids})
+        blocked.append(
+            {
+                "segment_id": segment.id,
+                "state": "qa_blocked",
+                "selected_take_id": segment.selected_take_id,
+                "candidate_take_ids": sorted(refused),
+                "blocking_qa": {
+                    "checks": checks,
+                    "takes": {take_id: ids for take_id, ids in sorted(refused.items())},
+                    "qa_check_version": next(
+                        (
+                            take.qa_report.qa_check_version
+                            for take in segment.takes
+                            if take.id in refused and take.qa_report is not None
+                        ),
+                        None,
+                    ),
+                },
+            }
+        )
+    return blocked
+
+
 def status_report(project_id: str) -> Dict[str, object]:
     """One object with everything a caller needs to see where a book stands."""
 
@@ -312,6 +375,7 @@ def status_report(project_id: str) -> Dict[str, object]:
         cues=project.audio_cues,
         project_root=project_root(project_id),
     )
+    blocked = blocked_utterances(segments)
     return {
         "project_id": project.id,
         "name": project.name,
@@ -323,6 +387,8 @@ def status_report(project_id: str) -> Dict[str, object]:
         "stale_utterances": sorted(stale),
         "coverage": report.as_dict(),
         "release_ready": report.ready,
+        "qa_blocked": len(blocked),
+        "blocked_utterances": blocked,
     }
 
 

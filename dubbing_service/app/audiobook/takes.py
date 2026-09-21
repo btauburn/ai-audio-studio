@@ -17,6 +17,8 @@ from dubbing_service.app.services.takes import (
     ensure_take_state,
     normalize_slot,
     sync_legacy_projection,
+    take_is_selectable,
+    withdraw_unselectable_selection,
 )
 from dubbing_service.app.audiobook.fingerprint import (
     SynthesisRequirement,
@@ -188,6 +190,10 @@ def attach_qa_report(
 ) -> SegmentTake:
     take = find_take(segment, take_id)
     take.qa_report = report
+    # A blocking failure is a decision, not a note: withdraw the selection here
+    # so the refusal is part of the state that gets committed instead of being
+    # undone by the next load that only knows about slots.
+    withdraw_unselectable_selection(segment)
     return take
 
 
@@ -202,17 +208,18 @@ def promote_take(
     """Select a Take only when it is safe to do so.
 
     Refusals are explicit errors rather than silent fallbacks; the previously
-    selected Take is never removed.
+    selected Take is never removed.  Eligibility itself lives in the shared
+    rule (``services.takes.take_is_selectable``) so promotion cannot disagree
+    with selection or state repair about what is usable.
     """
 
     take = find_take(segment, take_id)
-    if not take.audio_file:
-        raise PromotionError(f"Take 没有音频文件，不能选用: {take_id}")
-
-    if take.stale and not allow_stale:
-        raise PromotionError(
-            f"Take 已过期（依赖变化: {', '.join(take.stale_components) or 'unknown'}），不能选用"
-        )
+    refusal = take_is_selectable(
+        take, allow_stale=allow_stale, allow_blocking_qa=allow_blocking_qa
+    )
+    if refusal is not None:
+        _reason, message = refusal
+        raise PromotionError(f"{message}，不能选用: {take_id}")
 
     if requirement is not None:
         is_stale, changed = take_is_stale(take, requirement)
@@ -220,16 +227,6 @@ def promote_take(
             raise PromotionError(
                 f"Take 与当前需求不一致（{', '.join(changed) or 'fingerprint'}），不能选用"
             )
-
-    report = take.qa_report
-    if report is not None:
-        if report.output_audio_hash and take.audio_sha256:
-            if report.output_audio_hash != take.audio_sha256:
-                raise PromotionError("QA 报告与 Take 音频哈希不匹配，不能选用")
-        blocking = report.blocking_failures()
-        if blocking and not allow_blocking_qa:
-            checks = ", ".join(item.check_id for item in blocking)
-            raise PromotionError(f"QA 阻断项未通过（{checks}），不能选用")
 
     segment.selected_take_id = take.id
     segment.active_version = normalize_slot(segment.active_version)
