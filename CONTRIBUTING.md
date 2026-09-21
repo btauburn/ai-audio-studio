@@ -43,10 +43,15 @@ WebUI 静态资源依赖位于 `dubbing_service/webui/package-lock.json`，更�
 .\scripts\export_source.ps1 -ValidateOnly
 .\scripts\ci_source_guard.ps1
 uv lock --check
-python -m pytest tests --ignore=tests/test_indextts_audio_safety.py --ignore=tests/test_service_server_api.py
 ```
 
-涉及 IndexTTS2 推理或完整服务入口时，还应在正确的 CUDA/PyTorch 环境中运行被 CI 排除的测试，并用项目目录内、许可合规的模型完成真实音频冒烟测试。涉及 CosyVoice3 或 Qwen3-TTS 时，必须在各自 uv 环境中单独验收，不能把依赖合并进根环境。
+在按 `docs/installation.md` 引导完成的根环境中，运行完整测试套件（不要加 `--ignore`）：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests -q
+```
+
+`.github/requirements-ci.txt` 只覆盖无模型子集（不含 `torch` 与 `uvicorn`），所以 CI 仍会跳过 `tests/test_indextts_audio_safety.py` 与 `tests/test_service_server_api.py`；本地根环境具备 CUDA/PyTorch 依赖，应运行全部测试文件。涉及 IndexTTS2 推理或完整服务入口时，还应用项目目录内、许可合规的模型完成真实音频冒烟测试。涉及 CosyVoice3 或 Qwen3-TTS 时，必须在各自 uv 环境中单独验收，不能把依赖合并进根环境。
 
 Pull Request 应写明已运行和未运行的检查。通过测试不表示生成内容已达到发布质量；听感、响度、爆音、截断、字幕同步和商业授权仍需人工验收。
 
