@@ -88,6 +88,24 @@ class AppConfig(BaseModel):
     # 可选：TTS 服务的 API Key，用于需要鉴权的 TTS REST 服务
     tts_api_key: str | None = None
     projects_root: Path = Path("dubbing_projects")
+    # 多进程写入保护：超过该心跳时长且进程已消失的锁视为过期锁
+    project_lock_stale_seconds: float = 120.0
+
+    @field_validator("project_lock_stale_seconds", mode="before")
+    @classmethod
+    def _from_env_project_lock_stale_seconds(cls, v: float | str | None) -> float:
+        env_value = os.getenv("DUBBING_PROJECT_LOCK_STALE_SECONDS")
+        if env_value:
+            try:
+                return float(env_value)
+            except ValueError:
+                return 120.0
+        if v is None:
+            return 120.0
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return 120.0
 
     @field_validator("tts_base_url", mode="before")
     @classmethod

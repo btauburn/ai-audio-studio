@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from threading import Lock
-from typing import Dict, Generator, Iterable, List
+from typing import Dict, Generator, Iterable, List, Mapping, Optional, Sequence
 
 from pydantic import ValidationError
 
@@ -139,6 +141,103 @@ def upsert_job(project_id: str, job: SynthesisJob) -> SynthesisJob:
 
 def get_job(project_id: str, job_id: str) -> SynthesisJob | None:
     return next((item for item in load_jobs(project_id) if item.id == job_id), None)
+
+
+def get_job_by_request_id(project_id: str, request_id: str) -> SynthesisJob | None:
+    """Durable ``status(request_id)`` lookup for uncertain agent submissions."""
+
+    return next(
+        (item for item in load_jobs(project_id) if item.request_id == request_id),
+        None,
+    )
+
+
+def get_job_by_idempotency_key(
+    project_id: str, idempotency_key: str
+) -> SynthesisJob | None:
+    return next(
+        (
+            item
+            for item in load_jobs(project_id)
+            if item.idempotency_key == idempotency_key
+        ),
+        None,
+    )
+
+
+def synthesis_intent_hash(
+    project_id: str,
+    *,
+    job_type: str,
+    segment_ids: Sequence[str],
+    segment_backends: Optional[Mapping[str, str]] = None,
+) -> str:
+    """Canonical hash of a synthesis intent (what would be synthesized).
+
+    Segment order is not part of the intent: the same set of utterances, in the
+    same order *by user intent*, describes the same GPU work.
+    """
+
+    payload = {
+        "project_id": project_id,
+        "job_type": job_type,
+        "segment_ids": list(segment_ids),
+        "segment_backends": {
+            key: value
+            for key, value in sorted((segment_backends or {}).items())
+            if key in set(segment_ids)
+        },
+    }
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def register_synthesis_request(
+    project_id: str,
+    *,
+    job_id: str,
+    job_type: str,
+    segment_ids: Iterable[str],
+    segment_backends: Dict[str, str] | None = None,
+    project_name: str | None = None,
+    request_id: str | None = None,
+    idempotency_key: str | None = None,
+    intent_hash: str | None = None,
+) -> tuple[SynthesisJob, bool]:
+    """Create a job, or return the existing one for a repeated request.
+
+    Returns ``(job, created)``.  A repeated ``idempotency_key`` with the same
+    ``intent_hash`` never creates duplicate GPU work; reusing a key for a
+    different intent is rejected instead of silently coalescing two requests.
+    Cancellation is deliberately not consulted here: it is operational, while
+    request identity is correctness.
+    """
+
+    with project_jobs_lock(project_id):
+        if idempotency_key:
+            existing = get_job_by_idempotency_key(project_id, idempotency_key)
+            if existing is not None:
+                if intent_hash and existing.intent_hash and existing.intent_hash != intent_hash:
+                    raise JobStorageError(
+                        "idempotency_key 已用于不同的合成意图；请使用新的 key"
+                    )
+                return existing, False
+
+        job = SynthesisJob(
+            id=job_id,
+            project_id=project_id,
+            job_type=job_type,
+            project_name=project_name,
+            segment_ids=list(segment_ids),
+            segment_backends=dict(segment_backends or {}),
+            request_id=request_id or uuid.uuid4().hex,
+            idempotency_key=idempotency_key,
+            intent_hash=intent_hash,
+        )
+        jobs = load_jobs(project_id)
+        jobs.insert(0, job)
+        save_jobs(project_id, jobs[:100])
+    return job, True
 
 
 def mutate_job(project_id: str, job_id: str, mutator) -> SynthesisJob:

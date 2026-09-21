@@ -34,6 +34,20 @@ class SynthesisJob(BaseModel):
     project_id: str
     job_type: str = Field(pattern="^(batch_synthesize|single_synthesize)$")
     project_name: Optional[str] = None
+
+    # --- audiobook architecture v1.2: durable agent request identity ---
+    request_id: Optional[str] = Field(
+        default=None,
+        description="调用方可轮询的持久请求 ID（超时/断线后仍可 status(request_id)）",
+    )
+    idempotency_key: Optional[str] = Field(
+        default=None,
+        description="相同 request + 相同 key 必须复用既有 Job，避免重复 GPU 工作",
+    )
+    intent_hash: Optional[str] = Field(
+        default=None,
+        description="请求意图的规范化哈希（项目/段落集合/后端），用于识别同一意图",
+    )
     segment_ids: List[str] = Field(default_factory=list)
     segment_backends: Dict[str, str] = Field(default_factory=dict)
     status: SynthesisJobStatus = SynthesisJobStatus.QUEUED

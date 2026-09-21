@@ -111,6 +111,7 @@ Upstream = "https://github.com/index-tts/index-tts"
 [project.scripts]
 # Set the installed binary names and entry points.
 indextts = "indextts.cli:main"
+make-audiobook = "dubbing_service.app.audiobook.cli:main"
 
 [dependency-groups]
 dev = [

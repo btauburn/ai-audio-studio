@@ -14,11 +14,14 @@ from dubbing_service.app.storage.jobs import (
     cancel_job,
     delete_job,
     get_job,
+    get_job_by_request_id,
     load_jobs,
     record_job_segment,
     recover_interrupted_jobs,
+    register_synthesis_request,
     resume_job,
     start_job,
+    synthesis_intent_hash,
     upsert_job,
 )
 from dubbing_service.app.storage.segments import load_segments
@@ -32,6 +35,8 @@ class CreateSynthesisJobRequest(BaseModel):
     project_name: Optional[str] = None
     segment_ids: List[str] = Field(min_length=1)
     segment_backends: Dict[str, str] = Field(default_factory=dict)
+    request_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
 
 
 class JobSegmentResultRequest(BaseModel):
@@ -68,22 +73,63 @@ async def api_create_synthesis_job(
     existing = get_job(project_id, job_id)
     if existing is not None:
         return existing
+    backends = {
+        key: value
+        for key, value in payload.segment_backends.items()
+        if key in set(segment_ids)
+    }
+    if payload.idempotency_key:
+        # A repeated idempotency key must reuse the existing job instead of
+        # queueing the same GPU work twice, even under a fresh client job id.
+        try:
+            job, _created = register_synthesis_request(
+                project_id,
+                job_id=job_id,
+                job_type=payload.job_type,
+                segment_ids=segment_ids,
+                segment_backends=backends,
+                project_name=payload.project_name,
+                request_id=payload.request_id,
+                idempotency_key=payload.idempotency_key,
+                intent_hash=synthesis_intent_hash(
+                    project_id,
+                    job_type=payload.job_type,
+                    segment_ids=segment_ids,
+                    segment_backends=backends,
+                ),
+            )
+        except (JobStorageError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return job
     job = SynthesisJob(
         id=job_id,
         project_id=project_id,
         job_type=payload.job_type,
         project_name=payload.project_name,
         segment_ids=segment_ids,
-        segment_backends={
-            key: value
-            for key, value in payload.segment_backends.items()
-            if key in set(segment_ids)
-        },
+        segment_backends=backends,
+        request_id=payload.request_id,
     )
     try:
         return upsert_job(project_id, job)
     except (JobStorageError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/projects/{project_id}/synthesis-requests/{request_id}",
+    response_model=SynthesisJob,
+)
+async def api_get_synthesis_request(project_id: str, request_id: str) -> SynthesisJob:
+    """Durable ``status(request_id)`` lookup after a timeout or disconnect."""
+
+    try:
+        job = get_job_by_request_id(project_id, request_id)
+    except JobStorageError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if job is None:
+        raise HTTPException(status_code=404, detail="请求不存在")
+    return job
 
 
 @router.post(

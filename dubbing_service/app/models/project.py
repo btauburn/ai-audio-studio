@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from .audiobook import (
+    AudioCue,
+    Attribution,
+    ChunkRecord,
+    SegmentLineage,
+    SourceAnchor,
+    SourceRevision,
+    SpokenTextRevision,
+    TakeQaReport,
+)
 from .enums import EmotionMode, RoleType, SegmentReviewStatus, SegmentStatus
 
 
@@ -213,6 +223,41 @@ class SegmentTake(BaseModel):
         description="Take 创建时间（UTC）",
     )
 
+    # --- audiobook architecture v1.2 (all optional: old projects still load) ---
+    input_fingerprint: Optional[str] = Field(
+        default=None,
+        description="本次合成需求指纹（输入），与 audio_sha256（输出）严格分离",
+    )
+    fingerprint_components: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="指纹的规范化组成项，用于精确指出哪一个依赖发生了变化",
+    )
+    renderer_id: Optional[str] = None
+    engine_id: Optional[str] = None
+    model_id: Optional[str] = None
+    spoken_text_revision_id: Optional[str] = Field(
+        default=None, description="生成时所使用的 spoken-text 修订"
+    )
+    source_text_hash: Optional[str] = Field(
+        default=None, description="该 Take 对应的 canonical source 文本哈希"
+    )
+    chunk_map: List[ChunkRecord] = Field(
+        default_factory=list,
+        description="渲染器内部分块与重组后的时间映射；提交的 Take 只有一个权威 utterance",
+    )
+    stale: bool = Field(
+        default=False,
+        description="生成结果晚于文本/音色/模型变化返回；可保留为历史候选，但不可自动选用",
+    )
+    stale_components: List[str] = Field(
+        default_factory=list,
+        description="导致该 Take 过期的具体依赖项名称（用于选择性重新生成）",
+    )
+    qa_report: Optional[TakeQaReport] = Field(
+        default=None,
+        description="绑定到 take_id + audio_sha256 + qa_check_version 的 QA 结果",
+    )
+
 
 class SegmentReviewIssue(BaseModel):
     id: str
@@ -336,6 +381,27 @@ class Segment(BaseModel):
         None, description="LLM 分析原始结构化结果，用于调试或回溯"
     )
 
+    # --- audiobook architecture v1.2 utterance provenance ---
+    source_anchor: Optional[SourceAnchor] = Field(
+        None, description="该 utterance 在 canonical source 快照中的锚点"
+    )
+    spoken_text_revision_id: Optional[str] = Field(
+        None, description="当前 spoken-text 修订 ID"
+    )
+    attribution: Optional[Attribution] = Field(
+        None, description="说话人归属来源与置信度；人工修正不可被自动结果覆盖"
+    )
+    lineage: Optional[SegmentLineage] = Field(
+        None, description="split/merge 身份血缘；普通文本编辑不改变 segment.id"
+    )
+    engine_text: Optional[str] = Field(
+        None,
+        description=(
+            "最近一次渲染器实际收到的文本（引擎表示）。canonical source 与 "
+            "spoken text 不得包含引擎专有标记；完整历史见 Take.synthesis_text。"
+        ),
+    )
+
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), description="段落创建时间（UTC）"
     )
@@ -363,3 +429,19 @@ class Project(BaseModel):
         default_factory=list, description="项目下的章节列表"
     )
     roles: List[Role] = Field(default_factory=list, description="项目下的角色列表")
+
+    # --- audiobook architecture v1.2 state (single canonical store) ---
+    source_revisions: List[SourceRevision] = Field(
+        default_factory=list, description="canonical source 的不可变快照修订"
+    )
+    spoken_text_revisions: List[SpokenTextRevision] = Field(
+        default_factory=list, description="spoken-text 修订历史（与 canonical source 分离）"
+    )
+    audio_cues: List[AudioCue] = Field(
+        default_factory=list,
+        description="Audio Director 预留的 utterance 锚定线索；当前不自动生成",
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="非音频元数据（书名、作者、来源路径、分析工具版本等）；不参与合成指纹",
+    )

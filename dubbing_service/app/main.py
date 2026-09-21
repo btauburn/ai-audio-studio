@@ -69,12 +69,39 @@ class WebUIStaticFiles(StaticFiles):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """应用生命周期：启动时初始化日志，关闭时清理 TTS 子进程。"""
+    """应用生命周期：启动时取得 projects root 写锁，关闭时清理 TTS 子进程。
+
+    Phase 13：同一 projects root 不允许两个 AI Audio Studio 进程同时写入。
+    锁在启动时取得、在关闭时释放；持有者信息（PID/主机/心跳）写入锁文件，
+    因此崩溃后的陈旧锁可以被安全接管。
+    """
+
     setup_logging()
     logger.info("Dubbing service starting up")
+    from dubbing_service.app.storage.process_lock import (
+        LockBusyError,
+        acquire_projects_root,
+    )
+
+    projects_lock = None
+    try:
+        projects_lock = acquire_projects_root(label="dubbing-service")
+        logger.info("Projects root write lock acquired: %s", projects_lock.lock_path)
+    except LockBusyError as exc:
+        logger.error(
+            "Refusing to start: another AI Audio Studio process owns this projects root (%s)",
+            exc,
+        )
+        raise RuntimeError(str(exc)) from exc
     yield
     # ── Shutdown ──────────────────────────────────────────────────────
     logger.info("Dubbing service shutting down, cleaning up ...")
+    if projects_lock is not None:
+        try:
+            projects_lock.release()
+            logger.info("Projects root write lock released")
+        except Exception:
+            logger.warning("Failed to release projects root lock", exc_info=True)
     try:
         from dubbing_service.app.routers.settings import shutdown_tts_process
         shutdown_tts_process()
