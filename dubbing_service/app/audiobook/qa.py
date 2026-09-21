@@ -28,9 +28,23 @@ DEFAULT_ANOMALY_RATIO = 2.5
 DEFAULT_SILENCE_RATIO = 0.98
 DEFAULT_PEAK_CEILING = 0.999
 DEFAULT_MIN_RMS = 1e-4
-DEFAULT_COVERAGE_PER_CHAR_MS = 12.0
+
+# Duration plausibility, measured on a real Qwen3-TTS English corpus rendered on
+# an RTX 4070 (28 Takes, project 7fd2da08: 12 passed / 16 blocked under the
+# previous values).  Cost per character there was 49.4 ms at the p10, 75.6 ms at
+# the median and 155 ms at the p90, with long-form narration clustered at
+# 57-61 ms/char.  The former 12.0 ms/char placeholder sat ~5x below real English
+# speech, which is what made ordinary Takes look "implausible".  The window
+# answers one question only -- is this duration implausible for this text -- so
+# it stays far wider than the natural spread of reading speeds.
+DEFAULT_COVERAGE_PER_CHAR_MS = 60.0
 DEFAULT_COVERAGE_RATIO = 0.35
 DEFAULT_MAX_COVERAGE_RATIO = 6.0
+# Fixed lead-in/trail-out padding dominates a short utterance, so the long side
+# carries an additive allowance; the short side carries an absolute floor for
+# text too brief for a per-character ratio to mean anything.
+DEFAULT_COVERAGE_OVERHEAD_MS = 1200.0
+DEFAULT_MIN_COVERAGE_MS = 120.0
 
 BLOCKING_CHECK_IDS = frozenset(
     {
@@ -43,6 +57,60 @@ BLOCKING_CHECK_IDS = frozenset(
         "coverage_plausible",
     }
 )
+
+
+@dataclass(frozen=True)
+class CoverageProfile:
+    """Accepted duration window for one spoken language.
+
+    ``per_char_ms`` is the measured cost of one character of text; the window is
+    ``min_ratio``-``max_ratio`` of it, floored by an absolute minimum duration
+    and extended by a fixed overhead allowance on the long side.
+    """
+
+    name: str
+    per_char_ms: float
+    min_ratio: float = DEFAULT_COVERAGE_RATIO
+    max_ratio: float = DEFAULT_MAX_COVERAGE_RATIO
+    overhead_ms: float = DEFAULT_COVERAGE_OVERHEAD_MS
+    min_duration_ms: float = DEFAULT_MIN_COVERAGE_MS
+
+    def bounds(self, characters: int) -> tuple[float, float]:
+        """Lowest and highest plausible duration (ms) for ``characters`` glyphs."""
+
+        expected_ms = characters * self.per_char_ms
+        low = max(self.min_duration_ms, expected_ms * self.min_ratio)
+        high = expected_ms * self.max_ratio + self.overhead_ms
+        return low, high
+
+
+# English is the only language with measured evidence.  A Chinese character is a
+# syllable, and a syllable is worth roughly three Latin characters, so the
+# Chinese cost is derived from the same measurement (~200 ms) rather than
+# invented separately.
+ENGLISH_COVERAGE_PROFILE = CoverageProfile("english", DEFAULT_COVERAGE_PER_CHAR_MS)
+CHINESE_COVERAGE_PROFILE = CoverageProfile("chinese", 200.0)
+DEFAULT_COVERAGE_PROFILE = ENGLISH_COVERAGE_PROFILE
+
+_CHINESE_LANGUAGE_TOKENS = frozenset(
+    {"chinese", "cmn", "mandarin", "zh", "zh-cn", "zh-hans", "zh-hant"}
+)
+
+
+def coverage_profile_for(language: Optional[str]) -> CoverageProfile:
+    """Resolve the duration profile for a declared language.
+
+    Text that declares no language, or declares ``Auto`` (which the engine only
+    resolves at synthesis time), falls back to the measured English profile.
+    That direction is deliberate: a slower, syllable-per-character language lands
+    inside the English window anyway, whereas resolving English text as Chinese
+    would recreate the false "too short" verdicts this window exists to prevent.
+    """
+
+    token = (language or "").strip().lower()
+    if token in _CHINESE_LANGUAGE_TOKENS or token.startswith("zh-"):
+        return CHINESE_COVERAGE_PROFILE
+    return DEFAULT_COVERAGE_PROFILE
 
 
 @dataclass
@@ -214,7 +282,7 @@ def run_tier1_checks(
     silence_ratio: float = DEFAULT_SILENCE_RATIO,
     peak_ceiling: float = DEFAULT_PEAK_CEILING,
     min_rms: float = DEFAULT_MIN_RMS,
-    coverage_per_char_ms: float = DEFAULT_COVERAGE_PER_CHAR_MS,
+    language: Optional[str] = None,
 ) -> List[QaCheckResult]:
     results: List[QaCheckResult] = []
     target = Path(audio_path)
@@ -315,22 +383,26 @@ def run_tier1_checks(
             results.append(_check("rms_ok", "pass", measured=facts.rms))
 
     if text.strip():
-        expected_ms = max(1.0, len(text.strip()) * coverage_per_char_ms)
-        ratio = facts.duration_ms / expected_ms
-        if ratio < DEFAULT_COVERAGE_RATIO or ratio > DEFAULT_MAX_COVERAGE_RATIO:
+        characters = len(text.strip())
+        profile = coverage_profile_for(language)
+        low_ms, high_ms = profile.bounds(characters)
+        duration_ms = float(facts.duration_ms)
+        ratio = duration_ms / max(1.0, characters * profile.per_char_ms)
+        if low_ms <= duration_ms <= high_ms:
+            results.append(_check("coverage_plausible", "pass", measured=ratio))
+        else:
             results.append(
                 _check(
                     "coverage_plausible",
                     "fail",
                     detail=(
                         f"音频长度与文本规模不匹配（{facts.duration_ms} ms / "
-                        f"{len(text.strip())} 字，比例 {ratio:.2f}）"
+                        f"{characters} 字，允许 {int(low_ms)}-{int(high_ms)} ms，"
+                        f"{profile.name}）"
                     ),
                     measured=ratio,
                 )
             )
-        else:
-            results.append(_check("coverage_plausible", "pass", measured=ratio))
 
     return results
 
@@ -341,6 +413,7 @@ def run_tier1_checks_for_chunks(
     chunk_texts: Sequence[str],
     expected_sha256: Optional[str] = None,
     expected_duration_ms: Optional[float] = None,
+    language: Optional[str] = None,
 ) -> List[QaCheckResult]:
     """Chunked renders are QA'd as one Take, using the concatenated text."""
 
@@ -349,6 +422,7 @@ def run_tier1_checks_for_chunks(
         expected_sha256=expected_sha256,
         text="".join(chunk_texts),
         expected_duration_ms=expected_duration_ms,
+        language=language,
     )
 
 
@@ -465,14 +539,20 @@ def qa_take_audio(
     tier2_text: Optional[str] = None,
     tier2_model: str = "tiny",
     tier2_language: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> TakeQaReport:
-    """Run Tier 1 (and Tier 2 when requested) and bind the report to the audio."""
+    """Run Tier 1 (and Tier 2 when requested) and bind the report to the audio.
+
+    ``language`` is the language of the spoken text and selects the duration
+    window; ``tier2_language`` is the recognizer's language and is unrelated.
+    """
 
     checks = run_tier1_checks(
         audio_path=audio_path,
         expected_sha256=expected_sha256,
         text=text,
         expected_duration_ms=expected_duration_ms,
+        language=language,
     )
     sha = expected_sha256
     target = Path(audio_path)

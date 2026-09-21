@@ -204,6 +204,8 @@ def render_segment(
             audio_path=audio_path,
             text=segment.text,
             expected_sha256=audio_sha,
+            language=segment.qwen3_language
+            or (role.qwen3_language if role else None),
         )
         takes_module.attach_qa_report(segment, take_id, report)
         record.qa_passed = report.passed
