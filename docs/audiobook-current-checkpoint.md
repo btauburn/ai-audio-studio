@@ -203,3 +203,8 @@ all 631 selected audio hashes were verified. Missing selections are
 `seg_86957b72b63f60ee` (256/index234), `seg_465784cde8353227` (257/index2), and
 `seg_66ec076c3511fe36` (258/index76). Chapter review state remains draft. This
 checkpoint does not generate the remaining three or mark listening complete.
+
+
+## Guarded cross-project chapter review (2026-10-04)
+
+The subsequent bounded ELF preflight identified import ordering for exact source-selected recorded drafts and loss of governed narration exclusions in chapter forks. The scoped repair stages an unassigned sample for the existing target selection owner; immutable reference assessments, worker authorization, QA and Takes remain intact. See [selected-recorded-voice-review.md](selected-recorded-voice-review.md) for the implemented guards and Brian-authorized exact role mapping. Runtime audio and listening evidence remain separate from this source checkpoint.

@@ -88,14 +88,18 @@ def _source_snapshot(project_id: str, chapter_id: str) -> tuple[Any, list, dict]
                 or record.get("source_text_sha256") != text_sha256(segment.text)
                 or record.get("index") != segment.index or record.get("duration_seconds") != 1.25):
             raise ChapterExportError("Only explicit recorded star separators receive their 1.25-second scene pause")
-    speech_ids = [sid for sid in ids if sid not in break_ids]
+    from .voice_lab_chapter import _validated_exclusions
+    exclusions = _validated_exclusions(project, segments)
+    excluded_ids = {row["utterance_id"] for row in exclusions}
+    speech_ids = [sid for sid in ids if sid not in set(break_ids) | excluded_ids]
     if not speech_ids or speech_ids != meta.get("speech_utterance_ids"):
         raise ChapterExportError("Speech coverage does not match the explicit source scene-break manifest")
     if any(re.fullmatch(r"\s*\*{3,}\s*", by_id[sid].text) for sid in speech_ids):
         raise ChapterExportError("A source scene separator was incorrectly marked for synthesis")
     return project, segments, {"chapter_id": chapter_id, "chapter_title": chapter.title,
                                "metadata": meta, "source_utterance_ids": ids,
-                               "speech_utterance_ids": speech_ids, "breaks": breaks}
+                               "speech_utterance_ids": speech_ids, "breaks": breaks,
+                               **({"exclusions": exclusions} if exclusions else {})}
 
 
 def _take_snapshot(project: Any, segments: list, source: dict) -> tuple[list, list, dict]:
@@ -209,8 +213,15 @@ def export_chapter(project_id: str, chapter_id: str) -> dict:
             mp3 = _path(root, relative + "/listening.mp3")
             breaks = {b["utterance_id"]: b for b in source["breaks"]}
             speech_paths = dict(zip(source["speech_utterance_ids"], paths))
+            exclusions = {row["utterance_id"]: row for row in source.get("exclusions", [])}
             ordered, mapping, cursor = [], [], 0.0
             for segment in segments:
+                if segment.id in exclusions:
+                    excluded = exclusions[segment.id]
+                    mapping.append({"utterance_id": segment.id, "kind": "excluded", "role_id": None,
+                        "source_text_sha256": excluded["source_text_sha256"],
+                        "decision": excluded["decision"], "start_seconds": cursor, "end_seconds": cursor})
+                    continue
                 if segment.id in breaks:
                     path = _path(root, relative + f"/scene-breaks/{segment.id}.wav")
                     _pause(paths[0], path, breaks[segment.id]["duration_seconds"])
@@ -252,6 +263,7 @@ def export_chapter(project_id: str, chapter_id: str) -> dict:
                       "master_file": master.relative_to(root).as_posix(), "master_sha256": master_hash,
                       "duration_seconds": delivered, "master_duration_seconds": duration, "map": mapping,
                       "speech_utterance_count": len(paths), "scene_break_count": len(breaks),
+                      "excluded_utterance_count": len(exclusions),
                       "rendered_voice_role_count": len({r["role_id"] for r in selections}),
                       "technical_qa": "passed", "human_review": "pending", "qa_report": report.model_dump(mode="json"),
                       "integrated_loudness_lufs": loudness,

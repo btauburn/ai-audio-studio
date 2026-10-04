@@ -150,12 +150,78 @@ def _apply_reviewed_attribution(source, target, segments, review: dict | None = 
     return changes
 
 
+def _source_exclusions(project, rows) -> list[dict]:
+    """Carry existing governed source decisions, never infer new omissions."""
+    from . import casting_review, web_addresses
+    skipped = casting_review.skipped_lines(project)
+    exclusions = []
+    for segment in rows:
+        decision = skipped.get(segment.id)
+        if decision is None:
+            continue
+        if (not isinstance(decision, dict)
+                or decision.get("reason") not in {casting_review.SKIP_HUMAN, casting_review.SKIP_WEB_ADDRESS}
+                or not isinstance(decision.get("by"), str) or not decision["by"].strip()
+                or not isinstance(decision.get("at"), str) or not decision["at"].strip()
+                or _scene_break(segment.text)):
+            raise ChapterRenditionError("Chapter exclusions require existing governed human or web-address decisions")
+        if decision["reason"] == casting_review.SKIP_WEB_ADDRESS and not web_addresses.is_link_line(segment.text):
+            raise ChapterRenditionError("A frozen web-address exclusion must retain its actual source link line")
+        exclusions.append({**_source_row(segment), "decision": copy.deepcopy(decision)})
+    return exclusions
+
+
+def _validated_exclusions(project, rows, *, verify_files: bool = True) -> list[dict]:
+    """Check source-backed omissions against their immutable fork-time receipt."""
+    from . import casting_review
+    meta = project.metadata.get("chapter_rerun", {})
+    receipt = meta.get("governed_exclusions")
+    current = casting_review.skipped_lines(project)
+    if receipt is None:
+        if current or meta.get("expected_exclusions_hash"):
+            raise ChapterRenditionError("Chapter exclusions lack frozen source decision evidence")
+        return []
+    if (not isinstance(receipt, dict) or receipt.get("schema") != "chapter-governed-exclusions-v1"
+            or receipt.get("source_project_id") != meta.get("source_project_id")
+            or _hash(receipt) != meta.get("expected_exclusions_hash")):
+        raise ChapterRenditionError("Frozen chapter exclusion evidence changed")
+    recorded = receipt.get("decisions")
+    if not isinstance(recorded, list) or not 1 <= len(recorded) <= MAX_CHAPTER_UTTERANCES:
+        raise ChapterRenditionError("Frozen chapter exclusions are empty or outside their bounded scope")
+    checksum = receipt.get("source_project_metadata_sha256", "")
+    relative = receipt.get("source_project_metadata_file", "")
+    if (not re.fullmatch(r"[a-f0-9]{64}", checksum)
+            or relative != f"chapter_rerun/source-exclusions/source-project-{checksum}.json"
+            or not re.fullmatch(r"[a-f0-9]{64}", receipt.get("source_segments_sha256", ""))):
+        raise ChapterRenditionError("Frozen chapter exclusions lack canonical source metadata hashes")
+    if verify_files:
+        root = safe_project_root(project.id)
+        original = json.loads(_read_verified(_safe_path(root, relative), checksum))
+        if original.get("id") != meta.get("source_project_id"):
+            raise ChapterRenditionError("Chapter exclusion receipt belongs to another source project")
+        # Use the same existing skip parser on the preserved source metadata.
+        # Large archive bytes are checked at dispatch/completion/export, not
+        # reparsed for every utterance, like the existing source snapshots.
+        from types import SimpleNamespace
+        preserved = SimpleNamespace(metadata=original.get("metadata", {}))
+        if _source_exclusions(preserved, rows) != recorded:
+            raise ChapterRenditionError("Source governed chapter exclusion decisions changed")
+    if _source_exclusions(project, rows) != recorded:
+        raise ChapterRenditionError("Source or current governed chapter exclusion decisions changed")
+    wanted = {row["utterance_id"]: row["decision"] for row in recorded}
+    if current != wanted:
+        raise ChapterRenditionError("Current chapter skips differ from the frozen source exclusions")
+    return copy.deepcopy(recorded)
+
+
 def _fork_result(project, *, reused: bool) -> dict:
     meta = project.metadata["chapter_rerun"]
     return {"project_id": project.id, "chapter_id": meta["chapter_id"], "reused": reused,
             "source_project_id": meta["source_project_id"], "source_hash": meta["expected_source_hash"],
             "speech_utterance_count": len(meta["speech_utterance_ids"]),
-            "scene_break_count": len(meta["scene_breaks"]), "scope": project.voice_lab.scope}
+            "scene_break_count": len(meta["scene_breaks"]),
+            "excluded_utterance_count": len((meta.get("governed_exclusions") or {}).get("decisions", [])),
+            "scope": project.voice_lab.scope}
 
 
 def fork_chapter(project_id: str, *, chapter_id: str, name: str,
@@ -212,6 +278,8 @@ def fork_chapter(project_id: str, *, chapter_id: str, name: str,
             fork_key = _hash({"source_project_id": project_id, "chapter_id": chapter_id,
                               "request": request_id or name})
             source_rows = [_source_row(s) for s in segments]
+            exclusions = _source_exclusions(source, segments)
+            excluded_ids = {row["utterance_id"] for row in exclusions}
             # Compare retries with exactly the same source proof before returning.
             proof_project = source.model_copy(deep=True)
             proof_project.chapters, proof_project.source_revisions = [chapter], revisions
@@ -227,7 +295,8 @@ def fork_chapter(project_id: str, *, chapter_id: str, name: str,
                 meta = existing.metadata.get("chapter_rerun", {})
                 if meta.get("fork_key") == fork_key:
                     if (meta.get("expected_source_hash") != source_hash
-                            or meta.get("attribution_review_hash") != review_hash):
+                            or meta.get("attribution_review_hash") != review_hash
+                            or (meta.get("governed_exclusions") or {}).get("decisions", []) != exclusions):
                         raise ChapterRenditionError("Fork request now refers to changed source; use a new explicit request")
                     return _fork_result(existing, reused=True)
             breaks = []
@@ -248,7 +317,7 @@ def fork_chapter(project_id: str, *, chapter_id: str, name: str,
                 elif segment.id in supplied_breaks:
                     raise ChapterRenditionError("Scene-break metadata refers to spoken source text")
             break_ids = {row["utterance_id"] for row in breaks}
-            if len(break_ids) == len(segments):
+            if len(break_ids | excluded_ids) == len(segments):
                 raise ChapterRenditionError("Chapter contains scene breaks but no spoken utterances")
             fresh = create_project(name, description="Separate chapter rendition; source project and approved Takes preserved")
             target_lease = try_acquire_project_mutation(fresh.id, kind="voice_lab_chapter_fork_commit")
@@ -280,11 +349,28 @@ def fork_chapter(project_id: str, *, chapter_id: str, name: str,
                 fresh.voice_lab.scope = "production"
                 fresh.metadata = {key: copy.deepcopy(value) for key, value in source.metadata.items()
                                   if key in {"book_title", "title", "author", "language", "source_language", "pronunciation_dictionary"}}
+                exclusion_receipt = None
+                if exclusions:
+                    source_metadata = (original_root / "project.json").read_bytes()
+                    if len(source_metadata) > MAX_SOURCE_BYTES:
+                        raise ChapterRenditionError("Source exclusion metadata exceeds the bounded snapshot limit")
+                    source_sha = hashlib.sha256(source_metadata).hexdigest()
+                    relative = f"chapter_rerun/source-exclusions/source-project-{source_sha}.json"
+                    _publish_blob(target_root, relative, source_metadata, source_sha)
+                    exclusion_receipt = {"schema": "chapter-governed-exclusions-v1",
+                        "source_project_id": project_id, "source_project_metadata_file": relative,
+                        "source_project_metadata_sha256": source_sha,
+                        "source_segments_sha256": hashlib.sha256((original_root / "segments.json").read_bytes()).hexdigest(),
+                        "decisions": exclusions}
+                    # Keep the existing governed skip representation without
+                    # inheriting source Auto Cast mode, queues or approvals.
+                    fresh.metadata["autocast_import"] = {"skipped": {
+                        row["utterance_id"]: copy.deepcopy(row["decision"]) for row in exclusions}}
                 fresh.metadata["chapter_rerun"] = {
                     "schema": "voice-lab-chapter-rerun-v1", "authorized": True, "fork_key": fork_key,
                     "source_project_id": project_id, "chapter_id": chapter_id, "chapter_title": chapter.title,
                     "source_utterance_ids": [s.id for s in segments], "source_utterances": source_rows,
-                    "speech_utterance_ids": [s.id for s in segments if s.id not in break_ids],
+                    "speech_utterance_ids": [s.id for s in segments if s.id not in break_ids | excluded_ids],
                     "scene_breaks": breaks, "expected_source_hash": source_hash,
                     "attribution_review": copy.deepcopy(attribution_review), "attribution_review_hash": review_hash,
                     "attribution_derivation": derivation,
@@ -292,6 +378,9 @@ def fork_chapter(project_id: str, *, chapter_id: str, name: str,
                     "source_revision_id": revisions[0].id if len(revisions) == 1 else None,
                     "source_sha256": revisions[0].sha256 if len(revisions) == 1 else None,
                     "created_at": datetime.now(timezone.utc).isoformat(), "human_review": "pending"}
+                if exclusion_receipt is not None:
+                    fresh.metadata["chapter_rerun"].update(governed_exclusions=exclusion_receipt,
+                        expected_exclusions_hash=_hash(exclusion_receipt))
                 fresh_segments = []
                 for original in reviewed_segments:
                     segment = original.model_copy(deep=True)
@@ -304,7 +393,7 @@ def fork_chapter(project_id: str, *, chapter_id: str, name: str,
                     if segment.emotion_audio:
                         raise ChapterRenditionError("External emotion references require explicit migration before this fork")
                     fresh_segments.append(segment)
-                speech_segments = [s for s in fresh_segments if s.id not in break_ids]
+                speech_segments = [s for s in fresh_segments if s.id not in break_ids | excluded_ids]
                 fresh.metadata["chapter_rerun"]["speech_diagnostics"] = {
                     "max_source_characters": max(len(s.text) for s in speech_segments),
                     "max_source_words": max(len(s.text.split()) for s in speech_segments),
@@ -317,7 +406,7 @@ def fork_chapter(project_id: str, *, chapter_id: str, name: str,
         release_project_mutation(lease)
 
 
-def _bound_state(project_id: str, chapter_id: str, *, verify_files: bool = True):
+def _bound_state(project_id: str, chapter_id: str, *, verify_files: bool = True, verify_cast: bool = True):
     with project_meta_lock(project_id), project_segments_lock(project_id):
         project = load_project(project_id)
         meta = project.metadata.get("chapter_rerun", {})
@@ -338,7 +427,9 @@ def _bound_state(project_id: str, chapter_id: str, *, verify_files: bool = True)
         break_ids = {row["utterance_id"] for row in meta.get("scene_breaks", [])}
         if break_ids != {s.id for s in segments if _scene_break(s.text)}:
             raise ChapterRenditionError("Scene-break coverage changed")
-        speech = [s for s in segments if s.id not in break_ids]
+        exclusions = _validated_exclusions(project, segments, verify_files=verify_files)
+        excluded_ids = {row["utterance_id"] for row in exclusions}
+        speech = [s for s in segments if s.id not in break_ids | excluded_ids]
         if not speech or len(speech) > MAX_CHAPTER_UTTERANCES or [s.id for s in speech] != meta.get("speech_utterance_ids"):
             raise ChapterRenditionError("Chapter speech coverage is empty, changed or exceeds 2000 utterances")
         if project.character_cast.policy.enabled or project.character_cast.policy.audition_mode != "off":
@@ -348,15 +439,17 @@ def _bound_state(project_id: str, chapter_id: str, *, verify_files: bool = True)
         for segment in speech:
             role = roles.get(segment.role_id)
             identity = role.voice_identity if role else None
-            if (not identity or identity.status != "LOCKED" or identity.mechanism != "qwen_reference"
+            if verify_cast and (not identity or identity.status != "LOCKED" or identity.mechanism != "qwen_reference"
                     or identity.backend != "qwen3tts" or (segment.tts_backend or role.tts_backend) != "qwen3tts"):
                 raise ChapterRenditionError(f"Role {segment.role_id!r} needs a locked, ready Qwen Base reference identity")
-            if identity.role_id != role.id:
+            if verify_cast and identity.role_id != role.id:
                 raise ChapterRenditionError("Voice identity belongs to another role")
-            if not segment.attribution or segment.attribution.source == "unknown" or segment.attribution.speaker_id != segment.role_id:
+            if role is None or not segment.attribution or segment.attribution.source == "unknown" or segment.attribution.speaker_id != segment.role_id:
                 raise ChapterRenditionError(f"Utterance {segment.id} needs resolved source-backed speaker attribution")
             if segment.playback_speed != 1 or segment.edit_state is not None:
                 raise ChapterRenditionError("Chapter source must use complete unedited utterances at natural speed")
+            if not verify_cast:
+                continue
             if role.id not in identities:
                 if not all((identity.reference_audio, identity.reference_audio_sha256,
                             identity.prompt_artifact, identity.prompt_sha256)):
@@ -368,7 +461,18 @@ def _bound_state(project_id: str, chapter_id: str, *, verify_files: bool = True)
             requirements[segment.id] = pipeline.requirement_for(project, segment, renderer_id="qwen3tts").fingerprint()
         binding = {"source_hash": meta["expected_source_hash"], "identities": identities, "requirements": requirements,
                    "aliases": project.character_cast.role_aliases, "scene_breaks": meta.get("scene_breaks", [])}
+        if exclusions:
+            binding["governed_exclusions"] = copy.deepcopy(meta["governed_exclusions"])
         return project, speech, binding
+
+
+def source_scope(project_id: str, chapter_id: str):
+    """Read exact fork source/exclusions before cast selection, without dispatch.
+
+    Call outside project storage locks; they are non-reentrant. The caller's
+    mutation lease and subsequent compare-and-swap govern any later write.
+    """
+    return _bound_state(project_id, chapter_id, verify_cast=False)
 
 
 def _production_waiting(project_id: str, job_id: str) -> bool:

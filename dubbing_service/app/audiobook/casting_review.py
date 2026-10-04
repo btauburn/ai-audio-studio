@@ -1319,6 +1319,109 @@ def request_round(project_id, *, request_id, role_id, expected_round_revision,
     return {"receipt": receipt, "reason": receipt["reason"], "casting": view(project_id)}
 
 
+def prepare_imported_review(project_id, *, role_id, key, library_voice_id, version,
+                            audio_sha256, expected_identity_id, request_id):
+    """Stage an exact Library sample for the existing explicit-selection owner.
+
+    This metadata-only preparation applies to an authorized, non-strict chapter
+    fork. It assigns nothing, inherits no approval/rating and schedules no work.
+    The caller must still submit a genuine current selection through feedback().
+    """
+    _id(request_id)
+    _id(role_id)
+    from . import voice_lab_chapter as chapter, voice_lab_library as shelf
+    from dubbing_service.app.storage import voices as library
+    from dubbing_service.app.storage.segments import project_segments_lock
+    from dubbing_service.app.core.tts_operations import try_acquire_project_mutation, release_project_mutation
+    with library.voices_lock():
+        voice = next((v for v in library.load_voices() if v.id == library_voice_id), None)
+        if voice is None or version not in voice.voice_lab_versions:
+            raise CastingError("Exact Library version is unavailable")
+        entry = shelf._validated_entry(version, voice.voice_lab_versions[version])
+    if entry["record"]["key"] != key or entry["record"]["audio_sha256"] != audio_sha256:
+        raise CastingError("Review must identify the exact immutable Library sample")
+    command = {"role_id": role_id, "key": key, "library_voice_id": library_voice_id,
+               "version": version, "audio_sha256": audio_sha256,
+               "expected_identity_id": expected_identity_id, "request_id": request_id}
+    command_hash = lab.digest(command)
+    lease = try_acquire_project_mutation(project_id, kind="casting_imported_review")
+    if lease is None:
+        raise CastingError("Rendering owns this project; imported review must wait")
+    try:
+        initial = load_project(project_id)
+        chapter_id = initial.metadata.get("chapter_rerun", {}).get("chapter_id")
+        source_project, speech, binding = chapter.source_scope(project_id, chapter_id)
+        if role_id not in {s.role_id for s in speech}:
+            raise CastingError("This character is outside the exact chapter speech scope")
+        with project_meta_lock(project_id), project_segments_lock(project_id):
+            project = load_project(project_id)
+            state = _state(project)
+            if (state.get("enabled") or project.metadata.get("autocast_import", {}).get("mode") == "autocast"):
+                raise CastingError("Strict casting uses its existing review rounds")
+            if project.metadata.get("chapter_rerun") != source_project.metadata.get("chapter_rerun"):
+                raise CastingError("Chapter source changed during review preparation")
+            rows = sorted((s for s in load_segments(project_id) if chapter.release.is_live(s)), key=lambda s: (s.index, s.id))
+            current_source = [chapter._source_row(s) for s in rows]
+            if (current_source != source_project.metadata["chapter_rerun"]["source_utterances"]
+                    or chapter._hash(chapter._source_proof(project, current_source)) != binding["source_hash"]
+                    or project.character_cast.role_aliases != binding["aliases"]
+                    or any(s.playback_speed != 1 or s.edit_state is not None for s in rows)
+                    or project.character_cast.policy.enabled or project.character_cast.policy.audition_mode != "off"):
+                raise CastingError("Chapter source changed during review preparation")
+            requests = state.setdefault("imported_review_requests", {})
+            previous = requests.get(request_id)
+            if previous:
+                if previous["command_hash"] != command_hash:
+                    raise CastingError("Request ID already belongs to different imported review")
+                return copy.deepcopy(previous["receipt"])
+            role = _role(project, role_id)
+            current = role.voice_identity.id if role.voice_identity else voice_revision_for_role(role)
+            if current != expected_identity_id:
+                raise CastingError("Casting changed since review was requested; refresh")
+            if role.voice_identity is not None or (state["roles"].get(role_id) or {}).get("assignment"):
+                raise CastingError("Imported initial review requires an unassigned chapter role")
+            record = lab._verified_record(project, key, audio_sha256)
+            if (record.get("library_voice_id") != library_voice_id or record.get("library_version") != version
+                    or record.get("version") != version
+                    or shelf._profile_fingerprint(record) != shelf._profile_fingerprint(entry["record"])):
+                raise CastingError("Imported review differs from the immutable Library version")
+            # Revalidate immutable conditioning and any imported Take proof.
+            shelf._publication_record(project_id, record)
+            root = safe_project_root(project_id)
+            for relative, checksum in shelf._assets(record).values():
+                shelf._read_verified(shelf._safe_path(root, relative), checksum)
+            qa = record.get("technical_qa")
+            if not (qa == "passed" or isinstance(qa, dict) and (qa.get("passed") is True or qa.get("status") == "passed")):
+                raise CastingError("Imported sample requires passing bound technical QA")
+            item = state["roles"].setdefault(role_id, {"assignment_revision": 0, "round_revision": 0,
+                "history": [], "assignment": None, "rejections": []})
+            if item.get("round"):
+                raise CastingError("This character already has a review round; use its current decision")
+            revision = item["round_revision"] + 1
+            round_id = "round_" + lab.digest([project_id, request_id, role_id, key])[:24]
+            candidate_id = "candidate_" + lab.digest([round_id, key, audio_sha256])[:24]
+            from .provider_capabilities import effective_identity
+            candidate = {"candidate_id": candidate_id, "label": "A", "status": "ready", "key": key,
+                "audio_sha256": audio_sha256, "identity_id": effective_identity(record), "voice_version": version,
+                "duration_seconds": record.get("duration_seconds"), "technical_qa": copy.deepcopy(qa),
+                "sections": copy.deepcopy(record.get("sections", record.get("lines", []))), "rating": None,
+                "provenance": "preserved_library_sample", "library_voice_id": library_voice_id,
+                "library_version": version, "new_audio_generated": False}
+            item["round_revision"] = revision
+            item["round"] = {"id": round_id, "revision": revision, "status": "awaiting_review",
+                "candidates": [candidate], "direction": {}, "created_at": lab.now(),
+                "baseline_voice_revision": voice_revision_for_role(role), "proposal_count": 1,
+                "script_version": "preserved-library-sample", "source_hash": binding["source_hash"],
+                "notification": {"state": "not_requested"}, "metadata_only": True}
+            receipt = {"role_id": role_id, "candidate_id": candidate_id, "key": key,
+                "audio_sha256": audio_sha256, "round_revision": revision,
+                "assignment_revision": item["assignment_revision"], "new_audio_generated": False,
+                "assigned": False, "approved": False}
+            requests[request_id] = {"command_hash": command_hash, "receipt": copy.deepcopy(receipt)}
+            _save(project)
+            return receipt
+    finally:
+        release_project_mutation(lease)
 def feedback(project_id, payload):
     """Commit one exact human event, CAS decision and follow-up intent together."""
     _id(payload.get("event_id"))
