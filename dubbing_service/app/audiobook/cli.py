@@ -27,12 +27,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
 def _emit(payload: Dict[str, Any]) -> None:
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    # The CLI is a machine-readable subprocess boundary.  ASCII-escaped JSON
+    # survives the default Windows code page even when an error contains CJK,
+    # while json.loads reconstructs the original Unicode for every caller.
+    print(json.dumps(payload, ensure_ascii=True, indent=2))
 
 
 def _load_app() -> None:
@@ -85,6 +89,13 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         project = create_project(args.title or source.stem)
         project_id = project.id
 
+    from dubbing_service.app.storage.projects import save_project
+    if getattr(args, "palette", None):
+        project.character_cast.policy.inspiration_palette = args.palette
+    if getattr(args, "max_chapter", None) is not None:
+        project.character_cast.policy.max_chapter = args.max_chapter
+    save_project(project)
+
     try:
         result = adapter_module.AudiobookerAdapter().reconcile_into_project(
             analysis, project_id=project_id, project_name=args.title or source.stem
@@ -106,6 +117,9 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     payload["chapters_in_analysis"] = len(analysis.chapters)
     payload["utterances_in_analysis"] = analysis.utterance_count()
     payload["warnings"] = list(analysis.warnings)
+    refreshed = load_project(project_id)
+    payload["character_dossiers"] = len(refreshed.character_cast.dossiers)
+    payload["casting_profiles"] = len(refreshed.character_cast.profiles)
     _emit(payload)
     return 0
 
@@ -131,16 +145,132 @@ def _renderer_for(args: argparse.Namespace, project_id: str) -> Any:
     )
 
 
+def _target_utterances(
+    args: argparse.Namespace,
+    project_id: str,
+    *,
+    default_all: bool,
+) -> tuple[List[str], List[str]]:
+    """Resolve explicit utterance/chapter selectors without guessing scope."""
+
+    from dubbing_service.app.storage.projects import load_project
+    from dubbing_service.app.storage.segments import load_segments
+    from dubbing_service.app.audiobook import regeneration as regeneration_module
+
+    segments = load_segments(project_id)
+    utterance_ids = list(getattr(args, "utterance", []) or [])
+    chapter_refs = list(getattr(args, "chapter_id", []) or [])
+    resolved_chapters: List[str] = []
+    if chapter_refs:
+        project = load_project(project_id)
+        chapters = list(project.chapters)
+        for reference in chapter_refs:
+            matches = [chapter for chapter in chapters if chapter.id == reference]
+            if not matches:
+                matches = [
+                    chapter
+                    for chapter in chapters
+                    if chapter.title.strip().casefold() == reference.strip().casefold()
+                ]
+            if not matches and reference.isdigit():
+                numeric = re.compile(rf"(?<!\d){re.escape(reference)}(?!\d)")
+                matches = [
+                    chapter
+                    for chapter in chapters
+                    if numeric.search(chapter.title)
+                    or _chapter_title_has_number(chapter.title, int(reference))
+                ]
+            if len(matches) != 1:
+                raise ValueError(
+                    f"chapter selector {reference!r} resolved to {len(matches)} chapters; "
+                    "use an exact chapter ID or title"
+                )
+            resolved_chapters.append(matches[0].id)
+        chapter_targets = [
+            segment.id
+            for segment in segments
+            if segment.chapter_id in set(resolved_chapters)
+        ]
+        utterance_ids.extend(chapter_targets)
+
+    explicit = bool(getattr(args, "utterance", []) or chapter_refs)
+    if not explicit and default_all:
+        utterance_ids = regeneration_module.live_utterance_ids(segments)
+    targets = list(dict.fromkeys(utterance_ids))
+    return targets, resolved_chapters
+
+
+def _english_number_words(value: int) -> List[str]:
+    if value < 0 or value > 9999:
+        return []
+    ones = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven",
+        "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
+        "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+    ]
+    tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
+    words: List[str] = []
+    if value >= 1000:
+        words.extend(_english_number_words(value // 1000))
+        words.append("thousand")
+        value %= 1000
+    if value >= 100:
+        words.append(ones[value // 100])
+        words.append("hundred")
+        value %= 100
+    if value >= 20:
+        words.append(tens[value // 10])
+        value %= 10
+    if value:
+        words.append(ones[value])
+    return words
+
+
+def _chapter_title_has_number(title: str, value: int) -> bool:
+    wanted = _english_number_words(value)
+    title_words = re.findall(r"[a-z]+|\d+", title.casefold())
+    # Book titles may use the optional British-style "and" after hundreds.
+    title_words = [word for word in title_words if word != "and"]
+    if not wanted:
+        return False
+    return any(
+        title_words[index : index + len(wanted)] == wanted
+        for index in range(len(title_words) - len(wanted) + 1)
+    )
+
+
 def cmd_render(args: argparse.Namespace) -> int:
     from dubbing_service.app.audiobook import pipeline as pipeline_module
-    from dubbing_service.app.audiobook import regeneration as regeneration_module
-    from dubbing_service.app.storage.segments import load_segments
 
-    segments = load_segments(args.project_id)
-    if args.utterance:
-        targets = list(args.utterance)
-    else:
-        targets = regeneration_module.live_utterance_ids(segments)
+    mode = getattr(args, "mode", "new-take")
+    if mode == "resume" and not (args.utterance or args.chapter_id):
+        _emit({
+            "ok": False,
+            "operation": "render",
+            "project_id": args.project_id,
+            "error": "resume requires explicit --utterance or --chapter-id selectors; whole-project resume is refused",
+        })
+        return 1
+    if mode == "resume" and (args.no_promote or args.no_qa):
+        _emit({
+            "ok": False,
+            "operation": "render",
+            "project_id": args.project_id,
+            "error": "resume requires QA and promotion enabled; use new-take for an explicit non-promoting render",
+        })
+        return 1
+    try:
+        targets, resolved_chapters = _target_utterances(
+            args, args.project_id, default_all=(mode == "new-take")
+        )
+    except Exception as exc:  # noqa: BLE001 - CLI reports selection errors as JSON
+        _emit({
+            "ok": False,
+            "operation": "render",
+            "project_id": args.project_id,
+            "error": str(exc),
+        })
+        return 1
     if not targets:
         _emit(
             {
@@ -160,6 +290,7 @@ def cmd_render(args: argparse.Namespace) -> int:
             slot=args.slot,
             promote=not args.no_promote,
             run_qa=not args.no_qa,
+            resume=(mode == "resume"),
         )
     except Exception as exc:  # noqa: BLE001 - CLI reports the failure surface
         _emit(
@@ -185,24 +316,31 @@ def cmd_render(args: argparse.Namespace) -> int:
     payload = {
         "ok": not failures and not blocked,
         "operation": "render",
+        "mode": mode,
         "project_id": args.project_id,
+        "chapter_ids": resolved_chapters,
         "requested_renderer": args.renderer,
         "renderer": getattr(renderer, "renderer_id", args.renderer),
         "engine": getattr(renderer, "engine_id", None),
-        "rendered": len(records),
+        "rendered": sum(record.dispatched for record in records),
+        "reused": sum(record.reused for record in records),
+        "reaudited": sum(record.reaudited for record in records),
         "succeeded": len(records) - len(failures),
         "qa_blocked": len(blocked),
         "takes": [
             {
                 "segment_id": record.segment_id,
                 "take_id": record.take_id,
-                "rendered": True,
+                "rendered": record.dispatched,
+                "reused": record.reused,
+                "resume_reason": record.resume_reason,
                 "candidate_created": record.candidate_created,
                 "qa_passed": record.qa_passed,
                 "selected": record.selected,
                 "blocking_qa": list(record.blocking_qa),
                 "duration_ms": record.duration_ms,
                 "chunked": record.chunked,
+                "stage_timings": record.stage_timings,
                 "stale_components": list(record.stale_components),
             }
             for record in records
@@ -216,15 +354,31 @@ def cmd_render(args: argparse.Namespace) -> int:
                 "qa_passed": record.qa_passed,
                 "blocking_qa": list(record.blocking_qa),
                 "error": record.error,
+                "stage_timings": record.stage_timings,
             }
             for record in blocked
         ],
         "failed": [
-            {"segment_id": record.segment_id, "error": record.error}
+            {
+                "segment_id": record.segment_id,
+                "take_id": record.take_id,
+                "error": record.error,
+                "stage_timings": record.stage_timings,
+                "resume_reason": record.resume_reason,
+                "dispatched": record.dispatched,
+            }
             for record in failures
         ],
         "status": pipeline_module.status_report(args.project_id),
     }
+    if mode == "resume":
+        payload["resume_summary"] = {
+            "requested": len(records),
+            "reused": sum(record.reused for record in records),
+            "generated": sum(record.dispatched for record in records),
+            "reaudited": sum(record.reaudited for record in records),
+            "actionable_failures": len(failures),
+        }
     if failures:
         payload["error"] = f"{len(failures)} of {len(records)} renders failed"
     elif blocked:
@@ -237,6 +391,28 @@ def cmd_render(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     from dubbing_service.app.audiobook import interface as interface_module
+
+    if getattr(args, "resume", False):
+        from dubbing_service.app.audiobook import pipeline as pipeline_module
+
+        if not (args.utterance or args.chapter_id):
+            _emit({
+                "ok": False,
+                "operation": "status",
+                "error": "status --resume requires explicit --utterance or --chapter-id selectors",
+            })
+            return 1
+        try:
+            targets, chapters = _target_utterances(
+                args, args.project_id, default_all=False
+            )
+            result = pipeline_module.resume_status(args.project_id, targets)
+        except Exception as exc:  # noqa: BLE001 - CLI reports selection errors as JSON
+            _emit({"ok": False, "operation": "status", "error": str(exc)})
+            return 1
+        result["chapter_ids"] = chapters
+        _emit({"ok": True, "operation": "status", "resume": result})
+        return 0
 
     try:
         result = interface_module.get_status(args.project_id, job_id=args.job_id)
@@ -382,6 +558,46 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def cmd_cast(args: argparse.Namespace) -> int:
+    from dubbing_service.app.audiobook.character_casting import (
+        cast_report, markdown_report, prepare_cast, refresh_cast,
+    )
+    from dubbing_service.app.storage.projects import load_project, project_meta_lock, save_project
+
+    try:
+        with project_meta_lock(args.project_id):
+            project = load_project(args.project_id)
+            policy = project.character_cast.policy
+            if args.palette is not None:
+                policy.inspiration_palette = None if args.palette == "default" else args.palette
+            if args.max_chapter is not None:
+                policy.max_chapter = args.max_chapter
+            if args.adaptation:
+                policy.adaptation_requested = True
+            if args.allow_spoilers:
+                policy.allow_spoilers = True
+            if args.external_research:
+                policy.external_research = True
+            if args.max_candidates is not None:
+                policy.max_candidates = args.max_candidates
+            save_project(project)
+        if args.no_audition:
+            refresh_cast(args.project_id)
+            report = cast_report(args.project_id)
+        else:
+            report = prepare_cast(args.project_id, role_ids=args.role or None, max_characters=args.max_characters)
+        if args.report:
+            target = Path(args.report)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+            target.with_suffix(".md").write_text(markdown_report(report), encoding="utf-8")
+        _emit({"ok": True, "operation": "cast", **report})
+        return 0
+    except Exception as exc:
+        _emit({"ok": False, "operation": "cast", "project_id": args.project_id, "error": str(exc)})
+        return 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="make-audiobook",
@@ -395,6 +611,8 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--title", default=None)
     ingest.add_argument("--author", default=None)
     ingest.add_argument("--language", default=None)
+    ingest.add_argument("--palette", default=None, help="optional performance inspiration palette")
+    ingest.add_argument("--max-chapter", type=int, default=None, help="zero-based research spoiler boundary")
     ingest.add_argument(
         "--offline",
         action="store_true",
@@ -402,9 +620,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ingest.set_defaults(func=cmd_ingest)
 
+    cast = subparsers.add_parser("cast", help="research, design, audition and persist original character voices")
+    cast.add_argument("--project-id", required=True)
+    cast.add_argument("--palette", default=None, help="default or harry-potter-film-cast")
+    cast.add_argument("--adaptation", action="store_true", help="allow direct adaptation character mappings")
+    cast.add_argument("--max-chapter", type=int, default=None, help="zero-based inclusive spoiler boundary")
+    cast.add_argument("--allow-spoilers", action="store_true")
+    cast.add_argument("--external-research", action="store_true", help="try configured provider; unavailable remains UNKNOWN")
+    cast.add_argument("--no-audition", action="store_true", help="produce research/profiles without GPU work")
+    cast.add_argument("--role", action="append", default=[], help="bound voice work to these role IDs")
+    cast.add_argument("--max-characters", type=int, default=None)
+    cast.add_argument("--max-candidates", type=int, choices=(1, 2, 3, 4), default=None)
+    cast.add_argument("--report", default=None, help="save JSON plus human-readable Markdown")
+    cast.set_defaults(func=cmd_cast)
+
     render = subparsers.add_parser("render", help="render utterances")
     render.add_argument("--project-id", required=True)
     render.add_argument("--utterance", action="append", default=[])
+    render.add_argument(
+        "--chapter-id",
+        action="append",
+        default=[],
+        help="bounded chapter selector (exact project ID/title, or a unique numeric chapter number)",
+    )
+    render.add_argument(
+        "--mode",
+        choices=("new-take", "resume"),
+        default="new-take",
+        help="new-take always synthesizes; resume reuses only valid selected Takes",
+    )
     render.add_argument("--renderer", choices=("fixture", "backend"), default="fixture")
     render.add_argument(
         "--backend",
@@ -421,6 +665,9 @@ def build_parser() -> argparse.ArgumentParser:
     status = subparsers.add_parser("status", help="project and job status")
     status.add_argument("--project-id", required=True)
     status.add_argument("--job-id", default=None)
+    status.add_argument("--resume", action="store_true", help="show read-only resume eligibility for an explicit scope")
+    status.add_argument("--utterance", action="append", default=[])
+    status.add_argument("--chapter-id", action="append", default=[])
     status.set_defaults(func=cmd_status)
 
     export = subparsers.add_parser("export", help="release coverage manifest")

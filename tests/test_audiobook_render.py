@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 
 from dubbing_service.app.audiobook import qa, release, renderer, takes
 from dubbing_service.app.audiobook import pipeline
+from dubbing_service.app.providers.tts import TTSResult
 from tests.audiobook_helpers import (
     build_project,
     build_segments,
@@ -46,6 +48,36 @@ class FailingRenderer:
         )
 
 
+@dataclass
+class TelemetryProvider:
+    root: Path
+
+    def synthesize_segment(self, project_id, role, segment):  # noqa: ANN001
+        output = make_tone_wav(
+            self.root / f"{segment.id}.wav", seconds=max(0.2, len(segment.text) * 0.03)
+        )
+        return TTSResult(
+            success=True,
+            audio_path=str(output),
+            raw={
+                "request_id": "req-telemetry",
+                "utterance_id": segment.id,
+                "execution_profile": {
+                    "execution_profile_id": "profile-sdpa",
+                    "model_id": "qwen3_tts_customvoice",
+                    "attention_resolved": "sdpa",
+                },
+                "stage_timings": {
+                    "inclusive": {"model_generate_seconds": 0.125}
+                },
+                "generation": {
+                    "termination_reason": "eos",
+                    "generated_codec_steps": 12,
+                },
+            },
+        )
+
+
 def fixture_renderer(root, project_id):
     return renderer.FixtureRenderer(
         project_root=pipeline.project_root(project_id), renderer_id="fixture"
@@ -76,6 +108,37 @@ def test_short_utterance_creates_exactly_one_take(studio):
     assert (pipeline.project_root(project.id) / take.audio_file).is_file()
 
 
+def test_backend_execution_profile_and_stage_timings_persist_on_take(studio, tmp_path):
+    root, project, segments = studio
+    rendering = renderer.BackendRenderer(
+        backend="qwen3tts_cv",
+        engine_id="qwen3tts_customvoice",
+        provider=TelemetryProvider(tmp_path / "provider"),
+        project_root=pipeline.project_root(project.id),
+    )
+
+    record = pipeline.render_segment(
+        project,
+        segments[0],
+        renderer=rendering,
+        root=pipeline.project_root(project.id),
+        promote=True,
+    )
+
+    assert record.success is True
+    take = takes.find_take(segments[0], record.take_id)
+    calls = take.generation_metadata["provider_calls"]
+    assert calls[0]["request_id"] == "req-telemetry"
+    assert calls[0]["utterance_id"] == segments[0].id
+    assert calls[0]["execution_profile"]["execution_profile_id"] == "profile-sdpa"
+    assert calls[0]["stage_timings"]["inclusive"]["model_generate_seconds"] == 0.125
+    assert "transport_and_renderer" in calls[0]
+    assert "pipeline_precommit_stage_timings" in take.generation_metadata
+    assert record.stage_timings["exclusive"]["qa_seconds"] >= 0
+    assert take.qa_report is not None
+    assert take.qa_report.matches(take.id, take.audio_sha256) is True
+
+
 def test_long_utterance_is_chunked_into_a_single_take(studio):
     root, project, segments = studio
     rendering = fixture_renderer(root, project.id)
@@ -100,6 +163,38 @@ def test_long_utterance_is_chunked_into_a_single_take(studio):
 
     audio = pipeline.project_root(project.id) / take.audio_file
     assert renderer.sha256_file(audio) == take.audio_sha256
+
+
+def test_chunk_planner_does_not_create_sentence_tail_micro_chunks():
+    text = (
+        "The argument ran the length of the corridor and back again, past the pantry, "
+        "past the room where the maps were kept, past the door that nobody repaired, "
+        "and it did not resolve, because neither of them had come to resolve anything; "
+        "they had come to be right in front of a witness, and the witness, who had been "
+        "folding linen the entire time, kept folding linen, which is its own kind of "
+        "verdict. Later that evening the corridor was swept, the maps were rolled and "
+        "tied, and the door that nobody repaired was still not repaired, though someone "
+        "had chalked a small mark on the frame to show that it had been considered."
+    )
+
+    chunks = renderer.plan_chunks(text)
+
+    assert "".join(chunks) == text
+    assert len(chunks) == 3
+    assert max(map(len, chunks)) <= renderer.CHUNK_MAX_CHARS
+    assert min(map(len, chunks)) >= renderer.CHUNK_MIN_TRAILING_CHARS
+    assert "resolve " not in chunks
+    assert "the " not in chunks
+
+
+def test_chunk_planner_rebalances_a_short_final_remainder():
+    text = ("alpha beta gamma delta " * 19) + "omega"
+
+    chunks = renderer.plan_chunks(text, trigger_chars=100, max_chars=80)
+
+    assert "".join(chunks) == text
+    assert max(map(len, chunks)) <= 80
+    assert min(map(len, chunks)) >= renderer.CHUNK_MIN_TRAILING_CHARS
 
 
 def test_chunk_map_offsets_are_contiguous(studio):

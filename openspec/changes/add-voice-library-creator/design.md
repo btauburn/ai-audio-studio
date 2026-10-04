@@ -1,0 +1,11 @@
+# Design
+
+The desktop and Windows sign-in shortcuts invoke a repository-local windowless Python launcher. A local launch lock serializes launches. The launcher checks Studio's service/workspace identity, refuses an occupied unrelated port, and starts only missing application services. Explicit render actions obtain worker readiness through the existing process owner and GPU scheduler. Automatic starts refuse switching another worker under its process lock, disable output retention cleanup for that launch, and do not persist provider defaults.
+
+Local EPUB parsing follows the package spine and bounded archive members; TXT parsing is offline. Uploaded original bytes and extracted immutable source revisions live in a new canonical Studio project. This initial creator mode is clearly one-narrator reading. Existing library versions supply the exact narrator identity. A render request freezes its selection, source/cast fingerprint and idempotency key, resumes completed Takes, applies production QA, and exports a clean WAV/MP3 with source-to-audio mapping. Changing the narrator after rendering requires a separate book import instead of overwriting earlier selections.
+
+Casting preview requests bind role, profile/dossier, creative candidate and fixed original neutral text. A separate canonical audition project uses VoiceDesign conditioning followed by Base production synthesis and QA. Only immutable successful production audio is copied back as a reviewable version. Parent cast assignment remains an explicit action; preferences are never inherited. Reads, replay and feedback do not synthesize. Repeated requests reuse artifacts, and queued/interrupted requests resume explicitly.
+
+The private service remains a projection of the Studio owner. Existing identity, origin and write-header checks cover new routes. Upload bodies are bounded independently of feedback; only generated URL fields are rewritten. Library, MP3 and preview audio retain hash verification, HEAD and byte ranges. Project discovery returns only explicitly shared projects; the creator exposes only its managed imports.
+
+No external code was borrowed for this follow-up. Existing dependency licenses and earlier Voice Lab upstream provenance continue to apply.

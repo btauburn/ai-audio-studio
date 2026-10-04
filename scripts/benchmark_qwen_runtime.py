@@ -29,7 +29,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
@@ -220,11 +220,33 @@ class RenderSample:
     peak_vram_mib: Optional[int]
     baseline_vram_mib: Optional[int]
     run_peak_vram_mib: Optional[int] = None
+    accepted: bool = False
+    selected: Optional[bool] = None
+    synthesis_seconds: Optional[float] = None
+    stage_timings: Dict[str, Any] = field(default_factory=dict)
+    generation_metadata: Dict[str, Any] = field(default_factory=dict)
     stdout_tail: str = ""
     stderr_tail: str = ""
 
     def as_dict(self) -> Dict[str, Any]:
-        return dict(self.__dict__)
+        row = dict(self.__dict__)
+        row["stage_timings"] = dict(self.stage_timings or {})
+        row["generation_metadata"] = dict(self.generation_metadata or {})
+        synthesis_rtf = (
+            self.synthesis_seconds / self.audio_seconds
+            if self.synthesis_seconds and self.audio_seconds
+            else None
+        )
+        row["rtf_wall_over_audio"] = (
+            round(synthesis_rtf, 6) if synthesis_rtf is not None else None
+        )
+        row["end_to_end_rtf_wall_over_audio"] = self.rtf
+        row["audio_seconds_per_wall_second"] = (
+            round(1.0 / synthesis_rtf, 6)
+            if synthesis_rtf and synthesis_rtf > 0
+            else None
+        )
+        return row
 
 
 def _tail(text: str, limit: int = 4000) -> str:
@@ -288,30 +310,56 @@ def _take_metadata(project_id: str, segment_id: str, take_id: str) -> Dict[str, 
     a slot's current pointer in place of the Take the render actually created.
     """
 
-    from dubbing_service.app.storage.segments import load_segments
+    from dubbing_service.app.storage.segments import load_segments, project_segments_lock
 
-    for segment in load_segments(project_id):
-        if segment.id != segment_id:
-            continue
-        for take in getattr(segment, "takes", []) or []:
-            if take.id == take_id:
-                return {
-                    "audio_sha256": take.audio_sha256,
-                    "renderer_id": take.renderer_id,
-                    "engine_id": take.engine_id,
-                    "model_id": take.model_id,
-                    "audio_file": take.audio_file,
-                }
+    with project_segments_lock(project_id):
+        segments = load_segments(project_id)
+        for segment in segments:
+            if segment.id != segment_id:
+                continue
+            for take in getattr(segment, "takes", []) or []:
+                if take.id == take_id:
+                    return {
+                        "audio_sha256": take.audio_sha256,
+                        "renderer_id": take.renderer_id,
+                        "engine_id": take.engine_id,
+                        "model_id": take.model_id,
+                        "audio_file": take.audio_file,
+                        "input_fingerprint": take.input_fingerprint,
+                        "generation_metadata": dict(take.generation_metadata or {}),
+                    }
     raise BenchmarkError(f"take {take_id} for utterance {segment_id} was not persisted")
 
 
 def _segment_text(project_id: str, segment_id: str) -> str:
-    from dubbing_service.app.storage.segments import load_segments
+    from dubbing_service.app.storage.segments import load_segments, project_segments_lock
 
-    for segment in load_segments(project_id):
-        if segment.id == segment_id:
-            return segment.text or ""
+    with project_segments_lock(project_id):
+        for segment in load_segments(project_id):
+            if segment.id == segment_id:
+                return segment.text or ""
     raise BenchmarkError(f"utterance {segment_id} is not in project {project_id}")
+
+
+def _service_synthesis_seconds(metadata: Dict[str, Any]) -> Optional[float]:
+    generation = metadata.get("generation_metadata")
+    if not isinstance(generation, dict):
+        return None
+    calls = generation.get("provider_calls")
+    if not isinstance(calls, list):
+        return None
+    total = 0.0
+    found = False
+    for call in calls:
+        if not isinstance(call, dict):
+            continue
+        timings = call.get("stage_timings")
+        inclusive = timings.get("inclusive") if isinstance(timings, dict) else None
+        value = inclusive.get("model_generate_seconds") if isinstance(inclusive, dict) else None
+        if isinstance(value, (int, float)):
+            total += float(value)
+            found = True
+    return round(total, 6) if found else None
 
 
 def render_one(
@@ -393,6 +441,21 @@ def render_one(
 
     duration_ms = take.get("duration_ms") if isinstance(take, dict) else None
     audio_seconds = (duration_ms / 1000.0) if isinstance(duration_ms, (int, float)) else None
+    qa_passed = take.get("qa_passed") if isinstance(take, dict) else None
+    selected = take.get("selected") if isinstance(take, dict) else None
+    stage_timings = take.get("stage_timings") if isinstance(take, dict) else {}
+    if not isinstance(stage_timings, dict):
+        stage_timings = {}
+    generation_metadata = metadata.get("generation_metadata")
+    if not isinstance(generation_metadata, dict):
+        generation_metadata = {}
+    execution_profile = None
+    calls = generation_metadata.get("provider_calls")
+    if isinstance(calls, list) and calls and isinstance(calls[0], dict):
+        execution_profile = calls[0].get("execution_profile")
+    actual_model_id = metadata.get("model_id")
+    if not actual_model_id and isinstance(execution_profile, dict):
+        actual_model_id = execution_profile.get("model_id")
     peak_mib = (
         monitor.peak_since(mark)
         if (monitor is not None and mark is not None)
@@ -413,12 +476,17 @@ def render_one(
         take_id=take_id,
         renderer_id=metadata.get("renderer_id"),
         engine_id=metadata.get("engine_id"),
-        model_id=metadata.get("model_id"),
-        qa_passed=take.get("qa_passed") if isinstance(take, dict) else None,
+        model_id=actual_model_id,
+        qa_passed=qa_passed,
         chunked=take.get("chunked") if isinstance(take, dict) else None,
         peak_vram_mib=peak_mib,
         baseline_vram_mib=(monitor.baseline.memory_used_mib if monitor and monitor.baseline else (before.memory_used_mib if before else None)),
         run_peak_vram_mib=(monitor.peak.memory_used_mib if (monitor and monitor.peak) else None),
+        accepted=bool(code == 0 and qa_passed is True and selected is True),
+        selected=selected if isinstance(selected, bool) else None,
+        synthesis_seconds=_service_synthesis_seconds(metadata),
+        stage_timings=stage_timings,
+        generation_metadata=generation_metadata,
         stdout_tail=_tail(stdout),
         stderr_tail=_tail(stderr),
     )
@@ -514,7 +582,7 @@ def library_identity(python: Path) -> Dict[str, Any]:
     script = (
         "import json\n"
         "from importlib import metadata\n"
-        "names = ['qwen-tts', 'modelscope', 'transformers', 'safetensors', 'fastapi', 'uvicorn', 'soundfile']\n"
+        "names = ['qwen-tts', 'qwen-tts-hf', 'faster-qwen3-tts', 'modelscope', 'transformers', 'safetensors', 'fastapi', 'uvicorn', 'soundfile']\n"
         "out = {}\n"
         "for name in names:\n"
         "    try:\n"
@@ -539,23 +607,83 @@ def library_identity(python: Path) -> Dict[str, Any]:
 
 
 def summarize(samples: Sequence[RenderSample]) -> Dict[str, Any]:
-    """Aggregate a sample set, asserting the population before any verdict."""
+    """Aggregate with totals; per-segment medians remain diagnostics only."""
 
     if not samples:
         raise BenchmarkError("no samples: a summary over an empty population is not a result")
 
     succeeded = [s for s in samples if s.exit_code == 0]
+    completed_audio = [s for s in samples if s.audio_seconds is not None]
+    accepted = [
+        s
+        for s in samples
+        if s.accepted
+        or (
+            s.exit_code == 0
+            and s.qa_passed is True
+            and s.selected is not False
+        )
+    ]
     rtfs = [s.rtf for s in succeeded if s.rtf is not None]
     throughput = [s.chars_per_second for s in succeeded if s.chars_per_second is not None]
     wall = [s.wall_seconds for s in succeeded]
+    total_wall = sum(s.wall_seconds for s in samples)
+    accepted_wall = sum(s.wall_seconds for s in accepted)
+    total_completed_audio = sum(s.audio_seconds or 0.0 for s in completed_audio)
+    total_accepted_audio = sum(s.audio_seconds or 0.0 for s in accepted)
+    accepted_chars = sum(s.chars for s in accepted)
+    synthesis_seconds = sum(s.synthesis_seconds or 0.0 for s in completed_audio)
+    accepted_synthesis_seconds = sum(s.synthesis_seconds or 0.0 for s in accepted)
+    end_to_end_rtf = (
+        total_wall / total_accepted_audio if total_accepted_audio > 0 else None
+    )
+    synthesis_rtf = (
+        accepted_synthesis_seconds / total_accepted_audio
+        if accepted_synthesis_seconds > 0 and total_accepted_audio > 0
+        else None
+    )
+    accepted_audio_rate = (
+        total_accepted_audio / total_wall if total_wall > 0 else None
+    )
     return {
         "rendered": len(samples),
         "succeeded": len(succeeded),
         "failed": len(samples) - len(succeeded),
+        "completed_audio": len(completed_audio),
+        "accepted": len(accepted),
+        "first_pass_acceptance": round(len(accepted) / len(samples), 6),
+        "total_end_to_end_wall_seconds": round(total_wall, 4),
+        "accepted_end_to_end_wall_seconds": round(accepted_wall, 4),
+        "total_completed_audio_seconds": round(total_completed_audio, 3),
+        "total_accepted_audio_seconds": round(total_accepted_audio, 3),
+        "rtf_wall_over_audio": round(synthesis_rtf, 6) if synthesis_rtf else None,
+        "audio_seconds_per_wall_second": (
+            round(1.0 / synthesis_rtf, 6) if synthesis_rtf else None
+        ),
+        "end_to_end_rtf_wall_over_accepted_audio": (
+            round(end_to_end_rtf, 6) if end_to_end_rtf else None
+        ),
+        "end_to_end_accepted_audio_seconds_per_wall_second": (
+            round(accepted_audio_rate, 6) if accepted_audio_rate else None
+        ),
+        "accepted_source_characters_per_wall_second": (
+            round(accepted_chars / total_wall, 6) if total_wall > 0 else None
+        ),
+        "accepted_audio_minutes_per_wall_hour": (
+            round(accepted_audio_rate * 60.0, 6) if accepted_audio_rate else None
+        ),
+        "synthesis_wall_seconds": round(synthesis_seconds, 6),
+        "completed_audio_synthesis_rtf_wall_over_audio": (
+            round(synthesis_seconds / total_completed_audio, 6)
+            if synthesis_seconds and total_completed_audio else None
+        ),
+        # Diagnostics only: decisions use the aggregate totals above.
         "median_rtf": round(statistics.median(rtfs), 4) if rtfs else None,
         "median_chars_per_second": round(statistics.median(throughput), 3) if throughput else None,
         "median_wall_seconds": round(statistics.median(wall), 4) if wall else None,
-        "total_audio_seconds": round(sum(s.audio_seconds or 0.0 for s in succeeded), 3),
+        "total_audio_seconds": round(
+            sum(s.audio_seconds or 0.0 for s in succeeded), 3
+        ),
     }
 
 
@@ -618,21 +746,23 @@ def main(argv: Optional[List[str]] = None) -> int:
         "runtime_python": str(runtime_python),
         "runtime": runtime_identity(runtime_python) if runtime_python.exists() else {"ok": False, "error": "runtime python missing"},
         "libraries": library_identity(runtime_python) if runtime_python.exists() else {"ok": False},
-        "service": {},
+        "service_before": {},
+        "service_after": {},
         "cold_load": None,
         "samples": [],
     }
 
     if args.health_url:
         try:
-            report["service"] = http_json(args.health_url, timeout=60.0)
+            report["service_before"] = http_json(args.health_url, timeout=60.0)
         except Exception as exc:  # noqa: BLE001 - a probe reports, it does not raise
-            report["service"] = {"ok": False, "error": str(exc)}
+            report["service_before"] = {"ok": False, "error": str(exc)}
 
     if args.cold_load_url:
         report["cold_load"] = measure_cold_load(args.cold_load_url)
 
     monitor = VramMonitor(interval_seconds=args.poll_interval).start()
+    sample_objects: List[RenderSample] = []
     try:
         for segment_id in args.segment_id:
             sample = render_one(
@@ -645,12 +775,18 @@ def main(argv: Optional[List[str]] = None) -> int:
                 timeout_seconds=args.timeout,
                 monitor=monitor,
             )
+            sample_objects.append(sample)
             report["samples"].append(sample.as_dict())
     finally:
         monitor.stop()
 
     report["vram"] = monitor.summary()
-    report["summary"] = summarize([RenderSample(**row) for row in report["samples"]])
+    if args.health_url:
+        try:
+            report["service_after"] = http_json(args.health_url, timeout=60.0)
+        except Exception as exc:  # noqa: BLE001 - a probe reports, it does not raise
+            report["service_after"] = {"ok": False, "error": str(exc)}
+    report["summary"] = summarize(sample_objects)
     if args.output:
         report["report_path"] = str(write_report(Path(args.output), report))
     print(json.dumps(report, indent=2, ensure_ascii=False))

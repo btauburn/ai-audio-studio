@@ -71,6 +71,62 @@ def test_worker_ready_requires_backend_and_instance_token() -> None:
     assert payload["backend"] == "indextts"
 
 
+def test_qwen_worker_ready_requires_requested_profile_and_attention() -> None:
+    proc = Mock()
+    proc.poll.return_value = None
+    opener = Mock()
+    opener.open.return_value = _HealthResponse(
+        {
+            "status": "model_not_loaded",
+            "backend": "qwen3tts_cv",
+            "instance_token": "expected-token",
+            "configured_execution_profile": "native-sdpa",
+            "configured_attention": "sdpa",
+        }
+    )
+    with patch(
+        "dubbing_service.app.routers.settings.urllib.request.build_opener",
+        return_value=opener,
+    ):
+        payload = settings._wait_for_tts_ready(
+            proc,
+            "qwen3tts_cv",
+            expected_instance_token="expected-token",
+            expected_execution_profile="native-sdpa",
+            expected_attention="sdpa",
+            timeout_seconds=0.1,
+        )
+    assert payload["configured_execution_profile"] == "native-sdpa"
+
+
+def test_qwen_worker_rejects_health_with_wrong_execution_profile() -> None:
+    proc = Mock()
+    proc.poll.return_value = None
+    opener = Mock()
+    opener.open.return_value = _HealthResponse(
+        {
+            "status": "model_not_loaded",
+            "backend": "qwen3tts_cv",
+            "instance_token": "expected-token",
+            "configured_execution_profile": "native-current",
+            "configured_attention": "auto",
+        }
+    )
+    with patch(
+        "dubbing_service.app.routers.settings.urllib.request.build_opener",
+        return_value=opener,
+    ), patch("dubbing_service.app.routers.settings.time.sleep", return_value=None):
+        with pytest.raises(TimeoutError, match="执行配置不匹配"):
+            settings._wait_for_tts_ready(
+                proc,
+                "qwen3tts_cv",
+                expected_instance_token="expected-token",
+                expected_execution_profile="qwen-cudagraph",
+                expected_attention="sdpa",
+                timeout_seconds=0.01,
+            )
+
+
 def test_stale_worker_token_is_rejected() -> None:
     proc = Mock()
     proc.poll.return_value = None

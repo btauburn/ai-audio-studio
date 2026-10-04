@@ -32,6 +32,7 @@ from dubbing_service.app.storage.projects import (
     ProjectStorageError,
     create_project,
     project_meta_lock,
+    list_project_summaries,
     list_projects,
     load_project,
     save_project,
@@ -152,10 +153,21 @@ async def api_create_project(payload: ProjectCreateRequest) -> Project:
 
 
 @router.get("", response_model=List[Project])
-async def api_list_projects() -> List[Project]:
-    """列出所有项目。"""
+def api_list_projects() -> List[Project]:
+    """列出所有项目。
+
+    Plain ``def``: reading and validating every project takes about a second, and as a coroutine it
+    held up every other request while it ran.
+    """
 
     return list_projects()
+
+
+@router.get("/summaries")
+def api_list_project_summaries() -> List[dict]:
+    """``id`` and ``name`` of every project: what a book picker needs, without reading them all in full."""
+
+    return list_project_summaries()
 
 
 @router.put(

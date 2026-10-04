@@ -16,13 +16,15 @@ Design rules enforced here, not by convention:
 from __future__ import annotations
 
 import json
+import time
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 from dubbing_service.app.models.project import Project, Role, Segment, SegmentTake
 from dubbing_service.app.services.takes import take_is_selectable
-from dubbing_service.app.storage.projects import load_project
+from dubbing_service.app.storage.projects import load_project, project_meta_lock
 from dubbing_service.app.storage.segments import load_segments
 
 from dubbing_service.app.audiobook import fingerprint as fingerprint_module
@@ -59,6 +61,11 @@ class RenderRecord:
     # value, so callers get the exact checks that refused it.
     candidate_created: bool = False
     blocking_qa: List[str] = field(default_factory=list)
+    stage_timings: Dict[str, object] = field(default_factory=dict)
+    reused: bool = False
+    resume_reason: Optional[str] = None
+    reaudited: bool = False
+    dispatched: bool = False
 
     def as_dict(self) -> Dict[str, object]:
         return dict(self.__dict__)
@@ -93,8 +100,12 @@ def requirement_for(
     """
 
     if role is None and segment.role_id:
+        canonical_role = segment.role_id
+        if project.voice_lab.casting.get("productions"):
+            from .casting_review import _canonical
+            canonical_role = _canonical(project, canonical_role)
         role = next(
-            (item for item in project.roles if item.id == segment.role_id), None
+            (item for item in project.roles if item.id == canonical_role), None
         )
     from dubbing_service.app.audiobook import engines as engines_module
 
@@ -106,6 +117,15 @@ def requirement_for(
         or engines_module.default_engine_id()
     )
     resolved_renderer = renderer_id or declared or reference_renderer_id
+
+    # Strict casting and its auditions pin effective local model/runtime inputs.
+    # Legacy Takes keep their original fingerprint contract; enabling this new
+    # workflow never rewrites historical provenance or eagerly regenerates a book.
+    if ((project.voice_lab.casting.get("productions") or project.metadata.get("voice_lab_audition", {}).get("script_version"))
+            and resolved_engine in {"qwen3tts", "qwen3tts_cv", "qwen3tts_customvoice", "qwen3tts_voicedesign"}
+            and "engine_components" not in overrides):
+        from .provider_capabilities import synthesis_components
+        overrides["engine_components"] = synthesis_components(resolved_engine, role.voice_identity.model_dump(mode="json") if role and role.voice_identity else None)
 
     return fingerprint_module.requirement_for_segment(
         segment,
@@ -142,6 +162,9 @@ def render_segment(
 ) -> RenderRecord:
     """Render one utterance into a new immutable Take."""
 
+    render_segment_started = time.perf_counter()
+    preparation_started = render_segment_started
+
     if role is None:
         role = next(
             (item for item in project.roles if item.id == segment.role_id), None
@@ -154,6 +177,12 @@ def render_segment(
     # renderer and QA came to disagree about what language a Take was made in.
     language = language_module.resolve_synthesis_language(segment, role)
 
+    runtime_binding = renderer.runtime_contract() if hasattr(renderer, "runtime_contract") else None
+    if runtime_binding is not None:
+        from .runtime_binding import engine_components
+        extra_requirement = {**(extra_requirement or {}), "engine_components": engine_components(runtime_binding)}
+        if requirement is not None and requirement.runtime_version != runtime_binding["sha256"]:
+            raise PipelineError("Supplied synthesis requirement is not bound to the actual worker runtime")
     requirement = requirement or requirement_for(
         project,
         segment,
@@ -176,20 +205,46 @@ def render_segment(
         take_id=take_id,
         language=language,
     )
+    preparation_seconds = time.perf_counter() - preparation_started
 
+    renderer_started = time.perf_counter()
     outcome = renderer_module.reassemble_with_retry(renderer, request)
+    renderer_seconds = time.perf_counter() - renderer_started
     if not outcome.success or not outcome.audio_path:
         return RenderRecord(
             segment_id=segment.id,
             take_id=take_id,
             success=False,
             error=outcome.error or "渲染失败",
+            stage_timings={
+                "schema": "audiobook-pipeline-stage-timings-v1",
+                "clock": "time.perf_counter",
+                "inclusive": {
+                    "render_segment_seconds": round(
+                        time.perf_counter() - render_segment_started, 6
+                    ),
+                    "renderer_seconds": round(renderer_seconds, 6),
+                },
+                "exclusive": {
+                    "preparation_seconds": round(preparation_seconds, 6),
+                    "qa_seconds": 0.0,
+                },
+            },
         )
 
     audio_path = Path(outcome.audio_path)
     audio_sha = outcome.audio_sha256 or renderer_module.sha256_file(audio_path)
     audio_file = _relative_to_root(audio_path, root)
 
+    take_build_started = time.perf_counter()
+    generation_metadata = dict(outcome.generation_metadata)
+    if runtime_binding is not None:
+        generation_metadata["runtime_binding"] = runtime_binding
+    if role and role.voice_identity:
+        from .character_casting import performance_for
+        generation_metadata["character_voice_identity"] = role.voice_identity.model_dump(mode="json")
+        generation_metadata["scene_performance"] = performance_for(segment, role).model_dump(mode="json")
+    generation_metadata["renderer_stage_timings"] = dict(outcome.stage_timings)
     take = takes_module.build_take(
         segment,
         slot=slot,
@@ -204,9 +259,14 @@ def render_segment(
         source_text_hash=fingerprint_module.text_sha256(segment.text),
         synthesis_text=request.synthesis_text or segment.text,
         chunk_map=outcome.chunk_map(),
+        generation_metadata=generation_metadata,
         language=language,
     )
+    if outcome.generation_metadata.get("scene_audio_applied"):
+        take.baked_speed = take.playback_speed = segment.playback_speed
+        take.baked_volume = take.volume_gain = segment.volume_gain
     takes_module.attach_take(segment, take, slot=slot, promote=False)
+    take_build_seconds = time.perf_counter() - take_build_started
 
     record = RenderRecord(
         segment_id=segment.id,
@@ -218,6 +278,7 @@ def render_segment(
         chunked=outcome.chunked,
     )
 
+    qa_started = time.perf_counter()
     if run_qa:
         report = qa_module.qa_take_audio(
             take_id=take_id,
@@ -231,6 +292,7 @@ def render_segment(
         record.blocking_qa = [
             item.check_id for item in report.blocking_failures()
         ]
+    qa_seconds = time.perf_counter() - qa_started
 
     if promote:
         try:
@@ -244,6 +306,25 @@ def render_segment(
         except takes_module.PromotionError as exc:
             record.error = str(exc)
             record.stale_components = list(take.stale_components)
+
+    record.stage_timings = {
+        "schema": "audiobook-pipeline-stage-timings-v1",
+        "clock": "time.perf_counter",
+        "inclusive": {
+            "render_segment_seconds": round(
+                time.perf_counter() - render_segment_started, 6
+            ),
+            "renderer_seconds": round(renderer_seconds, 6),
+        },
+        "exclusive": {
+            "preparation_seconds": round(preparation_seconds, 6),
+            "take_build_seconds": round(take_build_seconds, 6),
+            "qa_seconds": round(qa_seconds, 6),
+        },
+    }
+    take.generation_metadata["pipeline_precommit_stage_timings"] = dict(
+        record.stage_timings
+    )
 
     return record
 
@@ -264,9 +345,15 @@ def _requirement_for_take(
     """
 
     try:
+        bound = (take.generation_metadata or {}).get("runtime_binding")
+        options = {}
+        if bound is not None:
+            from .runtime_binding import engine_components
+            options["engine_components"] = engine_components(bound)
         return requirement_for(
             project,
             segment,
+            **options,
             renderer_id=renderer_id,
             reference_engine_id=getattr(take, "engine_id", None),
             reference_renderer_id=getattr(take, "renderer_id", None),
@@ -318,6 +405,9 @@ def render_utterances(
     slot: str = "a",
     promote: bool = True,
     run_qa: bool = True,
+    resume: bool = False,
+    casting_manifest: Optional[dict] = None,
+    job_id: Optional[str] = None,
 ) -> List[RenderRecord]:
     """Render a bounded set of utterances and merge each result into canonical state.
 
@@ -328,21 +418,158 @@ def render_utterances(
     """
 
     project = load_project(project_id)
+    metadata = project.metadata or {}
+    strict_casting = bool(project.voice_lab.casting.get("enabled")) or (
+        (metadata.get("autocast_import") or {}).get("mode") == "autocast"
+    )
+    audition_child = bool(metadata.get("voice_lab_audition"))
+    if casting_manifest is None and strict_casting and not audition_child:
+        raise PipelineError(
+            "Strict casting requires a current approved cast manifest; use the casting render workflow"
+        )
+    if (casting_manifest is None and project.character_cast.policy.enabled and project.character_cast.dossiers
+            and getattr(renderer, "backend", None) == "qwen3tts"):
+        from .character_casting import prepare_cast
+        targets = set(utterance_ids)
+        role_ids = {project.character_cast.role_aliases.get(s.role_id, s.role_id) for s in load_segments(project_id)
+                    if s.id in targets and (s.role_id in project.character_cast.profiles or s.role_id in project.character_cast.role_aliases)}
+        ordered_roles = sorted(role_ids)
+        batch_size = max(1, project.character_cast.policy.max_audition_characters)
+        for start in range(0, len(ordered_roles), batch_size):
+            prepare_cast(project_id, provider=renderer._get_provider(), role_ids=ordered_roles[start:start + batch_size])
+        project = load_project(project_id)
+        missing = [r.name for r in project.roles if r.id in role_ids and r.voice_identity is None]
+        if missing:
+            raise PipelineError("Character voice preparation needs review: " + ", ".join(missing))
     root = project_root(project_id)
+    runtime_binding = renderer.runtime_contract() if hasattr(renderer, "runtime_contract") else None
+    if runtime_binding is not None:
+        from .runtime_binding import check_scope, bind_job
+        scope_ids = casting_manifest["utterance_ids"] if casting_manifest else list(utterance_ids)
+        scope = [s for s in load_segments(project_id) if s.id in scope_ids]
+        if job_id is not None:
+            from dubbing_service.app.storage.jobs import get_job
+            job = get_job(project_id, job_id)
+            scope = [s for s in load_segments(project_id) if s.id in job.segment_ids]
+            bind_job(project_id, job_id, renderer, scope, project.roles, project.character_cast.role_aliases)
+        elif resume:
+            check_scope(scope, runtime_binding)
     requirement_for = _canonical_requirement_factory(project_id)
     records: List[RenderRecord] = []
 
     for utterance_id in utterance_ids:
+        if casting_manifest is not None:
+            project = load_project(project_id)
+        utterance_started = time.perf_counter()
+        state_read_started = time.perf_counter()
         segments = load_segments(project_id)
+        state_read_seconds = time.perf_counter() - state_read_started
+        if casting_manifest is not None:
+            # A per-line guard over the state just read; re-deriving the whole book here
+            # (as this once did, before every line) made a full render quadratic.
+            from .casting_review import manifest_still_current
+            if not manifest_still_current(project, segments, casting_manifest, utterance_id):
+                raise PipelineError("Current human cast no longer matches the frozen production manifest")
         segment = next((item for item in segments if item.id == utterance_id), None)
         if segment is None:
             raise PipelineError(f"utterance not found: {utterance_id}")
+
+        resume_reason: Optional[str] = None
+        if resume:
+            reuse_record, resume_reason = _resume_selected_take(
+                project,
+                segment,
+                renderer=renderer,
+                root=root,
+                project_id=project_id,
+            )
+            if reuse_record is not None:
+                records.append(reuse_record)
+                continue
+            if resume_reason == "unknown_provenance":
+                records.append(
+                    RenderRecord(
+                        segment_id=segment.id,
+                        take_id=segment.selected_take_id or "",
+                        success=False,
+                        error=(
+                            "selected Take lacks a provable current synthesis requirement; "
+                            "resume will not guess or rewrite legacy provenance; use new-take explicitly"
+                        ),
+                        resume_reason=resume_reason,
+                    )
+                )
+                continue
+            if resume_reason == "reaudit_failed":
+                records.append(
+                    RenderRecord(
+                        segment_id=segment.id,
+                        take_id=segment.selected_take_id or "",
+                        success=False,
+                        error="selected Take could not be re-audited safely; no synthesis was dispatched",
+                        resume_reason=resume_reason,
+                    )
+                )
+                continue
+            if resume_reason == "selection_changed":
+                records.append(
+                    RenderRecord(
+                        segment_id=segment.id,
+                        take_id=segment.selected_take_id or "",
+                        success=False,
+                        error="canonical selection changed during resume validation; rerun status before rendering",
+                        resume_reason=resume_reason,
+                    )
+                )
+                continue
+            latest_segments = load_segments(project_id)
+            latest = next(
+                (item for item in latest_segments if item.id == utterance_id),
+                None,
+            )
+            if latest is None:
+                records.append(
+                    RenderRecord(
+                        segment_id=utterance_id,
+                        take_id="",
+                        success=False,
+                        error="utterance was removed during resume validation",
+                        resume_reason="selection_changed",
+                    )
+                )
+                continue
+            selection_expected_to_clear = (
+                resume_reason == "qa_blocked"
+                and segment.selected_take_id is not None
+                and latest.selected_take_id is None
+            )
+            if (
+                latest.selected_take_id != segment.selected_take_id
+                and not selection_expected_to_clear
+            ):
+                records.append(
+                    RenderRecord(
+                        segment_id=utterance_id,
+                        take_id=latest.selected_take_id or "",
+                        success=False,
+                        error="canonical selection changed during resume validation; rerun status before rendering",
+                        resume_reason="selection_changed",
+                    )
+                )
+                continue
+            segment = latest
 
         # What canonical state held when this utterance was read.  The merge
         # refuses to move a pointer that no longer holds these values, which is
         # how an explicit newer choice survives a render that started earlier.
         observed_selected = segment.selected_take_id
         observed_slot = takes_module.slot_take_id(segment, slot)
+
+        render_role = None
+        if casting_manifest is not None and segment.role_id:
+            from .casting_review import _canonical
+            canonical_role_id = _canonical(project, segment.role_id)
+            render_role = next((role for role in project.roles if role.id == canonical_role_id), None)
 
         # Promotion is decided at the merge, not here: the render pass only
         # produces the artifact, and the state decides whether it may be claimed.
@@ -354,30 +581,262 @@ def render_utterances(
             slot=slot,
             promote=False,
             run_qa=run_qa,
+            role=render_role,
         )
+        record.dispatched = True
+        if resume:
+            record.resume_reason = resume_reason
         if not record.success:
+            record.stage_timings["production_path"] = {
+                "schema": "audiobook-production-path-stage-timings-v1",
+                "clock": "time.perf_counter",
+                "inclusive": {
+                    "utterance_seconds": round(
+                        time.perf_counter() - utterance_started, 6
+                    )
+                },
+                "exclusive": {
+                    "canonical_state_read_seconds": round(state_read_seconds, 6),
+                    "canonical_merge_lock_seconds": 0.0,
+                },
+                "merge_skipped": True,
+            }
             records.append(record)
             continue
 
-        merge = persistence_module.commit_take_result(
-            project_id,
-            segment_id=utterance_id,
-            take=takes_module.find_take(segment, record.take_id),
-            requirement_for=requirement_for,
-            slot=slot,
-            promote=promote,
-            allow_blocking_qa=bool(not run_qa),
-            observed_selected_take_id=observed_selected,
-            observed_slot_take_id=observed_slot,
-        )
+        merge_started = time.perf_counter()
+        # Rejection and the pointer promotion share this short project boundary.
+        # A finished obsolete waveform remains an immutable unselected Take.
+        from .casting_review import cast_current
+        with project_meta_lock(project_id) if casting_manifest is not None else nullcontext():
+            # Under the project lock only the approval is re-read: it is what can be revoked
+            # while a line renders, and the merge judges the Take itself against current state.
+            approval_current = casting_manifest is None or cast_current(load_project(project_id), casting_manifest)
+            merge = persistence_module.commit_take_result(
+                project_id,
+                segment_id=utterance_id,
+                take=takes_module.find_take(segment, record.take_id),
+                requirement_for=requirement_for,
+                slot=slot,
+                promote=promote and approval_current,
+                allow_blocking_qa=bool(not run_qa),
+                observed_selected_take_id=observed_selected,
+                observed_slot_take_id=observed_slot,
+            )
+            if not approval_current:
+                record.error = "Human casting approval changed; completed audio retained without promotion"
+        merge_seconds = time.perf_counter() - merge_started
         record.selected = merge.selected
         record.stale = merge.stale
         record.stale_components = list(merge.stale_components)
         if not merge.selected and merge.reason:
             record.error = record.error or merge.reason
+        record.stage_timings["production_path"] = {
+            "schema": "audiobook-production-path-stage-timings-v1",
+            "clock": "time.perf_counter",
+            "inclusive": {
+                "utterance_seconds": round(
+                    time.perf_counter() - utterance_started, 6
+                )
+            },
+            "exclusive": {
+                "canonical_state_read_seconds": round(state_read_seconds, 6),
+                "canonical_merge_lock_seconds": round(merge_seconds, 6),
+            },
+        }
         records.append(record)
 
     return records
+
+
+def _resume_selected_take(
+    project: Project,
+    segment: Segment,
+    *,
+    renderer: Optional[renderer_module.UtteranceRenderer],
+    root: Path,
+    project_id: str,
+    audit_missing_qa: bool = True,
+) -> tuple[Optional[RenderRecord], str]:
+    """Reuse only the selected Take after checking current requirements and bytes.
+
+    A status-only caller passes ``renderer=None``; that compares against the
+    Take's own recorded engine/renderer policy and never today's global default.
+    A render-resume caller supplies its explicit backend, so a different
+    requested renderer cannot silently reuse another profile's audio.
+    """
+
+    selected_id = segment.selected_take_id
+    take = next((item for item in segment.takes if item.id == selected_id), None)
+    if take is None:
+        return None, "missing_selection"
+    if not take.input_fingerprint:
+        return None, "unknown_provenance"
+    if take.missing or not take.audio_file:
+        return None, "missing_audio"
+    if take.archived_at is not None:
+        return None, "archived_selection"
+
+    role = next((item for item in project.roles if item.id == segment.role_id), None)
+    if role is None:
+        return None, "missing_role"
+    try:
+        if renderer is None:
+            requirement = _requirement_for_take(project, segment, take)
+        else:
+            language = language_module.resolve_synthesis_language(segment, role)
+            options = {}
+            bound = renderer.runtime_contract() if hasattr(renderer, "runtime_contract") else None
+            if bound is not None:
+                from .runtime_binding import require_take, engine_components
+                require_take(take, bound)
+                options["engine_components"] = engine_components(bound)
+            requirement = requirement_for(
+                project,
+                segment,
+                role=role,
+                renderer_id=getattr(renderer, "renderer_id", None),
+                engine_id=getattr(renderer, "engine_id", None),
+                language=language,
+                **options,
+            )
+    except Exception:
+        requirement = None
+    if requirement is None:
+        return None, "unknown_provenance"
+    stale, _changed = takes_module.take_is_stale(take, requirement)
+    if stale or take.input_fingerprint != requirement.fingerprint():
+        return None, "stale_requirement"
+
+    try:
+        audio_path = (root / take.audio_file).resolve()
+        audio_path.relative_to(root.resolve())
+    except (OSError, ValueError):
+        return None, "invalid_audio_path"
+    if not audio_path.is_file():
+        return None, "missing_audio"
+    try:
+        actual_sha256 = fingerprint_module.file_sha256(audio_path)
+    except OSError:
+        return None, "unreadable_audio"
+    if not take.audio_sha256:
+        return None, "unknown_provenance"
+    if actual_sha256 != take.audio_sha256:
+        return None, "audio_hash_mismatch"
+    facts = qa_module.read_audio_facts(audio_path)
+    if facts is None or not facts.decodable or facts.duration_ms <= 0:
+        return None, "undecodable_audio"
+
+    report = take.qa_report
+    report_identity_current = bool(
+        report is not None
+        and report.matches(take.id, actual_sha256)
+        and report.qa_check_version == qa_module.QA_CHECK_VERSION
+        and report.coverage_profile == qa_module.coverage_profile_identity(take.language)
+    )
+    if report_identity_current and report is not None and report.blocking_failures():
+        return None, "qa_blocked"
+    qa_current = bool(report_identity_current and report is not None and report.passed)
+    if not qa_current:
+        if not audit_missing_qa:
+            return None, "qa_required"
+        try:
+            audit = qa_module.reaudit_take(
+                take_id=take.id,
+                audio_path=audio_path,
+                text=take.text or segment.text,
+                language=take.language,
+                expected_sha256=actual_sha256,
+                notes="Resume validation re-audit using the selected Take's stored text and language.",
+            )
+        except Exception:
+            return None, "reaudit_failed"
+        committed = persistence_module.commit_selected_take_qa_report(
+            project_id,
+            segment_id=segment.id,
+            take_id=take.id,
+            expected_audio_sha256=actual_sha256,
+            report=audit,
+        )
+        if not committed:
+            return None, "selection_changed"
+        if not audit.passed or audit.blocking_failures():
+            return None, "qa_blocked"
+
+        # The selected pointer, synthesis requirement and audio bytes may have
+        # changed while QA ran. Re-read before deciding to reuse the Take.
+        refreshed = load_segments(project_id)
+        latest = next((item for item in refreshed if item.id == segment.id), None)
+        if latest is None or latest.selected_take_id != take.id:
+            return None, "selection_changed"
+        record, reason = _resume_selected_take(
+            project,
+            latest,
+            renderer=renderer,
+            root=root,
+            project_id=project_id,
+        )
+        if record is not None:
+            record.reaudited = True
+        return record, reason
+
+    refusal = takes_module.take_is_selectable(take)
+    if refusal is not None:
+        return None, refusal[0]
+    return (
+        RenderRecord(
+            segment_id=segment.id,
+            take_id=take.id,
+            success=True,
+            audio_sha256=actual_sha256,
+            duration_ms=facts.duration_ms,
+            qa_passed=True,
+            selected=True,
+            reused=True,
+            resume_reason="selected_take_valid",
+        ),
+        "selected_take_valid",
+    )
+
+
+def resume_status(project_id: str, utterance_ids: Sequence[str]) -> Dict[str, object]:
+    """Read-only resume eligibility summary for a bounded explicit scope."""
+
+    project = load_project(project_id)
+    segments = load_segments(project_id)
+    root = project_root(project_id)
+    by_id = {segment.id: segment for segment in segments}
+    rows: List[Dict[str, object]] = []
+    for utterance_id in utterance_ids:
+        segment = by_id.get(utterance_id)
+        if segment is None:
+            rows.append({"segment_id": utterance_id, "state": "missing_utterance"})
+            continue
+        record, reason = _resume_selected_take(
+            project,
+            segment,
+            renderer=None,
+            root=root,
+            project_id=project_id,
+            audit_missing_qa=False,
+        )
+        state = "reusable" if record is not None else (
+            "audit_required" if reason == "qa_required" else "actionable"
+        )
+        rows.append(
+            {
+                "segment_id": segment.id,
+                "selected_take_id": segment.selected_take_id,
+                "state": state,
+                "reason": reason,
+                "audio_sha256": record.audio_sha256 if record else None,
+            }
+        )
+    counts = {
+        key: sum(row.get("state") == key for row in rows)
+        for key in ("reusable", "audit_required", "actionable", "missing_utterance")
+    }
+    return {"project_id": project_id, "scope_count": len(rows), "counts": counts, "utterances": rows}
 
 
 def release_report(project_id: str) -> release_module.CoverageReport:

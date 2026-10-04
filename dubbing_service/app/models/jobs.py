@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, computed_field, model_validator
 
 class SynthesisJobStatus(str, Enum):
     QUEUED = "queued"
+    AWAITING_REVIEW = "awaiting_review"
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     SUCCEEDED_WITH_ERRORS = "succeeded_with_errors"
@@ -32,7 +33,7 @@ class SynthesisJob(BaseModel):
 
     id: str
     project_id: str
-    job_type: str = Field(pattern="^(batch_synthesize|single_synthesize)$")
+    job_type: str = Field(pattern="^(batch_synthesize|single_synthesize|voice_lab_discovery|voice_lab_listening)$")
     project_name: Optional[str] = None
 
     # --- audiobook architecture v1.2: durable agent request identity ---
@@ -50,6 +51,7 @@ class SynthesisJob(BaseModel):
     )
     segment_ids: List[str] = Field(default_factory=list)
     segment_backends: Dict[str, str] = Field(default_factory=dict)
+    runtime_bindings: Dict[str, dict] = Field(default_factory=dict)
     status: SynthesisJobStatus = SynthesisJobStatus.QUEUED
     completed_segment_ids: List[str] = Field(default_factory=list)
     failed_segments: Dict[str, str] = Field(default_factory=dict)

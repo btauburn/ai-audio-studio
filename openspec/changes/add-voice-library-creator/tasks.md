@@ -1,0 +1,9 @@
+- [x] Record preservation baseline and scoped responsibility plan
+- [x] Implement desktop/sign-in launcher and on-demand worker readiness
+- [x] Implement local EPUB/TXT imports and durable narrator MP3 jobs
+- [x] Implement cached short production auditions and explicit assignment
+- [x] Integrate Voice Lab and Brian-only private controls
+- [x] Run isolated regression and independent boundary review
+- [x] Exercise one real audition and tiny original book through the application
+- [x] Install and verify shortcut/startup targets and repeated-launch reuse
+- [x] Verify old cast, selected Take pointers and audio are preserved

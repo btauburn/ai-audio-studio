@@ -1,0 +1,19 @@
+- [x] Capture dirty baseline and trace Snow source, role, Take and export.
+- [x] Agree additive scoped review, event, intent and strict-manifest contracts.
+- [x] Reject unresolved provider voices and expose exact capabilities.
+- [x] Verify atomic feedback, bounded replacements, approval and stale decisions in isolated fixtures.
+- [x] Implement standardized production-path auditions with preserved conditioning identity; verify fixture boundaries.
+- [x] Integrate phone inbox, private notification and strict park/resume; verify application and browser-controller tests.
+- [x] Complete implementation regression and independent source review evidence. Final isolated Python suite: 1,397 passed, 1 skipped, 4 warnings, 17 subtests; 276.86 seconds. Final Node suite: 56 passed. Preserve the earlier failed and stopped suites separately.
+- [x] Run bounded real existing-reference A/B/A provider canary and verify existing Voice Lab GET/range hashes. This is not the new audition workflow acceptance.
+- [ ] Obtain a valid autoreview-helper result. The supported mission-only retry also exited without a structured review; independent source review is separate evidence.
+- [x] Activate the Studio/private delivery services after the user's follow-up; the earlier activation blocker is resolved.
+- [x] Generate three real Mother initial auditions through the normal queue (46.16, 48.96, 47.20 seconds); verify immutable private GET/range media.
+- [x] Observe the new private inbox and normal-speed section/candidate playback in the desktop browser. Final Node controller suite: 56 passed.
+- [x] Verify normal-priority Brian-only notification provider acceptance; phone receipt is a separate unobserved fact.
+- [x] Find and fix the live-owner stale-heartbeat lock defect; isolate test application storage and exercise two-process refusal/dead-owner recovery.
+- [x] Complete a clean real replacement round after the competing-test-writer incident; preserve the conflicted round as evidence. Three unrated candidates are ready at 23.84, 24.48 and 18.32 seconds; C is a measured duration outlier.
+- [x] Repair audition-to-production artifact materialization and explicit retry recovery; preserve the first fixture's rejected production attempts. Retain legacy book-creator identity checks with verified relocation support.
+- [x] Complete isolated synthetic strict park/use/resume verification; no production approval is authorized by fixture events. Fresh fixture 60ee93b8 produced exactly one 4.00-second Take in one attempt, with matching identity and conditioning hashes.
+- [ ] Observe actual phone notification receipt and human playback.
+- [ ] Receive genuine human casting feedback (human review boundary).

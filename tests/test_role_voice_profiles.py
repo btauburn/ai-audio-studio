@@ -4,6 +4,7 @@ import os
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.error import URLError
 
 from fastapi.testclient import TestClient
 
@@ -24,7 +25,7 @@ class RoleVoiceProfileTests(unittest.TestCase):
         self.assertIsNone(role.qwen3_speaker)
         self.assertIsNone(role.voice_description)
 
-    def test_custom_voice_uses_segment_then_role_then_safe_default(self) -> None:
+    def test_custom_voice_uses_explicit_segment_then_role_and_rejects_missing_voice(self) -> None:
         provider = Qwen3TTSCustomVoiceProvider()
         role = Role(
             id="role1",
@@ -42,6 +43,52 @@ class RoleVoiceProfileTests(unittest.TestCase):
 
         segment.qwen3_speaker = "vivian"
         self.assertEqual(provider._build_payload("project", role, segment)["speaker"], "vivian")
+        segment.qwen3_speaker = None
+        role.qwen3_speaker = None
+        with self.assertRaisesRegex(ValueError, "speaker must"):
+            provider._build_payload("project", role, segment)
+
+    def test_graph_provider_requests_cancel_after_transport_failure(self) -> None:
+        provider = Qwen3TTSCustomVoiceProvider()
+        provider.execution_profile = "qwen-cudagraph"
+        role = Role(id="role1", name="旁白", qwen3_speaker="vivian")
+        segment = Segment(id="seg1", role_id=role.id, text="你好", index=0)
+        with patch(
+            "dubbing_service.app.providers.tts.urllib.request.urlopen",
+            side_effect=URLError("connection timeout"),
+        ), patch.object(provider, "_request_cancel") as cancel, patch.object(
+            provider, "_request_status", return_value=None
+        ):
+            result = provider.synthesize_segment("project", role, segment)
+        self.assertFalse(result.success)
+        self.assertEqual(result.raw["outcome"], "uncertain")
+        self.assertTrue(result.raw["request_id"].startswith(segment.id))
+        cancel.assert_called_once()
+        self.assertEqual(cancel.call_args.args[0].split("-")[0], segment.id)
+
+    def test_graph_provider_recovers_completed_response_after_transport_failure(self) -> None:
+        provider = Qwen3TTSCustomVoiceProvider()
+        role = Role(id="role1", name="旁白", qwen3_speaker="vivian")
+        segment = Segment(id="seg1", role_id=role.id, text="你好", index=0)
+        completed = {
+            "state": "completed",
+            "response": {
+                "success": True,
+                "effective_speaker": "vivian",
+                "audio_file": "C:/project/audio/request.wav",
+                "execution_profile": {"execution_profile_id": "profile-id"},
+            },
+        }
+        with patch(
+            "dubbing_service.app.providers.tts.urllib.request.urlopen",
+            side_effect=URLError("response stream interrupted"),
+        ), patch.object(provider, "_request_cancel"), patch.object(
+            provider, "_request_status", return_value=completed
+        ):
+            result = provider.synthesize_segment("project", role, segment)
+        self.assertTrue(result.success)
+        self.assertEqual(result.audio_path, "C:/project/audio/request.wav")
+        self.assertEqual(result.raw["execution_profile"]["execution_profile_id"], "profile-id")
 
     def test_voice_design_preserves_identity_and_appends_performance(self) -> None:
         provider = Qwen3TTSProvider()

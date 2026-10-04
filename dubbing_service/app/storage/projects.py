@@ -23,6 +23,7 @@ from pydantic import ValidationError
 
 from dubbing_service.app.core.config import get_config, safe_project_root
 from dubbing_service.app.models.project import Project
+from dubbing_service.app.storage.atomic import ensure_metadata_writable, replace_metadata_file
 
 
 class ProjectStorageError(Exception):
@@ -32,7 +33,6 @@ class ProjectStorageError(Exception):
 # 项目级别的锁，防止同一项目 project.json 的读-改-写竞态条件
 _PROJECT_META_LOCKS: Dict[str, Lock] = {}
 _META_LOCKS_LOCK = Lock()
-
 
 def _get_project_meta_lock(project_id: str) -> Lock:
     with _META_LOCKS_LOCK:
@@ -130,6 +130,7 @@ def save_project(project: Project) -> None:
     if not project_dir.exists():
         raise ProjectStorageError(f"项目目录不存在: {project_dir}")
 
+    ensure_metadata_writable(project_dir)
     meta_path = project_dir / "project.json"
     data = project.model_dump(mode="json")
 
@@ -137,10 +138,13 @@ def save_project(project: Project) -> None:
     fd, tmp_path = tempfile.mkstemp(dir=project_dir, suffix=".tmp", prefix="project_")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            # Compact, not indented: the indented writer is pure Python and about four times
+            # slower, and this runs under the project lock, on a file of many megabytes,
+            # for every rating, every audition and every recorded line.
+            f.write(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp_path, meta_path)
+        replace_metadata_file(tmp_path, meta_path)
     except Exception:
         try:
             os.unlink(tmp_path)
@@ -210,6 +214,50 @@ def list_projects() -> List[Project]:
     # 按创建时间排序，旧项目在前
     results.sort(key=_created_at_utc)
     return results
+
+
+# id and name of every project, remembered until its file changes. The book pickers only need these,
+# and listing projects in full parses and validates every project file (tens of megabytes).
+_SUMMARIES: Dict[str, tuple] = {}
+_SUMMARIES_LOCK = Lock()
+
+
+def list_project_summaries() -> List[dict]:
+    """``{id, name, created_at}`` for every readable project, oldest first.
+
+    A project file is read again only when its size or modification time changed, and it is not
+    validated as a whole, so this is cheap enough for a page that opens on every visit.
+    """
+
+    root = _ensure_projects_root()
+    rows: List[dict] = []
+    with _SUMMARIES_LOCK:
+        live = set()
+        for item in root.iterdir():
+            meta_path = item / "project.json"
+            try:
+                stat = meta_path.stat()
+            except OSError:
+                continue
+            key = str(meta_path)
+            stamp = (stat.st_mtime_ns, stat.st_size)
+            cached = _SUMMARIES.get(key)
+            if cached and cached[0] == stamp:
+                row = cached[1]
+            else:
+                try:
+                    with meta_path.open("r", encoding="utf-8") as f:
+                        raw = json.load(f)
+                    row = {"id": raw["id"], "name": raw["name"], "created_at": str(raw.get("created_at") or "")}
+                except Exception:
+                    continue  # one unreadable project never hides the others
+                _SUMMARIES[key] = (stamp, row)
+            live.add(key)
+            rows.append(dict(row))
+        for key in [key for key in _SUMMARIES if key not in live and key.startswith(str(root))]:
+            del _SUMMARIES[key]
+    rows.sort(key=lambda row: (row["created_at"], row["id"]))
+    return rows
 
 
 def touch_project_updated_at(project_id: str, when: datetime | None = None) -> None:

@@ -1,3 +1,5 @@
+> **Current audiobook architecture (2026-10-04):** [Faster Qwen default, casting, immutable library and safety checkpoint](audiobook-current-checkpoint.md). This supersedes the September 25 v1.2 audiobook snapshot and older native-default assumptions.
+
 # 配音平台架构说明
 
 本文描述当前仓库中用于生产配音的平台架构。它以当前代码为准，而不是上游 IndexTTS2 演示项目或早期 MVP 文档。运维步骤见 [operations.md](operations.md)；历史恢复与规划材料仅保存在 [`archive/`](../archive/README.md) 供维护审计。

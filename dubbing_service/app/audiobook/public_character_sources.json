@@ -1,0 +1,73 @@
+{
+  "schema": "public-character-sources-v1",
+  "works": [
+    {
+      "id": "super-supportive",
+      "title": "Super Supportive",
+      "authors": [
+        "Sleyca"
+      ],
+      "title_aliases": [],
+      "wiki_api": "https://supersupportive.miraheze.org/w/api.php",
+      "citation_template": "soup",
+      "chapter_template": "Template:Soup/chapter",
+      "chapter_source_host": "www.royalroad.com",
+      "chapter_source_path": "/fiction/63759/super-supportive/chapter/",
+      "registry_evidence": "https://www.royalroad.com/fiction/63759/super-supportive",
+      "wiki_license": "CC BY-SA 4.0"
+    },
+    {
+      "id": "pride-and-prejudice",
+      "title": "Pride and Prejudice",
+      "authors": [
+        "Jane Austen"
+      ],
+      "title_aliases": [],
+      "wiki_api": null,
+      "registry_evidence": "https://en.wikipedia.org/wiki/Pride_and_Prejudice"
+    },
+    {
+      "id": "adventures-sherlock-holmes",
+      "title": "The Adventures of Sherlock Holmes",
+      "authors": [
+        "Arthur Conan Doyle",
+        "Sir Arthur Conan Doyle"
+      ],
+      "title_aliases": [],
+      "wiki_api": null,
+      "registry_evidence": "https://en.wikipedia.org/wiki/The_Adventures_of_Sherlock_Holmes"
+    },
+    {
+      "id": "elf-who-would-become-a-dragon",
+      "title": "The Elf Who Would Become A Dragon",
+      "authors": [
+        "ljamberfantasy",
+        "L. J. Amber"
+      ],
+      "title_aliases": [
+        "The Elf Who Would Become A Dragon [Story Complete; Copyedits in Progress]"
+      ],
+      "wiki_api": null,
+      "registry_evidence": "https://www.royalroad.com/fiction/104434/the-elf-who-would-become-a-dragon-story-complete",
+      "research_sources": [
+        {
+          "source_kind": "official",
+          "source": "https://www.royalroad.com/fiction/104434/the-elf-who-would-become-a-dragon-story-complete/chapter/2620903/dramatis-personae-chapters-1-74",
+          "published_chapter_range": [
+            1,
+            74
+          ],
+          "status": "review_only",
+          "restriction": "Unscoped author reference covers later chapters; do not promote traits without local, chapter-specific corroboration"
+        }
+      ],
+      "official_chapters": [
+        {
+          "number": 1,
+          "url": "https://www.royalroad.com/fiction/104434/the-elf-who-would-become-a-dragon-story-complete/chapter/2034542/prelude-and-chapter-1-the-frog-and-the-toad",
+          "identity_evidence": "https://ljamberfantasy.com/"
+        }
+      ]
+    }
+  ]
+}

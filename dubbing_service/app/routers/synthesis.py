@@ -196,6 +196,30 @@ def _selected_take_projection(segment: Segment) -> Segment:
     return projected
 
 
+def _strict_casting_binding(project: Project, segments: list[Segment]) -> dict | None:
+    from dubbing_service.app.audiobook.casting_assembly import (
+        CastingAssemblyError,
+        current_frozen_binding,
+    )
+    try:
+        return current_frozen_binding(project, segments)
+    except CastingAssemblyError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+def _revalidate_strict_casting(project: Project, segments: list[Segment], binding: dict | None) -> None:
+    if binding is None:
+        return
+    from dubbing_service.app.audiobook.casting_assembly import (
+        CastingAssemblyError,
+        revalidate_binding,
+    )
+    try:
+        revalidate_binding(project, segments, binding)
+    except CastingAssemblyError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
 def _prune_audio_temp(project_root: Path, *, keep_hours: int) -> CleanupAudioTempResponse:
     audio_dir = project_root / "audio"
     if not audio_dir.is_dir():
@@ -1643,7 +1667,7 @@ def api_export_full_project(project_id: str) -> ExportFullResponse:
     """将项目中所有已生成的段落音频按顺序拼接为整书音频。"""
 
     try:
-        load_project(project_id)
+        project = load_project(project_id)
     except ProjectStorageError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1657,11 +1681,14 @@ def api_export_full_project(project_id: str) -> ExportFullResponse:
             detail="当前项目没有任何段落，无法导出。",
         )
 
+    ordered_segments = _ordered_segments(project_id, segments)
+    casting_binding = _strict_casting_binding(project, ordered_segments)
+
     project_root = _project_root(project_id)
     playable: list[tuple[Segment, Path]] = []
     missing_segments: list[Segment] = []
     project_root_resolved = project_root.resolve()
-    for seg in _ordered_segments(project_id, segments):
+    for seg in ordered_segments:
         export_seg = _selected_take_projection(seg)
         if not export_seg.audio_file:
             missing_segments.append(seg)
@@ -1802,8 +1829,16 @@ def api_export_full_project(project_id: str) -> ExportFullResponse:
     }
 
     try:
-        _write_json_atomic(timeline_path, timeline_data)
-        _write_json_atomic(latest_path, timeline_data)
+        with project_meta_lock(project_id), project_segments_lock(project_id):
+            current_project = load_project(project_id)
+            current_segments = _ordered_segments(project_id, load_segments(project_id))
+            _revalidate_strict_casting(current_project, current_segments, casting_binding)
+            _write_json_atomic(timeline_path, timeline_data)
+            _write_json_atomic(latest_path, timeline_data)
+    except HTTPException:
+        if casting_binding is not None:
+            output_path.unlink(missing_ok=True)
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1839,7 +1874,7 @@ def api_export_full_project_with_edits(project_id: str) -> ExportFullResponse:
     """
 
     try:
-        load_project(project_id)
+        project = load_project(project_id)
     except ProjectStorageError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1853,13 +1888,16 @@ def api_export_full_project_with_edits(project_id: str) -> ExportFullResponse:
             detail="当前项目没有任何段落，无法导出。",
         )
 
+    ordered_segments = _ordered_segments(project_id, segments)
+    casting_binding = _strict_casting_binding(project, ordered_segments)
+
     project_root = _project_root(project_id)
 
     # 仅导出音频文件实际存在的段落（无论 status 是否为 DONE），避免因状态异常漏掉可播放音频
     playable: list[tuple[Segment, Path]] = []
     missing_segments: list[Segment] = []
     project_root_resolved = project_root.resolve()
-    for seg in _ordered_segments(project_id, segments):
+    for seg in ordered_segments:
         export_seg = _selected_take_projection(seg)
         if not export_seg.audio_file:
             missing_segments.append(seg)
@@ -2033,8 +2071,16 @@ def api_export_full_project_with_edits(project_id: str) -> ExportFullResponse:
         }
 
         try:
-            _write_json_atomic(timeline_path, timeline_data)
-            _write_json_atomic(latest_path, timeline_data)
+            with project_meta_lock(project_id), project_segments_lock(project_id):
+                current_project = load_project(project_id)
+                current_segments = _ordered_segments(project_id, load_segments(project_id))
+                _revalidate_strict_casting(current_project, current_segments, casting_binding)
+                _write_json_atomic(timeline_path, timeline_data)
+                _write_json_atomic(latest_path, timeline_data)
+        except HTTPException:
+            if casting_binding is not None and "output_path" in locals():
+                output_path.unlink(missing_ok=True)
+            raise
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

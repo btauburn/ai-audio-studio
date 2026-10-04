@@ -1,0 +1,3637 @@
+{
+  "schema": "generic-voice-library-baseline-v1",
+  "observed_at_utc": "2026-10-04T13:22:35.791615+00:00",
+  "labels": {
+    "IMPLEMENTED": "Six accepted immutable versions are registered in the generic shelf; five newly added, narrator idempotent. Original audio, identities, ratings and provenance retained.",
+    "TESTED": "Independent read-only byte verification: all preservation-manifest files, selected global assets, successful portability bundle assets and prior global rows verified; no synthesis or listening performed.",
+    "USER_APPROVED_DEFAULT": "Brian explicitly authorizes the implemented Faster Qwen profile as canonical default on 2026-10-04. This approval does not invent ratings or prove universal audible quality; execution-profile implementation/test evidence lives in the checkpoint handoff.",
+    "PROPOSED": "No draft candidate or replacement voice is promoted by this baseline. Resolving three guarded source-delivery portability holds remains proposed and requires evidence; no guard relaxation is implied."
+  },
+  "storage": {
+    "repository_anchor": "repository root",
+    "generic_registry": "dubbing_service/voices.json",
+    "generic_shelf": "dubbing_service/voices",
+    "source_project": "../runtime_evidence/2026-09-28-autocast-elf-acceptance/projects/80b99ad8",
+    "preservation": "../runtime_evidence/2026-10-04-generic-voice-baseline",
+    "preservation_manifest": "backup-manifest.json",
+    "preservation_manifest_sha256": "39aba7a56ac1a4857e31a43eb50937a0ab8dc9b32b20ece269127149fa964b46",
+    "preservation_file_count": 227,
+    "private_runtime_audio_in_git": false,
+    "backup_scope": "Local preserved duplicate of relevant before/after global registry, global assets, six selected source conditioning/samples/proofs and acquired originals; not an off-machine backup."
+  },
+  "receipts": {
+    "source_project_id": "80b99ad8",
+    "source_project_sha256": "e3ac13d3087bd6f3a522cf757bea6ccc49b502e4035de24408629bb772103310",
+    "generic_registry_before_sha256": "4f96d49bccdb4eec502c02b059efa08c917648963f73f129b8f55cb0c33fd38a",
+    "generic_registry_after_sha256": "20d63c416504b3d80b3b8cddd40a367abe284fc43bccbadeb6463a63f56e67ad",
+    "rows_before": 37,
+    "versions_before": 38,
+    "rows_after": 42,
+    "versions_after": 43,
+    "accepted_versions": 6,
+    "newly_registered_versions": 5,
+    "existing_global_rows_unchanged": true,
+    "source_project_unchanged": true,
+    "new_ratings": 0,
+    "synthesis_calls": 0,
+    "preservation_manifest_mismatches": 0,
+    "recorded_reference_bundles_verified": [
+      "narrator",
+      "hermione"
+    ],
+    "portability_holds": [
+      "harry",
+      "ron",
+      "snape"
+    ]
+  },
+  "accepted_baseline": [
+    {
+      "role_id": "narrator",
+      "name_preserved": "David Attenborough reference clone - review pending",
+      "library_voice_id": "vl_4f6b9e95f8bf6c15bc5f99f8",
+      "key": "v_decc8c575172b4692bb99d9f6d53",
+      "version": "9b4ade09539db5213e716465b10e9866",
+      "identity_id": "voice_a37dcda4814f13ec41fad2d6",
+      "source_type": "human_recorded_reference_clone",
+      "synthetic_output": true,
+      "kind": "reference_clone",
+      "identity": {
+        "id": "voice_a37dcda4814f13ec41fad2d6",
+        "role_id": "narrator",
+        "status": "LOCKED",
+        "mechanism": "qwen_reference",
+        "dossier_revision": "eligible-reference",
+        "casting_profile_revision": "5c4b5dcfa0589082ee16116b",
+        "inspiration": null,
+        "design_instruction": "Eligible reference clone; synthetic output.",
+        "reference_audio": "casting/voices/voice_a37dcda4814f13ec41fad2d6/reference.wav",
+        "reference_audio_sha256": "19764be5f553466f8aa2ce7d0aacfdeb65bda3651cd275203c42bff779497f82",
+        "acoustics": null,
+        "reference_text": "So it was extraordinary. But as that happened, you knew perfectly well that she was amiably inclined.",
+        "prompt_artifact": "casting/voices/voice_a37dcda4814f13ec41fad2d6/conditioning.npz",
+        "prompt_sha256": "6d1c4c0abb827be8bc06a122888223834f7dd565521cf5755684c8834656f204",
+        "builtin_speaker": null,
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "generation_settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "provenance": {
+          "origin": "eligible_reference_clone",
+          "actor_audio_used": true,
+          "source": {
+            "attribution": "BBC Radio 4, Desert Island Discs, David Attenborough, 29 January 2012. CC BY 3.0. Excerpt cropped and converted to mono; no endorsement.",
+            "duration_seconds": 36.38979166666667,
+            "language": "en",
+            "license_url": "https://creativecommons.org/licenses/by/3.0/",
+            "media_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Sir_David_Attenborough_BBC_Radio4_Desert_Island_Discs_29_Jan_2012_b01b8yy0.flac",
+            "performer": "David Attenborough",
+            "recording_permission_ticket": "2013111310011767",
+            "source_id": "commons:Sir_David_Attenborough_BBC_Radio4_Desert_Island_Discs_29_Jan_2012_b01b8yy0.flac",
+            "source_page": "https://commons.wikimedia.org/wiki/File:Sir_David_Attenborough_BBC_Radio4_Desert_Island_Discs_29_Jan_2012_b01b8yy0.flac",
+            "terms_url": "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+            "title": "BBC Radio 4 Desert Island Discs, 29 January 2012 â€” licensed voice excerpt",
+            "upstream_media_sha1": "2ba30432e01e7939c093ca6ee43324bb6e897098"
+          },
+          "eligibility": {
+            "acquisition_eligible": true,
+            "clone_ready": false,
+            "download_eligible": true,
+            "hold_reasons": [],
+            "intended_use": "private_synthetic_voice",
+            "intended_use_eligible": true,
+            "intended_use_evidence": {
+              "authority": "voice_license",
+              "basis": "CC BY 3.0 licensed recording plus explicit owner request for private experiment; no performer-consent assertion.",
+              "copyright_license": "https://creativecommons.org/licenses/by/3.0/",
+              "evidence_ref": "voice_lab/discovery/approvals/attenborough-private-use-evidence.json",
+              "owner_requested": true,
+              "scope": "private_local_experiment",
+              "source_id": "commons:Sir_David_Attenborough_BBC_Radio4_Desert_Island_Discs_29_Jan_2012_b01b8yy0.flac",
+              "status": "approved",
+              "use": "private_synthetic_voice"
+            },
+            "technical_review": "not_analyzed"
+          },
+          "acquisition_id": "06f0e8c3387f60f494be85c63b62a06f",
+          "acquisition_sha256": "5c4b5dcfa0589082ee16116b74744c7153b8a039393ab11f1e1de599a2cb0cff",
+          "preprocessing": [
+            {
+              "input_channels": 2,
+              "operation": "stereo_to_mono_mean"
+            },
+            {
+              "end_frame": 1737600,
+              "operation": "contiguous_crop",
+              "start_frame": 1291200
+            },
+            {
+              "operation": "lossless_float_wav",
+              "sample_rate": 48000
+            }
+          ],
+          "technical_qa": {
+            "clipping_fraction": 0.0,
+            "holds": [],
+            "peak": 0.374359130859375,
+            "silent_fraction": 0.09253808243727599,
+            "status": "pass"
+          },
+          "created_at": "2026-10-02T03:55:26.109667+00:00"
+        },
+        "created_at": "2026-10-02T03:55:57.115196Z"
+      },
+      "generation": {
+        "requested_execution_profile": "faster-base-032",
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "sample_duration_seconds": 20.880041666666667
+      },
+      "approval": {
+        "approved": true,
+        "decision": "explicit_selection",
+        "rating": 5,
+        "selection_event": {
+          "event_id": "48865bc8-a5b1-438c-8677-6b913aa0b546",
+          "role_id": "narrator",
+          "candidate_id": "candidate_4e388a97ecdf5009a7084a71",
+          "round_revision": 5,
+          "assignment_revision": 0,
+          "key": "v_decc8c575172b4692bb99d9f6d53",
+          "audio_sha256": "9a7faae94812326fb1a0b0f85fdb84ba824d28894925a268130b0a8e218dd284",
+          "action": "use",
+          "selection_confirmed": true,
+          "actor": "brian",
+          "origin": "human",
+          "created_at": "2026-10-02T17:29:15.307106+00:00",
+          "voice_id": "voice_a37dcda4814f13ec41fad2d6",
+          "voice_version": "9b4ade09539db5213e716465b10e9866",
+          "take_id": "ec6cdef4c5664911"
+        },
+        "rating_events": [
+          {
+            "event_id": "18e34989-6fa9-42be-a833-fc111b0bf0db",
+            "role_id": "narrator",
+            "candidate_id": "candidate_4e388a97ecdf5009a7084a71",
+            "round_revision": 5,
+            "assignment_revision": 0,
+            "key": "v_decc8c575172b4692bb99d9f6d53",
+            "audio_sha256": "9a7faae94812326fb1a0b0f85fdb84ba824d28894925a268130b0a8e218dd284",
+            "stars": 5,
+            "action": "save",
+            "actor": "brian",
+            "origin": "human",
+            "created_at": "2026-10-02T11:54:10.511157+00:00",
+            "voice_id": "voice_a37dcda4814f13ec41fad2d6",
+            "voice_version": "9b4ade09539db5213e716465b10e9866",
+            "take_id": "ec6cdef4c5664911"
+          }
+        ],
+        "favorite": true,
+        "historical_record_human_review": "pending",
+        "source_decision_pointer": "project.json#/voice_lab/casting/events/48865bc8-a5b1-438c-8677-6b913aa0b546"
+      },
+      "frozen_acquisition_flags": {
+        "clone_ready": true
+      },
+      "acquisition": {
+        "schema": "voice-lab-acquisition-v1",
+        "acquisition_id": "06f0e8c3387f60f494be85c63b62a06f",
+        "retrieved_at": "2026-10-02T01:51:13.635755+00:00",
+        "source": {
+          "attribution": "BBC Radio 4, Desert Island Discs, David Attenborough, 29 January 2012. CC BY 3.0. Excerpt cropped and converted to mono; no endorsement.",
+          "duration_seconds": 36.38979166666667,
+          "language": "en",
+          "license_url": "https://creativecommons.org/licenses/by/3.0/",
+          "media_url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Sir_David_Attenborough_BBC_Radio4_Desert_Island_Discs_29_Jan_2012_b01b8yy0.flac",
+          "performer": "David Attenborough",
+          "recording_permission_ticket": "2013111310011767",
+          "source_id": "commons:Sir_David_Attenborough_BBC_Radio4_Desert_Island_Discs_29_Jan_2012_b01b8yy0.flac",
+          "source_page": "https://commons.wikimedia.org/wiki/File:Sir_David_Attenborough_BBC_Radio4_Desert_Island_Discs_29_Jan_2012_b01b8yy0.flac",
+          "terms_url": "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+          "title": "BBC Radio 4 Desert Island Discs, 29 January 2012 â€” licensed voice excerpt",
+          "upstream_media_sha1": "2ba30432e01e7939c093ca6ee43324bb6e897098"
+        },
+        "eligibility": {
+          "acquisition_eligible": true,
+          "clone_ready": false,
+          "download_eligible": true,
+          "hold_reasons": [],
+          "intended_use": "private_synthetic_voice",
+          "intended_use_eligible": true,
+          "intended_use_evidence": {
+            "authority": "voice_license",
+            "basis": "CC BY 3.0 licensed recording plus explicit owner request for private experiment; no performer-consent assertion.",
+            "copyright_license": "https://creativecommons.org/licenses/by/3.0/",
+            "evidence_ref": "voice_lab/discovery/approvals/attenborough-private-use-evidence.json",
+            "owner_requested": true,
+            "scope": "private_local_experiment",
+            "source_id": "commons:Sir_David_Attenborough_BBC_Radio4_Desert_Island_Discs_29_Jan_2012_b01b8yy0.flac",
+            "status": "approved",
+            "use": "private_synthetic_voice"
+          },
+          "technical_review": "not_analyzed"
+        },
+        "technical_qa": {
+          "clipping_fraction": 0.0,
+          "holds": [],
+          "peak": 0.374359130859375,
+          "silent_fraction": 0.09253808243727599,
+          "status": "pass"
+        },
+        "audio_review": {
+          "end_seconds": 36.2,
+          "evidence_ref": "voice_lab/discovery/reviews/attenborough-user-confirmed-20261002.json",
+          "heavy_music": false,
+          "method": "human_review",
+          "original_sha256": "cce21ab3bae74d4e6361241eab8ac43e0bf8e170517afbbacb47dd9a12ffe946",
+          "overlapping_speech": false,
+          "single_speaker": true,
+          "source_id": "commons:Sir_David_Attenborough_BBC_Radio4_Desert_Island_Discs_29_Jan_2012_b01b8yy0.flac",
+          "start_seconds": 26.9,
+          "transcript_aligned": true,
+          "transcript_sha256": "e86cdd171e1c62554875252a5950dcf8e6786ddfb13d12e8808fb19b853533c1",
+          "unsuitable_noise": false
+        },
+        "reference_text": "So it was extraordinary. But as that happened, you knew perfectly well that she was amiably inclined.",
+        "transcript_sha256": "e86cdd171e1c62554875252a5950dcf8e6786ddfb13d12e8808fb19b853533c1",
+        "start_seconds": 26.9,
+        "end_seconds": 36.2,
+        "sample_rate": 48000,
+        "preprocessing": [
+          {
+            "input_channels": 2,
+            "operation": "stereo_to_mono_mean"
+          },
+          {
+            "end_frame": 1737600,
+            "operation": "contiguous_crop",
+            "start_frame": 1291200
+          },
+          {
+            "operation": "lossless_float_wav",
+            "sample_rate": 48000
+          }
+        ]
+      },
+      "assets": {
+        "sample": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_4f6b9e95f8bf6c15bc5f99f8/96d6263e04ed3bc58af4660e/sample-9a7faae94812326fb1a0b0f85fdb84ba824d28894925a268130b0a8e218dd284.wav",
+          "sha256": "9a7faae94812326fb1a0b0f85fdb84ba824d28894925a268130b0a8e218dd284",
+          "bytes": 1002286,
+          "preserved_copy": "generic/assets/voice_lab/vl_4f6b9e95f8bf6c15bc5f99f8/96d6263e04ed3bc58af4660e/sample-9a7faae94812326fb1a0b0f85fdb84ba824d28894925a268130b0a8e218dd284.wav"
+        },
+        "reference_audio": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_4f6b9e95f8bf6c15bc5f99f8/96d6263e04ed3bc58af4660e/reference_audio-19764be5f553466f8aa2ce7d0aacfdeb65bda3651cd275203c42bff779497f82.wav",
+          "sha256": "19764be5f553466f8aa2ce7d0aacfdeb65bda3651cd275203c42bff779497f82",
+          "bytes": 1785680,
+          "preserved_copy": "generic/assets/voice_lab/vl_4f6b9e95f8bf6c15bc5f99f8/96d6263e04ed3bc58af4660e/reference_audio-19764be5f553466f8aa2ce7d0aacfdeb65bda3651cd275203c42bff779497f82.wav"
+        },
+        "prompt_artifact": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_4f6b9e95f8bf6c15bc5f99f8/96d6263e04ed3bc58af4660e/prompt_artifact-6d1c4c0abb827be8bc06a122888223834f7dd565521cf5755684c8834656f204.npz",
+          "sha256": "6d1c4c0abb827be8bc06a122888223834f7dd565521cf5755684c8834656f204",
+          "bytes": 9500,
+          "preserved_copy": "generic/assets/voice_lab/vl_4f6b9e95f8bf6c15bc5f99f8/96d6263e04ed3bc58af4660e/prompt_artifact-6d1c4c0abb827be8bc06a122888223834f7dd565521cf5755684c8834656f204.npz"
+        },
+        "audition_proof": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_4f6b9e95f8bf6c15bc5f99f8/96d6263e04ed3bc58af4660e/audition_proof-9db21e01e445febe9866f2171370974615d956b792fc40a0cc47f56e112ae99b.json",
+          "sha256": "9db21e01e445febe9866f2171370974615d956b792fc40a0cc47f56e112ae99b",
+          "bytes": 260650,
+          "preserved_copy": "generic/assets/voice_lab/vl_4f6b9e95f8bf6c15bc5f99f8/96d6263e04ed3bc58af4660e/audition_proof-9db21e01e445febe9866f2171370974615d956b792fc40a0cc47f56e112ae99b.json"
+        }
+      },
+      "original_source_assets": {
+        "acquisition_receipt": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/06f0e8c3387f60f494be85c63b62a06f/acquisition.json",
+          "sha256": "5c4b5dcfa0589082ee16116b74744c7153b8a039393ab11f1e1de599a2cb0cff",
+          "bytes": 3419,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/06f0e8c3387f60f494be85c63b62a06f/acquisition.json"
+        },
+        "original_recording": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/downloads/cd990f853459283f4427a79e1141f0079538ed070bff5fb02b9cb3e12b8ce9e6.audio",
+          "sha256": "cce21ab3bae74d4e6361241eab8ac43e0bf8e170517afbbacb47dd9a12ffe946",
+          "bytes": 3038492,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/downloads/cd990f853459283f4427a79e1141f0079538ed070bff5fb02b9cb3e12b8ce9e6.audio"
+        },
+        "acquired_reference": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/06f0e8c3387f60f494be85c63b62a06f/reference.wav",
+          "sha256": "19764be5f553466f8aa2ce7d0aacfdeb65bda3651cd275203c42bff779497f82",
+          "bytes": 1785680,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/06f0e8c3387f60f494be85c63b62a06f/reference.wav"
+        }
+      },
+      "immutable_global_manifest_sha256": "8574cf7adb8859a939e5fd91bd8c09dc96aee4e430e5ee4c8cf613a1073baab5",
+      "publication": {
+        "newly_registered": false,
+        "portability": {
+          "manifest_relative": "voice_lab/portability/07bad6e9ab8d1c2a9491b0af7eb2c141/manifest.json",
+          "manifest_sha256": "82197e7d7022430e1cab1265afa6682675007b6dc10e8e372f40b7691365882f",
+          "status": "verified_bundle",
+          "bundle_assets": [
+            {
+              "path": "voice_lab/discovery/acquisitions/06f0e8c3387f60f494be85c63b62a06f/acquisition.json",
+              "sha256": "5c4b5dcfa0589082ee16116b74744c7153b8a039393ab11f1e1de599a2cb0cff",
+              "bytes": 3419
+            },
+            {
+              "path": "voice_lab/discovery/acquisitions/06f0e8c3387f60f494be85c63b62a06f/reference.wav",
+              "sha256": "19764be5f553466f8aa2ce7d0aacfdeb65bda3651cd275203c42bff779497f82",
+              "bytes": 1785680
+            },
+            {
+              "path": "voice_lab/discovery/downloads/cd990f853459283f4427a79e1141f0079538ed070bff5fb02b9cb3e12b8ce9e6.audio",
+              "sha256": "cce21ab3bae74d4e6361241eab8ac43e0bf8e170517afbbacb47dd9a12ffe946",
+              "bytes": 3038492
+            }
+          ]
+        }
+      }
+    },
+    {
+      "role_id": "harry",
+      "name_preserved": "p226 reference clone - review pending",
+      "library_voice_id": "vl_9eba24858d81be64ca87a9d0",
+      "key": "v_bfffb10cf1c1995bda946118e653",
+      "version": "fe083b7f72d8c7fcbff48a1aa8301ab6",
+      "identity_id": "voice_66725b96a455ed76da776ef4",
+      "source_type": "human_recorded_reference_clone",
+      "synthetic_output": true,
+      "kind": "reference_clone",
+      "identity": {
+        "id": "voice_66725b96a455ed76da776ef4",
+        "role_id": "harry",
+        "status": "LOCKED",
+        "mechanism": "qwen_reference",
+        "dossier_revision": "eligible-reference",
+        "casting_profile_revision": "ec86ec98f51da4cbd5026749",
+        "inspiration": null,
+        "design_instruction": "Eligible reference clone; synthetic output.",
+        "reference_audio": "casting/voices/voice_66725b96a455ed76da776ef4/reference.wav",
+        "reference_audio_sha256": "50a3f942a88b0948426e4bb0eab162387bcc095f8e3800be36d6c3ec6ad47f30",
+        "acoustics": null,
+        "reference_text": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light",
+        "prompt_artifact": "casting/voices/voice_66725b96a455ed76da776ef4/conditioning.npz",
+        "prompt_sha256": "b5a9c1249367a8df4d32f8aae1dcaca15ccf1a29b96d4aadcbd88f491e1ada44",
+        "builtin_speaker": null,
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "generation_settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "provenance": {
+          "origin": "eligible_reference_clone",
+          "actor_audio_used": true,
+          "source": {
+            "acquired_utc": "2026-10-03T12:24:11.132440+00:00",
+            "archive_member": "wav48_silence_trimmed/p226/p226_023_mic1.flac",
+            "attribution": "CSTR, University of Edinburgh; VCTK speaker p226",
+            "audio_observations": [],
+            "checksum_origin": "locally_observed_download_not_publisher_checksum",
+            "duration_seconds": 12.152979166666666,
+            "facts_verified_at": "2026-10-03",
+            "intended_use_evidence_scope": "Publisher documented TTS purpose; no inferred personal consent or celebrity identity",
+            "language": "en",
+            "license": "CC BY 4.0",
+            "license_url": "https://creativecommons.org/licenses/by/4.0/",
+            "media_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/535f4286-e54c-4038-838c-a02285e32cb2/content",
+            "mime": "audio/flac",
+            "original_path": null,
+            "performer": "p226",
+            "preprocessing": [],
+            "provider": "reviewed_dataset_recording",
+            "recording_date": null,
+            "recording_license_evidence": "Publisher explicitly describes voice cloning and speaker-adaptive TTS; separate from claiming performer consent",
+            "requires_cached_original": true,
+            "requires_narration_delivery_review": true,
+            "reviewed_original_sha256": "e1fd78e41082e9966e2036283d8aa727397d50b111ebf2d008cfab6fb5f18792",
+            "rights_scope": "Exact publisher recording only; local source-bound voice-use decision and human delivery review remain separate",
+            "size_bytes": 569832,
+            "source_id": "cstr-vctk-p226_023_mic1",
+            "source_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+            "source_revision": "VCTK-0.92",
+            "terms_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/956a1688-0b59-428c-8a2f-10837433dde3/content"
+          },
+          "eligibility": {
+            "acquisition_eligible": true,
+            "clone_ready": false,
+            "download_eligible": true,
+            "hold_reasons": [],
+            "intended_use": "private_synthetic_voice",
+            "intended_use_eligible": true,
+            "intended_use_evidence": {
+              "authority": "voice_license",
+              "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+              "evidence_ref": "https://datashare.ed.ac.uk/handle/10283/3443; publisher Voice Cloning Toolkit/speaker-adaptive TTS purpose; README sha256 ba814954324641403096c224e20061f80819d50dcde6b98dd253dc8c21395d44; CC BY 4.0 license sha256 b34e17103bfb246f2549fc82a279e6ba28834e0cb42f76a92efc14b72e3a3723",
+              "performer_consent_claimed": false,
+              "scope": "private unapproved audition experiment; no sharing or public use",
+              "source_id": "cstr-vctk-p226_023_mic1",
+              "status": "approved",
+              "use": "private_synthetic_voice"
+            },
+            "technical_review": "not_analyzed"
+          },
+          "acquisition_id": "93e73cd57b90929703d2862121a9dea5",
+          "acquisition_sha256": "ec86ec98f51da4cbd5026749cf5424e3fe6aed0ebc4dc16912ad33c06614ba00",
+          "preprocessing": [
+            {
+              "end_frame": 496800,
+              "operation": "contiguous_crop",
+              "start_frame": 19680
+            },
+            {
+              "operation": "lossless_float_wav",
+              "sample_rate": 48000
+            }
+          ],
+          "technical_qa": {
+            "clipping_fraction": 0.0,
+            "holds": [],
+            "peak": 0.76141357421875,
+            "silent_fraction": 0.04207956069751844,
+            "status": "pass"
+          },
+          "audition_draft_policy": {
+            "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+            "draft_id": "0162f4ebcec99b6d72f43ddc7f740e8d",
+            "evidence_sha256": "a690014f78cade9032efeac5b2fa38f5b96c574e4298e0707e215b9a30a07012",
+            "human_verified": false,
+            "production_approved": false,
+            "schema": "recorded-audition-draft-v1",
+            "selection_requires_human_casting": true,
+            "source_delivery_fit": "unknown"
+          },
+          "human_fit": "unknown",
+          "production_approved": false,
+          "created_at": "2026-10-03T14:00:26.251250+00:00"
+        },
+        "created_at": "2026-10-03T14:00:45.436289Z"
+      },
+      "generation": {
+        "requested_execution_profile": "faster-base-032",
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "sample_duration_seconds": 40.88
+      },
+      "approval": {
+        "approved": true,
+        "decision": "explicit_selection",
+        "rating": null,
+        "selection_event": {
+          "event_id": "9b95a40f-0a2d-4788-93fb-84c6c18e762a",
+          "role_id": "harry",
+          "candidate_id": "candidate_038df082ab7c52e54d56d2f0",
+          "round_revision": 3,
+          "assignment_revision": 0,
+          "key": "v_bfffb10cf1c1995bda946118e653",
+          "audio_sha256": "9ac7dbd6b42c0eeafe688c4b24e8d77e3f478fcb80a9fae1d1c5b3a58f8b4fd5",
+          "action": "use",
+          "selection_confirmed": true,
+          "actor": "brian",
+          "origin": "human",
+          "created_at": "2026-10-03T14:16:45.736136+00:00",
+          "voice_id": "voice_66725b96a455ed76da776ef4",
+          "voice_version": "fe083b7f72d8c7fcbff48a1aa8301ab6",
+          "take_id": "6b37e401b398476e"
+        },
+        "rating_events": [],
+        "favorite": true,
+        "historical_record_human_review": "pending",
+        "source_decision_pointer": "project.json#/voice_lab/casting/events/9b95a40f-0a2d-4788-93fb-84c6c18e762a"
+      },
+      "frozen_acquisition_flags": {
+        "clone_ready": true,
+        "production_approved": false,
+        "audition_draft_ready": true,
+        "source_fit_review_required": true,
+        "readiness_holds": [],
+        "narration_delivery_fit": {
+          "audio_assessment": null,
+          "context_flags": [],
+          "delivery_decision": "review",
+          "duration_seconds": 9.94,
+          "end_seconds": 10.35,
+          "evidence_strength": "delivery_unknown",
+          "identity_claim": null,
+          "input_pcm_sha256": "1dd8b331de4e4222768f6704523263bbc16ecbd77657f590045ba13d02cd2858",
+          "metrics": {
+            "clipped_fraction": 0.0,
+            "limitations": "Energy/dynamics are weak gain/EQ/compression/content-confounded proxies; no yelling, overlap, age, accent, or identity inference.",
+            "missing": [
+              "reliable_pitch",
+              "aligned_speech_rate",
+              "calibrated_semantic_delivery_detector"
+            ],
+            "normalized_intensity_range_db_p95_p10": 29.005685011784777,
+            "pitch_hz": null,
+            "raw_peak": 0.76141357421875,
+            "raw_rms": 0.08916387741622653,
+            "relative_energy_active_fraction": 0.7464788732394366,
+            "relative_energy_pause_seconds": [
+              0.04,
+              0.04,
+              0.04,
+              0.02,
+              0.02,
+              0.02,
+              0.02,
+              0.14,
+              0.04,
+              0.08,
+              0.12,
+              0.5,
+              0.06,
+              0.06,
+              0.04,
+              0.04,
+              0.06,
+              0.04,
+              0.48,
+              0.04
+            ],
+            "relative_energy_phrase_seconds": [
+              0.64,
+              0.08,
+              0.3,
+              0.2,
+              0.24,
+              0.02,
+              0.04,
+              0.28,
+              0.22,
+              0.44,
+              0.08,
+              0.34,
+              0.44,
+              0.02,
+              0.14,
+              0.1,
+              0.3,
+              1.96,
+              0.32,
+              0.74,
+              0.52
+            ],
+            "semantic_shouting_probability": null,
+            "speech_rate_wpm": null
+          },
+          "outcome": "no_suitable_reference",
+          "pipeline_source_sha256": "63038dad48da7ff3e87f34dae26fbfc1804663932b09cb648524b6e309082ffc",
+          "production_approved": false,
+          "reason_codes": [
+            "INSUFFICIENT_AUDIO_DELIVERY_EVIDENCE"
+          ],
+          "sample_rate": 48000,
+          "schema": "narration-delivery-fit-v1",
+          "score": null,
+          "selected_reference": false,
+          "source": {
+            "context": null,
+            "source_id": "cstr-vctk-p226_023_mic1",
+            "source_label": null,
+            "source_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+            "title": null
+          },
+          "start_seconds": 0.4099999999999998,
+          "target_profile": "sustained_conversational_storytelling",
+          "technical_decision": "pass",
+          "transcript_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872"
+        },
+        "audition_draft_policy": {
+          "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+          "draft_id": "0162f4ebcec99b6d72f43ddc7f740e8d",
+          "evidence_sha256": "a690014f78cade9032efeac5b2fa38f5b96c574e4298e0707e215b9a30a07012",
+          "human_verified": false,
+          "production_approved": false,
+          "schema": "recorded-audition-draft-v1",
+          "selection_requires_human_casting": true,
+          "source_delivery_fit": "unknown"
+        }
+      },
+      "acquisition": {
+        "schema": "voice-lab-acquisition-v1",
+        "acquisition_id": "93e73cd57b90929703d2862121a9dea5",
+        "retrieved_at": "2026-10-03T13:58:58.614257+00:00",
+        "source": {
+          "acquired_utc": "2026-10-03T12:24:11.132440+00:00",
+          "archive_member": "wav48_silence_trimmed/p226/p226_023_mic1.flac",
+          "attribution": "CSTR, University of Edinburgh; VCTK speaker p226",
+          "audio_observations": [],
+          "checksum_origin": "locally_observed_download_not_publisher_checksum",
+          "duration_seconds": 12.152979166666666,
+          "facts_verified_at": "2026-10-03",
+          "intended_use_evidence_scope": "Publisher documented TTS purpose; no inferred personal consent or celebrity identity",
+          "language": "en",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "media_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/535f4286-e54c-4038-838c-a02285e32cb2/content",
+          "mime": "audio/flac",
+          "original_path": null,
+          "performer": "p226",
+          "preprocessing": [],
+          "provider": "reviewed_dataset_recording",
+          "recording_date": null,
+          "recording_license_evidence": "Publisher explicitly describes voice cloning and speaker-adaptive TTS; separate from claiming performer consent",
+          "requires_cached_original": true,
+          "requires_narration_delivery_review": true,
+          "reviewed_original_sha256": "e1fd78e41082e9966e2036283d8aa727397d50b111ebf2d008cfab6fb5f18792",
+          "rights_scope": "Exact publisher recording only; local source-bound voice-use decision and human delivery review remain separate",
+          "size_bytes": 569832,
+          "source_id": "cstr-vctk-p226_023_mic1",
+          "source_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+          "source_revision": "VCTK-0.92",
+          "terms_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/956a1688-0b59-428c-8a2f-10837433dde3/content"
+        },
+        "eligibility": {
+          "acquisition_eligible": true,
+          "clone_ready": false,
+          "download_eligible": true,
+          "hold_reasons": [],
+          "intended_use": "private_synthetic_voice",
+          "intended_use_eligible": true,
+          "intended_use_evidence": {
+            "authority": "voice_license",
+            "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+            "evidence_ref": "https://datashare.ed.ac.uk/handle/10283/3443; publisher Voice Cloning Toolkit/speaker-adaptive TTS purpose; README sha256 ba814954324641403096c224e20061f80819d50dcde6b98dd253dc8c21395d44; CC BY 4.0 license sha256 b34e17103bfb246f2549fc82a279e6ba28834e0cb42f76a92efc14b72e3a3723",
+            "performer_consent_claimed": false,
+            "scope": "private unapproved audition experiment; no sharing or public use",
+            "source_id": "cstr-vctk-p226_023_mic1",
+            "status": "approved",
+            "use": "private_synthetic_voice"
+          },
+          "technical_review": "not_analyzed"
+        },
+        "technical_qa": {
+          "clipping_fraction": 0.0,
+          "holds": [],
+          "peak": 0.76141357421875,
+          "silent_fraction": 0.04207956069751844,
+          "status": "pass"
+        },
+        "audio_review": {
+          "end_seconds": 10.35,
+          "evidence_ref": "prior_private_evidence:recorded-reference-2026-10-03/recorded_draft_evidence.json#0162f4ebcec99b6d72f43ddc7f740e8d",
+          "heavy_music": false,
+          "human_verified": false,
+          "method": "local_tools",
+          "original_sha256": "e1fd78e41082e9966e2036283d8aa727397d50b111ebf2d008cfab6fb5f18792",
+          "overlapping_speech": false,
+          "single_speaker": true,
+          "source_id": "cstr-vctk-p226_023_mic1",
+          "start_seconds": 0.4099999999999998,
+          "transcript_aligned": true,
+          "transcript_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872",
+          "unsuitable_noise": false
+        },
+        "reference_text": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light",
+        "transcript_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872",
+        "start_seconds": 0.4099999999999998,
+        "end_seconds": 10.35,
+        "sample_rate": 48000,
+        "preprocessing": [
+          {
+            "end_frame": 496800,
+            "operation": "contiguous_crop",
+            "start_frame": 19680
+          },
+          {
+            "operation": "lossless_float_wav",
+            "sample_rate": 48000
+          }
+        ]
+      },
+      "assets": {
+        "sample": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_9eba24858d81be64ca87a9d0/7b70abc70b266ee631c66892/sample-9ac7dbd6b42c0eeafe688c4b24e8d77e3f478fcb80a9fae1d1c5b3a58f8b4fd5.wav",
+          "sha256": "9ac7dbd6b42c0eeafe688c4b24e8d77e3f478fcb80a9fae1d1c5b3a58f8b4fd5",
+          "bytes": 1962284,
+          "preserved_copy": "generic/assets/voice_lab/vl_9eba24858d81be64ca87a9d0/7b70abc70b266ee631c66892/sample-9ac7dbd6b42c0eeafe688c4b24e8d77e3f478fcb80a9fae1d1c5b3a58f8b4fd5.wav"
+        },
+        "reference_audio": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_9eba24858d81be64ca87a9d0/7b70abc70b266ee631c66892/reference_audio-50a3f942a88b0948426e4bb0eab162387bcc095f8e3800be36d6c3ec6ad47f30.wav",
+          "sha256": "50a3f942a88b0948426e4bb0eab162387bcc095f8e3800be36d6c3ec6ad47f30",
+          "bytes": 1908560,
+          "preserved_copy": "generic/assets/voice_lab/vl_9eba24858d81be64ca87a9d0/7b70abc70b266ee631c66892/reference_audio-50a3f942a88b0948426e4bb0eab162387bcc095f8e3800be36d6c3ec6ad47f30.wav"
+        },
+        "prompt_artifact": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_9eba24858d81be64ca87a9d0/7b70abc70b266ee631c66892/prompt_artifact-b5a9c1249367a8df4d32f8aae1dcaca15ccf1a29b96d4aadcbd88f491e1ada44.npz",
+          "sha256": "b5a9c1249367a8df4d32f8aae1dcaca15ccf1a29b96d4aadcbd88f491e1ada44",
+          "bytes": 10033,
+          "preserved_copy": "generic/assets/voice_lab/vl_9eba24858d81be64ca87a9d0/7b70abc70b266ee631c66892/prompt_artifact-b5a9c1249367a8df4d32f8aae1dcaca15ccf1a29b96d4aadcbd88f491e1ada44.npz"
+        },
+        "audition_proof": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_9eba24858d81be64ca87a9d0/7b70abc70b266ee631c66892/audition_proof-515cd57d8338c01bc103c4a36d862c6206203663b87b7bf9ec3a9336ff465278.json",
+          "sha256": "515cd57d8338c01bc103c4a36d862c6206203663b87b7bf9ec3a9336ff465278",
+          "bytes": 358733,
+          "preserved_copy": "generic/assets/voice_lab/vl_9eba24858d81be64ca87a9d0/7b70abc70b266ee631c66892/audition_proof-515cd57d8338c01bc103c4a36d862c6206203663b87b7bf9ec3a9336ff465278.json"
+        }
+      },
+      "original_source_assets": {
+        "acquisition_receipt": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/93e73cd57b90929703d2862121a9dea5/acquisition.json",
+          "sha256": "ec86ec98f51da4cbd5026749cf5424e3fe6aed0ebc4dc16912ad33c06614ba00",
+          "bytes": 6355,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/93e73cd57b90929703d2862121a9dea5/acquisition.json"
+        },
+        "original_recording": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/downloads/1a85b95a2bfe62f17bf3c53e191caec1f93ae95cb744c50bf1e47948cb67311c.audio",
+          "sha256": "e1fd78e41082e9966e2036283d8aa727397d50b111ebf2d008cfab6fb5f18792",
+          "bytes": 569832,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/downloads/1a85b95a2bfe62f17bf3c53e191caec1f93ae95cb744c50bf1e47948cb67311c.audio"
+        },
+        "acquired_reference": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/93e73cd57b90929703d2862121a9dea5/reference.wav",
+          "sha256": "50a3f942a88b0948426e4bb0eab162387bcc095f8e3800be36d6c3ec6ad47f30",
+          "bytes": 1908560,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/93e73cd57b90929703d2862121a9dea5/reference.wav"
+        }
+      },
+      "immutable_global_manifest_sha256": "3a0376ed0514699a3a75ae8e129fae9194457a5e132228632881c6f1559e670d",
+      "publication": {
+        "newly_registered": true,
+        "portability": {
+          "blocked": "reference narration delivery evidence failed exact audio replay",
+          "source_store_dependency": true,
+          "status": "guarded_hold"
+        }
+      }
+    },
+    {
+      "role_id": "hermione",
+      "name_preserved": "Emma Watson reference clone - review pending",
+      "library_voice_id": "vl_746b2ecbf0d057a5e918b25a",
+      "key": "v_e8dccca8f3ce113e9219c93668e2",
+      "version": "ca477066a91df6a1162ed4f29e849404",
+      "identity_id": "voice_b054a42383a8a83758346195",
+      "source_type": "human_recorded_reference_clone",
+      "synthetic_output": true,
+      "kind": "reference_clone",
+      "identity": {
+        "id": "voice_b054a42383a8a83758346195",
+        "role_id": "hermione",
+        "status": "LOCKED",
+        "mechanism": "qwen_reference",
+        "dossier_revision": "eligible-reference",
+        "casting_profile_revision": "1b531cc1558f4c93b080282d",
+        "inspiration": null,
+        "design_instruction": "Eligible reference clone; synthetic output.",
+        "reference_audio": "casting/voices/voice_b054a42383a8a83758346195/reference.wav",
+        "reference_audio_sha256": "6725a54d339058a8a340ab4b334a9d7a2f83cccb42714f709a88c3e0cf4c58f8",
+        "acoustics": null,
+        "reference_text": "We have an urgent mission to complete by 2030 and I really need your help. We need to fight global inequality, end extreme poverty and respect our planet.",
+        "prompt_artifact": "casting/voices/voice_b054a42383a8a83758346195/conditioning.npz",
+        "prompt_sha256": "17f6f5f42dc2678bbc29cfff2bd0d7e667d8265fc573f917fdbf9920bbaae53b",
+        "builtin_speaker": null,
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "generation_settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "provenance": {
+          "origin": "eligible_reference_clone",
+          "actor_audio_used": true,
+          "source": {
+            "attribution": "ONU Brasil â€” Emma Watson apresenta a maior aula do mundo (2017-07-28), CC BY 3.0; decoded, mono mean and cropped for private review. No endorsement.",
+            "duration_seconds": 313.661,
+            "filename": "Emma Watson apresenta a maior aula do mundo.webm",
+            "language": "en",
+            "license": "CC BY 3.0",
+            "license_url": "https://creativecommons.org/licenses/by/3.0",
+            "media_url": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Emma_Watson_apresenta_a_maior_aula_do_mundo.webm",
+            "metadata_content_sha256": "0524cf7c204428ea5e400e324d86dff6af9b2bbc79fbed02a3dbc1b9d381cb32",
+            "mime": "video/webm",
+            "performer": "Emma Watson",
+            "provider": "wikimedia_commons",
+            "recording_license_evidence": "Commons page revision1228812017: publisher ONU Brasil; license review DarwIn2023-12-30; self-review/re-review-needed category retained.",
+            "restrictions": "",
+            "size_bytes": 28288703,
+            "source_id": "commons-8044a1ff860f65e8e7e4a4e2",
+            "source_page": "https://commons.wikimedia.org/wiki/File:Emma_Watson_apresenta_a_maior_aula_do_mundo.webm",
+            "terms_url": "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+            "upstream_media_sha1": "ab39e95a99b43ff87c50a0530c7cc57a709be2e1"
+          },
+          "eligibility": {
+            "acquisition_eligible": true,
+            "clone_ready": false,
+            "download_eligible": true,
+            "hold_reasons": [],
+            "intended_use": "private_synthetic_voice",
+            "intended_use_eligible": true,
+            "intended_use_evidence": {
+              "authority": "voice_license",
+              "basis": "Existing app documented licensed-recording plus explicit owner private-reference request basis, as used for Attenborough. User requested actor clones at2026-10-02T12:00:36Z. This exact Emma source is CC BY3.0. Source recording license and private-use intent only; no performer consent, endorsement, blanket rights waiver or production acceptance asserted.",
+              "endorsement_claimed": false,
+              "evidence_ref": "owner-request-2026-10-02T12:00:36Z+commons-revision-1228812017-CC-BY-3.0",
+              "performer_consent_claimed": false,
+              "permitted_scope": "private local reference-cloning experiment",
+              "production_approved": false,
+              "recording_license_url": "https://creativecommons.org/licenses/by/3.0",
+              "recording_source_sha256": "e36baa02c783d5d76b87ceda2b7b85b879cac4388eb6d41d174ec1318beadc68",
+              "source_id": "commons-8044a1ff860f65e8e7e4a4e2",
+              "status": "approved",
+              "use": "private_synthetic_voice"
+            },
+            "technical_review": "not_analyzed"
+          },
+          "acquisition_id": "637a3d6f3b04bb983cf9dbaf33ed364f",
+          "acquisition_sha256": "1b531cc1558f4c93b080282d0922bb3f8effdbe6b4b77554881e9e8de9f188ad",
+          "preprocessing": [
+            {
+              "end_frame": 854400,
+              "operation": "contiguous_crop",
+              "start_frame": 352800
+            },
+            {
+              "operation": "reference_vocals_isolation",
+              "recipe": {
+                "device": "cpu",
+                "input_channels": 2,
+                "input_pcm_sha256": "1a064a59472225b740e9e93f349f8e5b4dd60e070692e721aaa7b8b4926ec84c",
+                "input_sample_rate": 48000,
+                "model": "torchaudio.models.hdemucs_high",
+                "model_sha256": "a004b2790d73ffeaa535db458a1a79b539dfdbafbccc31f275d07e632ebd7816",
+                "operations": [
+                  "sinc_resample_44100",
+                  "normalize_mixture_mono_mean_std",
+                  "hdemucs_high_vocals_stem",
+                  "undo_normalization",
+                  "stereo_to_mono_mean"
+                ],
+                "output_pcm_sha256": "536a9313cef0e0bffaf099c3590c20fcfbe73fc38748bc19b1363892826cb881",
+                "output_sample_rate": 44100,
+                "output_samples": 460845,
+                "pipeline_sha256": "ea119777376c9f6adce64ebca7bbe60465bd6cc25072720ce47c5ac55b25b214",
+                "possible_timbral_artifacts": true,
+                "production_approved": false,
+                "schema": "reference-vocals-isolation-v1",
+                "torch_threads": 2,
+                "versions": {
+                  "numpy": "2.4.6",
+                  "soundfile": "0.13.1",
+                  "torch": "2.10.0+cu130",
+                  "torchaudio": "2.10.0+cu130"
+                },
+                "weights_only_load": true
+              }
+            },
+            {
+              "operation": "lossless_float_wav",
+              "sample_rate": 44100
+            }
+          ],
+          "technical_qa": {
+            "clipping_fraction": 0.0,
+            "holds": [],
+            "peak": 0.6517682075500488,
+            "silent_fraction": 0.1721923857262203,
+            "status": "pass"
+          },
+          "created_at": "2026-10-02T14:16:18.896378+00:00"
+        },
+        "created_at": "2026-10-02T14:18:29.261880Z"
+      },
+      "generation": {
+        "requested_execution_profile": "faster-base-032",
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "sample_duration_seconds": 18.72
+      },
+      "approval": {
+        "approved": true,
+        "decision": "explicit_selection",
+        "rating": null,
+        "selection_event": {
+          "event_id": "15801023-580d-40eb-a2fc-53e971bee297",
+          "role_id": "hermione",
+          "candidate_id": "candidate_9d32c350721d0240ef6db95a",
+          "round_revision": 1,
+          "assignment_revision": 0,
+          "key": "v_e8dccca8f3ce113e9219c93668e2",
+          "audio_sha256": "e65d79c66fd975b25bcddd2e20386e978b51899746c9e7e882ad5622755742be",
+          "action": "use",
+          "selection_confirmed": true,
+          "actor": "brian",
+          "origin": "human",
+          "created_at": "2026-10-02T17:29:34.689235+00:00",
+          "voice_id": "voice_b054a42383a8a83758346195",
+          "voice_version": "ca477066a91df6a1162ed4f29e849404",
+          "take_id": "a79f7e0b8f7e41f1"
+        },
+        "rating_events": [],
+        "favorite": true,
+        "historical_record_human_review": "pending",
+        "source_decision_pointer": "project.json#/voice_lab/casting/events/15801023-580d-40eb-a2fc-53e971bee297"
+      },
+      "frozen_acquisition_flags": {
+        "clone_ready": true,
+        "source_processing": {
+          "device": "cpu",
+          "input_channels": 2,
+          "input_pcm_sha256": "1a064a59472225b740e9e93f349f8e5b4dd60e070692e721aaa7b8b4926ec84c",
+          "input_sample_rate": 48000,
+          "model": "torchaudio.models.hdemucs_high",
+          "model_sha256": "a004b2790d73ffeaa535db458a1a79b539dfdbafbccc31f275d07e632ebd7816",
+          "operations": [
+            "sinc_resample_44100",
+            "normalize_mixture_mono_mean_std",
+            "hdemucs_high_vocals_stem",
+            "undo_normalization",
+            "stereo_to_mono_mean"
+          ],
+          "output_pcm_sha256": "536a9313cef0e0bffaf099c3590c20fcfbe73fc38748bc19b1363892826cb881",
+          "output_sample_rate": 44100,
+          "output_samples": 460845,
+          "pipeline_sha256": "ea119777376c9f6adce64ebca7bbe60465bd6cc25072720ce47c5ac55b25b214",
+          "possible_timbral_artifacts": true,
+          "production_approved": false,
+          "schema": "reference-vocals-isolation-v1",
+          "torch_threads": 2,
+          "versions": {
+            "numpy": "2.4.6",
+            "soundfile": "0.13.1",
+            "torch": "2.10.0+cu130",
+            "torchaudio": "2.10.0+cu130"
+          },
+          "weights_only_load": true
+        }
+      },
+      "acquisition": {
+        "schema": "voice-lab-acquisition-v1",
+        "acquisition_id": "637a3d6f3b04bb983cf9dbaf33ed364f",
+        "retrieved_at": "2026-10-02T12:57:34.776859+00:00",
+        "source": {
+          "attribution": "ONU Brasil â€” Emma Watson apresenta a maior aula do mundo (2017-07-28), CC BY 3.0; decoded, mono mean and cropped for private review. No endorsement.",
+          "duration_seconds": 313.661,
+          "filename": "Emma Watson apresenta a maior aula do mundo.webm",
+          "language": "en",
+          "license": "CC BY 3.0",
+          "license_url": "https://creativecommons.org/licenses/by/3.0",
+          "media_url": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Emma_Watson_apresenta_a_maior_aula_do_mundo.webm",
+          "metadata_content_sha256": "0524cf7c204428ea5e400e324d86dff6af9b2bbc79fbed02a3dbc1b9d381cb32",
+          "mime": "video/webm",
+          "performer": "Emma Watson",
+          "provider": "wikimedia_commons",
+          "recording_license_evidence": "Commons page revision1228812017: publisher ONU Brasil; license review DarwIn2023-12-30; self-review/re-review-needed category retained.",
+          "restrictions": "",
+          "size_bytes": 28288703,
+          "source_id": "commons-8044a1ff860f65e8e7e4a4e2",
+          "source_page": "https://commons.wikimedia.org/wiki/File:Emma_Watson_apresenta_a_maior_aula_do_mundo.webm",
+          "terms_url": "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+          "upstream_media_sha1": "ab39e95a99b43ff87c50a0530c7cc57a709be2e1"
+        },
+        "eligibility": {
+          "acquisition_eligible": true,
+          "clone_ready": false,
+          "download_eligible": true,
+          "hold_reasons": [],
+          "intended_use": "private_synthetic_voice",
+          "intended_use_eligible": true,
+          "intended_use_evidence": {
+            "authority": "voice_license",
+            "basis": "Existing app documented licensed-recording plus explicit owner private-reference request basis, as used for Attenborough. User requested actor clones at2026-10-02T12:00:36Z. This exact Emma source is CC BY3.0. Source recording license and private-use intent only; no performer consent, endorsement, blanket rights waiver or production acceptance asserted.",
+            "endorsement_claimed": false,
+            "evidence_ref": "owner-request-2026-10-02T12:00:36Z+commons-revision-1228812017-CC-BY-3.0",
+            "performer_consent_claimed": false,
+            "permitted_scope": "private local reference-cloning experiment",
+            "production_approved": false,
+            "recording_license_url": "https://creativecommons.org/licenses/by/3.0",
+            "recording_source_sha256": "e36baa02c783d5d76b87ceda2b7b85b879cac4388eb6d41d174ec1318beadc68",
+            "source_id": "commons-8044a1ff860f65e8e7e4a4e2",
+            "status": "approved",
+            "use": "private_synthetic_voice"
+          },
+          "technical_review": "not_analyzed"
+        },
+        "technical_qa": {
+          "clipping_fraction": 0.0,
+          "holds": [],
+          "peak": 0.6517682075500488,
+          "silent_fraction": 0.1721923857262203,
+          "status": "pass"
+        },
+        "audio_review": {
+          "audio_qc_sha256": "4a16fdce16a043885052815d79179f03ae7d949268cc1f99199838caa74f42ad",
+          "end_seconds": 17.8,
+          "evidence_ref": "separated-reference-quality.json+machine-cleaned-source-qc-observations.json+prepared-separation-recipe.json",
+          "heavy_music": false,
+          "human_verified": false,
+          "limitations": [
+            "Classifier output is evidence, not proof of identity/rights or naturalness.",
+            "WER is against independent ASR draft, not human transcript truth.",
+            "Vocal isolation may alter timbre; resulting clone remains unrated and experimental."
+          ],
+          "machine_thresholds": {
+            "active_singleton_classes": 1,
+            "music_sigmoid_below": 0.2,
+            "overlap_argmax_fraction": 0,
+            "overlap_probability_peak_below": 0.1
+          },
+          "method": "local_tools",
+          "original_sha256": "e36baa02c783d5d76b87ceda2b7b85b879cac4388eb6d41d174ec1318beadc68",
+          "overlapping_speech": false,
+          "reviewed_wav_sha256": "78f3a791b0a47c984ce66a72169a4adaa42a00990ae2097339ea87e1bc4579bb",
+          "single_speaker": true,
+          "source_classifiers_sha256": "9f83aadaadee1b6ab0d16ab2b54fe5c2aeff35278b8ba1ec2350ed4d9268375b",
+          "source_id": "commons-8044a1ff860f65e8e7e4a4e2",
+          "source_processing": {
+            "device": "cpu",
+            "input_channels": 2,
+            "input_pcm_sha256": "1a064a59472225b740e9e93f349f8e5b4dd60e070692e721aaa7b8b4926ec84c",
+            "input_sample_rate": 48000,
+            "model": "torchaudio.models.hdemucs_high",
+            "model_sha256": "a004b2790d73ffeaa535db458a1a79b539dfdbafbccc31f275d07e632ebd7816",
+            "operations": [
+              "sinc_resample_44100",
+              "normalize_mixture_mono_mean_std",
+              "hdemucs_high_vocals_stem",
+              "undo_normalization",
+              "stereo_to_mono_mean"
+            ],
+            "output_pcm_sha256": "536a9313cef0e0bffaf099c3590c20fcfbe73fc38748bc19b1363892826cb881",
+            "output_sample_rate": 44100,
+            "output_samples": 460845,
+            "pipeline_sha256": "ea119777376c9f6adce64ebca7bbe60465bd6cc25072720ce47c5ac55b25b214",
+            "possible_timbral_artifacts": true,
+            "production_approved": false,
+            "schema": "reference-vocals-isolation-v1",
+            "torch_threads": 2,
+            "versions": {
+              "numpy": "2.4.6",
+              "soundfile": "0.13.1",
+              "torch": "2.10.0+cu130",
+              "torchaudio": "2.10.0+cu130"
+            },
+            "weights_only_load": true
+          },
+          "start_seconds": 7.35,
+          "transcript_aligned": true,
+          "transcript_sha256": "8a3344fa99ccb281f8346a60e3021601c2838373cb44cc32e460f418b3dfc886",
+          "unsuitable_noise": false
+        },
+        "reference_text": "We have an urgent mission to complete by 2030 and I really need your help. We need to fight global inequality, end extreme poverty and respect our planet.",
+        "transcript_sha256": "8a3344fa99ccb281f8346a60e3021601c2838373cb44cc32e460f418b3dfc886",
+        "start_seconds": 7.35,
+        "end_seconds": 17.8,
+        "sample_rate": 44100,
+        "source_decode": {
+          "decoder": "ffmpeg",
+          "ffmpeg_sha256": "05f4251bce9293c2ab492cb17ca7724a0ffd0d06c881ba2ee83b82a89c2fc740",
+          "ffprobe_sha256": "51e0780cd881f83749b029ed716cbb841c2eac6289f418050f2f2961b158896b",
+          "operation": "webm_opus_decode_float32",
+          "version": "ffmpeg version 9.0-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers"
+        },
+        "preprocessing": [
+          {
+            "end_frame": 854400,
+            "operation": "contiguous_crop",
+            "start_frame": 352800
+          },
+          {
+            "operation": "reference_vocals_isolation",
+            "recipe": {
+              "device": "cpu",
+              "input_channels": 2,
+              "input_pcm_sha256": "1a064a59472225b740e9e93f349f8e5b4dd60e070692e721aaa7b8b4926ec84c",
+              "input_sample_rate": 48000,
+              "model": "torchaudio.models.hdemucs_high",
+              "model_sha256": "a004b2790d73ffeaa535db458a1a79b539dfdbafbccc31f275d07e632ebd7816",
+              "operations": [
+                "sinc_resample_44100",
+                "normalize_mixture_mono_mean_std",
+                "hdemucs_high_vocals_stem",
+                "undo_normalization",
+                "stereo_to_mono_mean"
+              ],
+              "output_pcm_sha256": "536a9313cef0e0bffaf099c3590c20fcfbe73fc38748bc19b1363892826cb881",
+              "output_sample_rate": 44100,
+              "output_samples": 460845,
+              "pipeline_sha256": "ea119777376c9f6adce64ebca7bbe60465bd6cc25072720ce47c5ac55b25b214",
+              "possible_timbral_artifacts": true,
+              "production_approved": false,
+              "schema": "reference-vocals-isolation-v1",
+              "torch_threads": 2,
+              "versions": {
+                "numpy": "2.4.6",
+                "soundfile": "0.13.1",
+                "torch": "2.10.0+cu130",
+                "torchaudio": "2.10.0+cu130"
+              },
+              "weights_only_load": true
+            }
+          },
+          {
+            "operation": "lossless_float_wav",
+            "sample_rate": 44100
+          }
+        ]
+      },
+      "assets": {
+        "sample": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_746b2ecbf0d057a5e918b25a/c12552d5821d6529da571c6f/sample-e65d79c66fd975b25bcddd2e20386e978b51899746c9e7e882ad5622755742be.wav",
+          "sha256": "e65d79c66fd975b25bcddd2e20386e978b51899746c9e7e882ad5622755742be",
+          "bytes": 898604,
+          "preserved_copy": "generic/assets/voice_lab/vl_746b2ecbf0d057a5e918b25a/c12552d5821d6529da571c6f/sample-e65d79c66fd975b25bcddd2e20386e978b51899746c9e7e882ad5622755742be.wav"
+        },
+        "reference_audio": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_746b2ecbf0d057a5e918b25a/c12552d5821d6529da571c6f/reference_audio-6725a54d339058a8a340ab4b334a9d7a2f83cccb42714f709a88c3e0cf4c58f8.wav",
+          "sha256": "6725a54d339058a8a340ab4b334a9d7a2f83cccb42714f709a88c3e0cf4c58f8",
+          "bytes": 1843460,
+          "preserved_copy": "generic/assets/voice_lab/vl_746b2ecbf0d057a5e918b25a/c12552d5821d6529da571c6f/reference_audio-6725a54d339058a8a340ab4b334a9d7a2f83cccb42714f709a88c3e0cf4c58f8.wav"
+        },
+        "prompt_artifact": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_746b2ecbf0d057a5e918b25a/c12552d5821d6529da571c6f/prompt_artifact-17f6f5f42dc2678bbc29cfff2bd0d7e667d8265fc573f917fdbf9920bbaae53b.npz",
+          "sha256": "17f6f5f42dc2678bbc29cfff2bd0d7e667d8265fc573f917fdbf9920bbaae53b",
+          "bytes": 10020,
+          "preserved_copy": "generic/assets/voice_lab/vl_746b2ecbf0d057a5e918b25a/c12552d5821d6529da571c6f/prompt_artifact-17f6f5f42dc2678bbc29cfff2bd0d7e667d8265fc573f917fdbf9920bbaae53b.npz"
+        },
+        "audition_proof": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_746b2ecbf0d057a5e918b25a/c12552d5821d6529da571c6f/audition_proof-d6d09d9e0a0dc50e091cad8535bc75beb9d7ca071dae112f328c34011a790b23.json",
+          "sha256": "d6d09d9e0a0dc50e091cad8535bc75beb9d7ca071dae112f328c34011a790b23",
+          "bytes": 274034,
+          "preserved_copy": "generic/assets/voice_lab/vl_746b2ecbf0d057a5e918b25a/c12552d5821d6529da571c6f/audition_proof-d6d09d9e0a0dc50e091cad8535bc75beb9d7ca071dae112f328c34011a790b23.json"
+        }
+      },
+      "original_source_assets": {
+        "acquisition_receipt": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/637a3d6f3b04bb983cf9dbaf33ed364f/acquisition.json",
+          "sha256": "1b531cc1558f4c93b080282d0922bb3f8effdbe6b4b77554881e9e8de9f188ad",
+          "bytes": 7727,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/637a3d6f3b04bb983cf9dbaf33ed364f/acquisition.json"
+        },
+        "original_recording": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/downloads/b8ad57224f3d5b9b30d4028187257be287d3a67506e7c42d99c7ad93ed0ba5bd.audio",
+          "sha256": "e36baa02c783d5d76b87ceda2b7b85b879cac4388eb6d41d174ec1318beadc68",
+          "bytes": 28288703,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/downloads/b8ad57224f3d5b9b30d4028187257be287d3a67506e7c42d99c7ad93ed0ba5bd.audio"
+        },
+        "acquired_reference": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/637a3d6f3b04bb983cf9dbaf33ed364f/reference.wav",
+          "sha256": "6725a54d339058a8a340ab4b334a9d7a2f83cccb42714f709a88c3e0cf4c58f8",
+          "bytes": 1843460,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/637a3d6f3b04bb983cf9dbaf33ed364f/reference.wav"
+        }
+      },
+      "immutable_global_manifest_sha256": "6934c590630a14ebb118081e9357ce4003422560a7931c63243d89dc51db25d2",
+      "publication": {
+        "newly_registered": true,
+        "portability": {
+          "manifest_relative": "voice_lab/portability/39c98c4bc10ad58390f4a7b21f6f151c/manifest.json",
+          "manifest_sha256": "a6d2738afa6ee270a17d1fec537e75dc619f8b8e3fc3f4b320da599a5edb2ec6",
+          "status": "verified_bundle",
+          "bundle_assets": [
+            {
+              "path": "voice_lab/discovery/acquisitions/637a3d6f3b04bb983cf9dbaf33ed364f/acquisition.json",
+              "sha256": "1b531cc1558f4c93b080282d0922bb3f8effdbe6b4b77554881e9e8de9f188ad",
+              "bytes": 7727
+            },
+            {
+              "path": "voice_lab/discovery/acquisitions/637a3d6f3b04bb983cf9dbaf33ed364f/reference.wav",
+              "sha256": "6725a54d339058a8a340ab4b334a9d7a2f83cccb42714f709a88c3e0cf4c58f8",
+              "bytes": 1843460
+            },
+            {
+              "path": "voice_lab/discovery/downloads/b8ad57224f3d5b9b30d4028187257be287d3a67506e7c42d99c7ad93ed0ba5bd.audio",
+              "sha256": "e36baa02c783d5d76b87ceda2b7b85b879cac4388eb6d41d174ec1318beadc68",
+              "bytes": 28288703
+            }
+          ]
+        }
+      }
+    },
+    {
+      "role_id": "ron",
+      "name_preserved": "p273 reference clone - review pending",
+      "library_voice_id": "vl_2a312d1260a38ef83c3b6eba",
+      "key": "v_e9942dfd87f7f49b4b453bffabef",
+      "version": "5c5c7694fcd8b80e6e190dc7c6da8bf7",
+      "identity_id": "voice_77bbd275bda16f2aa651eea3",
+      "source_type": "human_recorded_reference_clone",
+      "synthetic_output": true,
+      "kind": "reference_clone",
+      "identity": {
+        "id": "voice_77bbd275bda16f2aa651eea3",
+        "role_id": "ron",
+        "status": "LOCKED",
+        "mechanism": "qwen_reference",
+        "dossier_revision": "eligible-reference",
+        "casting_profile_revision": "89043caf062f040c8214cea1",
+        "inspiration": null,
+        "design_instruction": "Eligible reference clone; synthetic output.",
+        "reference_audio": "casting/voices/voice_77bbd275bda16f2aa651eea3/reference.wav",
+        "reference_audio_sha256": "ef0a6e1455b42bd79f160cc55a8c34cf9814bb0d77e7a272577edb96889cb746",
+        "acoustics": null,
+        "reference_text": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light",
+        "prompt_artifact": "casting/voices/voice_77bbd275bda16f2aa651eea3/conditioning.npz",
+        "prompt_sha256": "61cb40438ae7ec99c82ca971ab87a42ae7b49f4d45281ecab2cc64c0f70884a7",
+        "builtin_speaker": null,
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "generation_settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "provenance": {
+          "origin": "eligible_reference_clone",
+          "actor_audio_used": true,
+          "source": {
+            "acquired_utc": "2026-10-03T12:24:22.315180+00:00",
+            "archive_member": "wav48_silence_trimmed/p273/p273_023_mic1.flac",
+            "attribution": "CSTR, University of Edinburgh; VCTK speaker p273",
+            "audio_observations": [],
+            "checksum_origin": "locally_observed_download_not_publisher_checksum",
+            "duration_seconds": 12.445145833333333,
+            "facts_verified_at": "2026-10-03",
+            "intended_use_evidence_scope": "Publisher documented TTS purpose; no inferred personal consent or celebrity identity",
+            "language": "en",
+            "license": "CC BY 4.0",
+            "license_url": "https://creativecommons.org/licenses/by/4.0/",
+            "media_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/535f4286-e54c-4038-838c-a02285e32cb2/content",
+            "mime": "audio/flac",
+            "original_path": null,
+            "performer": "p273",
+            "preprocessing": [],
+            "provider": "reviewed_dataset_recording",
+            "recording_date": null,
+            "recording_license_evidence": "Publisher explicitly describes voice cloning and speaker-adaptive TTS; separate from claiming performer consent",
+            "requires_cached_original": true,
+            "requires_narration_delivery_review": true,
+            "reviewed_original_sha256": "8df10564a331615dc6d7f3358bf8f79bbb07105de7bc45f8e1696dbdb2c698cc",
+            "rights_scope": "Exact publisher recording only; local source-bound voice-use decision and human delivery review remain separate",
+            "size_bytes": 537398,
+            "source_id": "cstr-vctk-p273_023_mic1",
+            "source_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+            "source_revision": "VCTK-0.92",
+            "terms_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/956a1688-0b59-428c-8a2f-10837433dde3/content"
+          },
+          "eligibility": {
+            "acquisition_eligible": true,
+            "clone_ready": false,
+            "download_eligible": true,
+            "hold_reasons": [],
+            "intended_use": "private_synthetic_voice",
+            "intended_use_eligible": true,
+            "intended_use_evidence": {
+              "authority": "voice_license",
+              "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+              "evidence_ref": "https://datashare.ed.ac.uk/handle/10283/3443; publisher Voice Cloning Toolkit/speaker-adaptive TTS purpose; README sha256 ba814954324641403096c224e20061f80819d50dcde6b98dd253dc8c21395d44; CC BY 4.0 license sha256 b34e17103bfb246f2549fc82a279e6ba28834e0cb42f76a92efc14b72e3a3723",
+              "performer_consent_claimed": false,
+              "scope": "private unapproved audition experiment; no sharing or public use",
+              "source_id": "cstr-vctk-p273_023_mic1",
+              "status": "approved",
+              "use": "private_synthetic_voice"
+            },
+            "technical_review": "not_analyzed"
+          },
+          "acquisition_id": "87549fb97e33f1b6ce1f40692a4a8459",
+          "acquisition_sha256": "89043caf062f040c8214cea1c9f3f0d18ebb67b955422bc5a352683efc762b7c",
+          "preprocessing": [
+            {
+              "end_frame": 491040,
+              "operation": "contiguous_crop",
+              "start_frame": 20640
+            },
+            {
+              "operation": "lossless_float_wav",
+              "sample_rate": 48000
+            }
+          ],
+          "technical_qa": {
+            "clipping_fraction": 0.0,
+            "holds": [],
+            "peak": 0.480224609375,
+            "silent_fraction": 0.046007653061224486,
+            "status": "pass"
+          },
+          "audition_draft_policy": {
+            "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+            "draft_id": "db46be4384880f035f6a0f51703c073c",
+            "evidence_sha256": "a690014f78cade9032efeac5b2fa38f5b96c574e4298e0707e215b9a30a07012",
+            "human_verified": false,
+            "production_approved": false,
+            "schema": "recorded-audition-draft-v1",
+            "selection_requires_human_casting": true,
+            "source_delivery_fit": "unknown"
+          },
+          "human_fit": "unknown",
+          "production_approved": false,
+          "created_at": "2026-10-03T14:00:46.807002+00:00"
+        },
+        "created_at": "2026-10-03T14:00:46.996788Z"
+      },
+      "generation": {
+        "requested_execution_profile": "faster-base-032",
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "sample_duration_seconds": 37.12
+      },
+      "approval": {
+        "approved": true,
+        "decision": "explicit_selection",
+        "rating": null,
+        "selection_event": {
+          "event_id": "a57c10df-1ce2-4ff3-8de4-9a77ab13fe60",
+          "role_id": "ron",
+          "candidate_id": "candidate_fb349fd4dbbb9906b63a466c",
+          "round_revision": 3,
+          "assignment_revision": 0,
+          "key": "v_e9942dfd87f7f49b4b453bffabef",
+          "audio_sha256": "0bc351ecabba487b250bca6c70452cf631c4b4f85131d27c07be124cb369ef08",
+          "action": "use",
+          "selection_confirmed": true,
+          "actor": "brian",
+          "origin": "human",
+          "created_at": "2026-10-03T14:17:01.603456+00:00",
+          "voice_id": "voice_77bbd275bda16f2aa651eea3",
+          "voice_version": "5c5c7694fcd8b80e6e190dc7c6da8bf7",
+          "take_id": "efb14377a24e4bfc"
+        },
+        "rating_events": [],
+        "favorite": true,
+        "historical_record_human_review": "pending",
+        "source_decision_pointer": "project.json#/voice_lab/casting/events/a57c10df-1ce2-4ff3-8de4-9a77ab13fe60"
+      },
+      "frozen_acquisition_flags": {
+        "clone_ready": true,
+        "production_approved": false,
+        "audition_draft_ready": true,
+        "source_fit_review_required": true,
+        "readiness_holds": [],
+        "narration_delivery_fit": {
+          "audio_assessment": null,
+          "context_flags": [],
+          "delivery_decision": "review",
+          "duration_seconds": 9.8,
+          "end_seconds": 10.23,
+          "evidence_strength": "delivery_unknown",
+          "identity_claim": null,
+          "input_pcm_sha256": "a3d732a294d2440df98dc7fef63ba906d73c9370500a08c5fd21bf305d3089d8",
+          "metrics": {
+            "clipped_fraction": 0.0,
+            "limitations": "Energy/dynamics are weak gain/EQ/compression/content-confounded proxies; no yelling, overlap, age, accent, or identity inference.",
+            "missing": [
+              "reliable_pitch",
+              "aligned_speech_rate",
+              "calibrated_semantic_delivery_detector"
+            ],
+            "normalized_intensity_range_db_p95_p10": 28.32508250562158,
+            "pitch_hz": null,
+            "raw_peak": 0.480224609375,
+            "raw_rms": 0.07134709666478349,
+            "relative_energy_active_fraction": 0.7653061224489796,
+            "relative_energy_pause_seconds": [
+              0.26,
+              0.02,
+              0.08,
+              0.02,
+              0.12,
+              0.04,
+              0.04,
+              0.12,
+              0.04,
+              0.14,
+              0.02,
+              0.22,
+              0.02,
+              0.02,
+              0.02,
+              0.02,
+              0.42,
+              0.28,
+              0.02,
+              0.08
+            ],
+            "relative_energy_phrase_seconds": [
+              0.02,
+              0.18,
+              0.46,
+              0.28,
+              0.44,
+              0.3,
+              0.7,
+              0.02,
+              0.36,
+              0.02,
+              0.82,
+              0.7,
+              1.16,
+              0.38,
+              0.2,
+              0.1,
+              0.04,
+              0.04,
+              0.36,
+              0.28,
+              0.64
+            ],
+            "semantic_shouting_probability": null,
+            "speech_rate_wpm": null
+          },
+          "outcome": "no_suitable_reference",
+          "pipeline_source_sha256": "63038dad48da7ff3e87f34dae26fbfc1804663932b09cb648524b6e309082ffc",
+          "production_approved": false,
+          "reason_codes": [
+            "INSUFFICIENT_AUDIO_DELIVERY_EVIDENCE"
+          ],
+          "sample_rate": 48000,
+          "schema": "narration-delivery-fit-v1",
+          "score": null,
+          "selected_reference": false,
+          "source": {
+            "context": null,
+            "source_id": "cstr-vctk-p273_023_mic1",
+            "source_label": null,
+            "source_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+            "title": null
+          },
+          "start_seconds": 0.4299999999999996,
+          "target_profile": "sustained_conversational_storytelling",
+          "technical_decision": "pass",
+          "transcript_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872"
+        },
+        "audition_draft_policy": {
+          "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+          "draft_id": "db46be4384880f035f6a0f51703c073c",
+          "evidence_sha256": "a690014f78cade9032efeac5b2fa38f5b96c574e4298e0707e215b9a30a07012",
+          "human_verified": false,
+          "production_approved": false,
+          "schema": "recorded-audition-draft-v1",
+          "selection_requires_human_casting": true,
+          "source_delivery_fit": "unknown"
+        }
+      },
+      "acquisition": {
+        "schema": "voice-lab-acquisition-v1",
+        "acquisition_id": "87549fb97e33f1b6ce1f40692a4a8459",
+        "retrieved_at": "2026-10-03T13:58:59.761583+00:00",
+        "source": {
+          "acquired_utc": "2026-10-03T12:24:22.315180+00:00",
+          "archive_member": "wav48_silence_trimmed/p273/p273_023_mic1.flac",
+          "attribution": "CSTR, University of Edinburgh; VCTK speaker p273",
+          "audio_observations": [],
+          "checksum_origin": "locally_observed_download_not_publisher_checksum",
+          "duration_seconds": 12.445145833333333,
+          "facts_verified_at": "2026-10-03",
+          "intended_use_evidence_scope": "Publisher documented TTS purpose; no inferred personal consent or celebrity identity",
+          "language": "en",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "media_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/535f4286-e54c-4038-838c-a02285e32cb2/content",
+          "mime": "audio/flac",
+          "original_path": null,
+          "performer": "p273",
+          "preprocessing": [],
+          "provider": "reviewed_dataset_recording",
+          "recording_date": null,
+          "recording_license_evidence": "Publisher explicitly describes voice cloning and speaker-adaptive TTS; separate from claiming performer consent",
+          "requires_cached_original": true,
+          "requires_narration_delivery_review": true,
+          "reviewed_original_sha256": "8df10564a331615dc6d7f3358bf8f79bbb07105de7bc45f8e1696dbdb2c698cc",
+          "rights_scope": "Exact publisher recording only; local source-bound voice-use decision and human delivery review remain separate",
+          "size_bytes": 537398,
+          "source_id": "cstr-vctk-p273_023_mic1",
+          "source_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+          "source_revision": "VCTK-0.92",
+          "terms_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/956a1688-0b59-428c-8a2f-10837433dde3/content"
+        },
+        "eligibility": {
+          "acquisition_eligible": true,
+          "clone_ready": false,
+          "download_eligible": true,
+          "hold_reasons": [],
+          "intended_use": "private_synthetic_voice",
+          "intended_use_eligible": true,
+          "intended_use_evidence": {
+            "authority": "voice_license",
+            "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+            "evidence_ref": "https://datashare.ed.ac.uk/handle/10283/3443; publisher Voice Cloning Toolkit/speaker-adaptive TTS purpose; README sha256 ba814954324641403096c224e20061f80819d50dcde6b98dd253dc8c21395d44; CC BY 4.0 license sha256 b34e17103bfb246f2549fc82a279e6ba28834e0cb42f76a92efc14b72e3a3723",
+            "performer_consent_claimed": false,
+            "scope": "private unapproved audition experiment; no sharing or public use",
+            "source_id": "cstr-vctk-p273_023_mic1",
+            "status": "approved",
+            "use": "private_synthetic_voice"
+          },
+          "technical_review": "not_analyzed"
+        },
+        "technical_qa": {
+          "clipping_fraction": 0.0,
+          "holds": [],
+          "peak": 0.480224609375,
+          "silent_fraction": 0.046007653061224486,
+          "status": "pass"
+        },
+        "audio_review": {
+          "end_seconds": 10.23,
+          "evidence_ref": "prior_private_evidence:recorded-reference-2026-10-03/recorded_draft_evidence.json#db46be4384880f035f6a0f51703c073c",
+          "heavy_music": false,
+          "human_verified": false,
+          "method": "local_tools",
+          "original_sha256": "8df10564a331615dc6d7f3358bf8f79bbb07105de7bc45f8e1696dbdb2c698cc",
+          "overlapping_speech": false,
+          "single_speaker": true,
+          "source_id": "cstr-vctk-p273_023_mic1",
+          "start_seconds": 0.4299999999999996,
+          "transcript_aligned": true,
+          "transcript_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872",
+          "unsuitable_noise": false
+        },
+        "reference_text": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light",
+        "transcript_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872",
+        "start_seconds": 0.4299999999999996,
+        "end_seconds": 10.23,
+        "sample_rate": 48000,
+        "preprocessing": [
+          {
+            "end_frame": 491040,
+            "operation": "contiguous_crop",
+            "start_frame": 20640
+          },
+          {
+            "operation": "lossless_float_wav",
+            "sample_rate": 48000
+          }
+        ]
+      },
+      "assets": {
+        "sample": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_2a312d1260a38ef83c3b6eba/b1aee5540f00df5b4c6f5903/sample-0bc351ecabba487b250bca6c70452cf631c4b4f85131d27c07be124cb369ef08.wav",
+          "sha256": "0bc351ecabba487b250bca6c70452cf631c4b4f85131d27c07be124cb369ef08",
+          "bytes": 1781804,
+          "preserved_copy": "generic/assets/voice_lab/vl_2a312d1260a38ef83c3b6eba/b1aee5540f00df5b4c6f5903/sample-0bc351ecabba487b250bca6c70452cf631c4b4f85131d27c07be124cb369ef08.wav"
+        },
+        "reference_audio": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_2a312d1260a38ef83c3b6eba/b1aee5540f00df5b4c6f5903/reference_audio-ef0a6e1455b42bd79f160cc55a8c34cf9814bb0d77e7a272577edb96889cb746.wav",
+          "sha256": "ef0a6e1455b42bd79f160cc55a8c34cf9814bb0d77e7a272577edb96889cb746",
+          "bytes": 1881680,
+          "preserved_copy": "generic/assets/voice_lab/vl_2a312d1260a38ef83c3b6eba/b1aee5540f00df5b4c6f5903/reference_audio-ef0a6e1455b42bd79f160cc55a8c34cf9814bb0d77e7a272577edb96889cb746.wav"
+        },
+        "prompt_artifact": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_2a312d1260a38ef83c3b6eba/b1aee5540f00df5b4c6f5903/prompt_artifact-61cb40438ae7ec99c82ca971ab87a42ae7b49f4d45281ecab2cc64c0f70884a7.npz",
+          "sha256": "61cb40438ae7ec99c82ca971ab87a42ae7b49f4d45281ecab2cc64c0f70884a7",
+          "bytes": 9955,
+          "preserved_copy": "generic/assets/voice_lab/vl_2a312d1260a38ef83c3b6eba/b1aee5540f00df5b4c6f5903/prompt_artifact-61cb40438ae7ec99c82ca971ab87a42ae7b49f4d45281ecab2cc64c0f70884a7.npz"
+        },
+        "audition_proof": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_2a312d1260a38ef83c3b6eba/b1aee5540f00df5b4c6f5903/audition_proof-05c70688ebddf773bd2f9d5f2a0af27015141d5d5c3fe8bb12884a9c478d5883.json",
+          "sha256": "05c70688ebddf773bd2f9d5f2a0af27015141d5d5c3fe8bb12884a9c478d5883",
+          "bytes": 358673,
+          "preserved_copy": "generic/assets/voice_lab/vl_2a312d1260a38ef83c3b6eba/b1aee5540f00df5b4c6f5903/audition_proof-05c70688ebddf773bd2f9d5f2a0af27015141d5d5c3fe8bb12884a9c478d5883.json"
+        }
+      },
+      "original_source_assets": {
+        "acquisition_receipt": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/87549fb97e33f1b6ce1f40692a4a8459/acquisition.json",
+          "sha256": "89043caf062f040c8214cea1c9f3f0d18ebb67b955422bc5a352683efc762b7c",
+          "bytes": 6349,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/87549fb97e33f1b6ce1f40692a4a8459/acquisition.json"
+        },
+        "original_recording": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/downloads/fb2df8134411ab8525c9d76a8bfbd1f02804d09f7422e68626641a81a7ded037.audio",
+          "sha256": "8df10564a331615dc6d7f3358bf8f79bbb07105de7bc45f8e1696dbdb2c698cc",
+          "bytes": 537398,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/downloads/fb2df8134411ab8525c9d76a8bfbd1f02804d09f7422e68626641a81a7ded037.audio"
+        },
+        "acquired_reference": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/87549fb97e33f1b6ce1f40692a4a8459/reference.wav",
+          "sha256": "ef0a6e1455b42bd79f160cc55a8c34cf9814bb0d77e7a272577edb96889cb746",
+          "bytes": 1881680,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/87549fb97e33f1b6ce1f40692a4a8459/reference.wav"
+        }
+      },
+      "immutable_global_manifest_sha256": "ede9f462b3494b94f485b7da86d4b0805b0a09e410c5aed9893be83879feea00",
+      "publication": {
+        "newly_registered": true,
+        "portability": {
+          "blocked": "reference narration delivery evidence failed exact audio replay",
+          "source_store_dependency": true,
+          "status": "guarded_hold"
+        }
+      }
+    },
+    {
+      "role_id": "dumbledore",
+      "name_preserved": "Rowan 96f68f",
+      "library_voice_id": "vl_9f1a6d7f681d60ccf9257fad",
+      "key": "v_5f7af75f360602aa32727fe8a940",
+      "version": "96f68f6e88a709f4353f38fd2d09bbe8",
+      "identity_id": "voice_6ddd6ad199381ea02cf158bf",
+      "source_type": "original_synthetic_voice_design_reference",
+      "synthetic_output": true,
+      "kind": "original_inspired",
+      "identity": {
+        "id": "voice_6ddd6ad199381ea02cf158bf",
+        "role_id": "dumbledore",
+        "status": "LOCKED",
+        "mechanism": "qwen_reference",
+        "dossier_revision": "unknown",
+        "casting_profile_revision": "f6122f8cf837fef4ffc146c0",
+        "inspiration": {
+          "palette": "original-inspired-design-v1",
+          "character": "First-film-era Dumbledore: elder warmth and patient British storytelling, original descriptive inspiration",
+          "performer": "Richard Harris",
+          "mode": "archetype",
+          "traits": {},
+          "reasons": [
+            "Explicit owner request for an original inspired VoiceDesign; Warm rounded elder. Human resemblance and British delivery require listening."
+          ],
+          "score": 0.0,
+          "source": "Owner-authored descriptive inspiration; no performer recording",
+          "original_voice_only": true
+        },
+        "design_instruction": "Create an original synthetic voice. An elderly male voice, about seventy to eighty, speaking cultivated British English with clear non-rhotic vowels and gentle slightly lilting musical phrasing. Rounded warm lower-middle resonance, soft weathered grain and a little airy breath. Calm sustained storytelling, patient spacious pauses, kindly curiosity and quiet reassuring authority. Delicate dry amusement, gradual rises and gentle falling endings. Words are connected naturally and clearly; an older wise conversational storyteller with soft warmth and no booming declamation.",
+        "reference_audio": "casting/voices/voice_6ddd6ad199381ea02cf158bf/reference.wav",
+        "reference_audio_sha256": "f3977b6d92194838a69af1aa8a81ca7f9a422605c7deb1b613498262b4e3ef39",
+        "acoustics": null,
+        "reference_text": "There is still time to find the right answer. Let us begin again, and listen carefully.",
+        "prompt_artifact": "casting/voices/voice_6ddd6ad199381ea02cf158bf/conditioning.npz",
+        "prompt_sha256": "be587ecab231eaae08874f63fee11bbe168c35ab84fe00c1b253e2f680c514b7",
+        "builtin_speaker": null,
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "generation_settings": {
+          "seed": 166831831,
+          "max_new_tokens": 384,
+          "do_sample": true,
+          "temperature": 0.8,
+          "top_k": 50,
+          "top_p": 1.0,
+          "repetition_penalty": 1.05,
+          "subtalker_dosample": true,
+          "subtalker_top_k": 50,
+          "subtalker_top_p": 1.0,
+          "subtalker_temperature": 0.9,
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "provenance": {
+          "origin": "generated_original_voice",
+          "actor_audio_used": false,
+          "design_model": {
+            "model": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+            "model_revision": "cc585b5049e11f4d619122338fd1758f705cb7f31473817ff5859b682cfe4dfe",
+            "runtime_version": "0.1.1"
+          },
+          "attention": "sdpa",
+          "dtype": "bfloat16",
+          "created_at": "2026-10-02T23:30:29.828613+00:00"
+        },
+        "created_at": "2026-10-02T23:30:35.823057Z"
+      },
+      "generation": {
+        "requested_execution_profile": "faster-base-032",
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "settings": {
+          "seed": 166831831,
+          "max_new_tokens": 384,
+          "do_sample": true,
+          "temperature": 0.8,
+          "top_k": 50,
+          "top_p": 1.0,
+          "repetition_penalty": 1.05,
+          "subtalker_dosample": true,
+          "subtalker_top_k": 50,
+          "subtalker_top_p": 1.0,
+          "subtalker_temperature": 0.9,
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "sample_duration_seconds": 23.12
+      },
+      "approval": {
+        "approved": true,
+        "decision": "explicit_selection",
+        "rating": null,
+        "selection_event": {
+          "event_id": "e72ac102-8dbe-4ee0-ac30-45fe0b3ed972",
+          "role_id": "dumbledore",
+          "candidate_id": "candidate_142fc3df1359dcc45a2367af",
+          "round_revision": 4,
+          "assignment_revision": 0,
+          "key": "v_5f7af75f360602aa32727fe8a940",
+          "audio_sha256": "1914064ecb6e8e94c3e4598a6bc0fb93b6e9ab439d878138b619ac1a30d46d6e",
+          "action": "use",
+          "selection_confirmed": true,
+          "actor": "brian",
+          "origin": "human",
+          "created_at": "2026-10-03T14:17:54.304302+00:00",
+          "voice_id": "voice_6ddd6ad199381ea02cf158bf",
+          "voice_version": "96f68f6e88a709f4353f38fd2d09bbe8",
+          "take_id": "510a1b219e6d4a65"
+        },
+        "rating_events": [],
+        "favorite": true,
+        "historical_record_human_review": "pending",
+        "source_decision_pointer": "project.json#/voice_lab/casting/events/e72ac102-8dbe-4ee0-ac30-45fe0b3ed972"
+      },
+      "frozen_acquisition_flags": {},
+      "acquisition": {},
+      "assets": {
+        "sample": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_9f1a6d7f681d60ccf9257fad/8155939e2541cbde20fde162/sample-1914064ecb6e8e94c3e4598a6bc0fb93b6e9ab439d878138b619ac1a30d46d6e.wav",
+          "sha256": "1914064ecb6e8e94c3e4598a6bc0fb93b6e9ab439d878138b619ac1a30d46d6e",
+          "bytes": 1109804,
+          "preserved_copy": "generic/assets/voice_lab/vl_9f1a6d7f681d60ccf9257fad/8155939e2541cbde20fde162/sample-1914064ecb6e8e94c3e4598a6bc0fb93b6e9ab439d878138b619ac1a30d46d6e.wav"
+        },
+        "reference_audio": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_9f1a6d7f681d60ccf9257fad/8155939e2541cbde20fde162/reference_audio-f3977b6d92194838a69af1aa8a81ca7f9a422605c7deb1b613498262b4e3ef39.wav",
+          "sha256": "f3977b6d92194838a69af1aa8a81ca7f9a422605c7deb1b613498262b4e3ef39",
+          "bytes": 284204,
+          "preserved_copy": "generic/assets/voice_lab/vl_9f1a6d7f681d60ccf9257fad/8155939e2541cbde20fde162/reference_audio-f3977b6d92194838a69af1aa8a81ca7f9a422605c7deb1b613498262b4e3ef39.wav"
+        },
+        "prompt_artifact": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_9f1a6d7f681d60ccf9257fad/8155939e2541cbde20fde162/prompt_artifact-be587ecab231eaae08874f63fee11bbe168c35ab84fe00c1b253e2f680c514b7.npz",
+          "sha256": "be587ecab231eaae08874f63fee11bbe168c35ab84fe00c1b253e2f680c514b7",
+          "bytes": 7970,
+          "preserved_copy": "generic/assets/voice_lab/vl_9f1a6d7f681d60ccf9257fad/8155939e2541cbde20fde162/prompt_artifact-be587ecab231eaae08874f63fee11bbe168c35ab84fe00c1b253e2f680c514b7.npz"
+        },
+        "audition_proof": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_9f1a6d7f681d60ccf9257fad/8155939e2541cbde20fde162/audition_proof-2f2779043d1edd22c68962bb83333ac0fd09875a2062eaecee74a151d2a8d6f0.json",
+          "sha256": "2f2779043d1edd22c68962bb83333ac0fd09875a2062eaecee74a151d2a8d6f0",
+          "bytes": 252933,
+          "preserved_copy": "generic/assets/voice_lab/vl_9f1a6d7f681d60ccf9257fad/8155939e2541cbde20fde162/audition_proof-2f2779043d1edd22c68962bb83333ac0fd09875a2062eaecee74a151d2a8d6f0.json"
+        }
+      },
+      "original_source_assets": {},
+      "immutable_global_manifest_sha256": "1c70b366361d08f2b1e695226a9db30a1e00338389db7701b955f358044a6344",
+      "publication": {
+        "newly_registered": true,
+        "portability": {
+          "not_required": "original synthetic reference",
+          "status": "not_required"
+        }
+      }
+    },
+    {
+      "role_id": "snape",
+      "name_preserved": "p254 reference clone - review pending",
+      "library_voice_id": "vl_19807bf67db86f2e7c9d8343",
+      "key": "v_bb9adba3ef1467e9913e0a5c1306",
+      "version": "c2d90cc7e37bb84568a2fa0664deef18",
+      "identity_id": "voice_43667fcb4460f71ba5c2ff76",
+      "source_type": "human_recorded_reference_clone",
+      "synthetic_output": true,
+      "kind": "reference_clone",
+      "identity": {
+        "id": "voice_43667fcb4460f71ba5c2ff76",
+        "role_id": "snape",
+        "status": "LOCKED",
+        "mechanism": "qwen_reference",
+        "dossier_revision": "eligible-reference",
+        "casting_profile_revision": "b1fb5eb17014a9c2d54988bb",
+        "inspiration": null,
+        "design_instruction": "Eligible reference clone; synthetic output.",
+        "reference_audio": "casting/voices/voice_43667fcb4460f71ba5c2ff76/reference.wav",
+        "reference_audio_sha256": "39020682264aba4184645ca8c5780e6dd1f4f98fa344c925e996c3ce2ff172a9",
+        "acoustics": null,
+        "reference_text": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+        "prompt_artifact": "casting/voices/voice_43667fcb4460f71ba5c2ff76/conditioning.npz",
+        "prompt_sha256": "66a2ec913459b9646810c48fa2db85095a2ee5d4d9d714870efe7ceec7c5bdf3",
+        "builtin_speaker": null,
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "generation_settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "provenance": {
+          "origin": "eligible_reference_clone",
+          "actor_audio_used": true,
+          "source": {
+            "acquired_utc": "2026-10-03T12:24:21.407156+00:00",
+            "archive_member": "wav48_silence_trimmed/p254/p254_021_mic1.flac",
+            "attribution": "CSTR, University of Edinburgh; VCTK speaker p254",
+            "audio_observations": [],
+            "checksum_origin": "locally_observed_download_not_publisher_checksum",
+            "duration_seconds": 9.022854166666667,
+            "facts_verified_at": "2026-10-03",
+            "intended_use_evidence_scope": "Publisher documented TTS purpose; no inferred personal consent or celebrity identity",
+            "language": "en",
+            "license": "CC BY 4.0",
+            "license_url": "https://creativecommons.org/licenses/by/4.0/",
+            "media_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/535f4286-e54c-4038-838c-a02285e32cb2/content",
+            "mime": "audio/flac",
+            "original_path": null,
+            "performer": "p254",
+            "preprocessing": [],
+            "provider": "reviewed_dataset_recording",
+            "recording_date": null,
+            "recording_license_evidence": "Publisher explicitly describes voice cloning and speaker-adaptive TTS; separate from claiming performer consent",
+            "requires_cached_original": true,
+            "requires_narration_delivery_review": true,
+            "reviewed_original_sha256": "81f928ae9f300206f4cb309db0c77805a6519d6330dc84386bad802b5376e249",
+            "rights_scope": "Exact publisher recording only; local source-bound voice-use decision and human delivery review remain separate",
+            "size_bytes": 434328,
+            "source_id": "cstr-vctk-p254_021_mic1",
+            "source_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+            "source_revision": "VCTK-0.92",
+            "terms_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/956a1688-0b59-428c-8a2f-10837433dde3/content"
+          },
+          "eligibility": {
+            "acquisition_eligible": true,
+            "clone_ready": false,
+            "download_eligible": true,
+            "hold_reasons": [],
+            "intended_use": "private_synthetic_voice",
+            "intended_use_eligible": true,
+            "intended_use_evidence": {
+              "authority": "voice_license",
+              "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+              "evidence_ref": "https://datashare.ed.ac.uk/handle/10283/3443; publisher Voice Cloning Toolkit/speaker-adaptive TTS purpose; README sha256 ba814954324641403096c224e20061f80819d50dcde6b98dd253dc8c21395d44; CC BY 4.0 license sha256 b34e17103bfb246f2549fc82a279e6ba28834e0cb42f76a92efc14b72e3a3723",
+              "performer_consent_claimed": false,
+              "scope": "private unapproved audition experiment; no sharing or public use",
+              "source_id": "cstr-vctk-p254_021_mic1",
+              "status": "approved",
+              "use": "private_synthetic_voice"
+            },
+            "technical_review": "not_analyzed"
+          },
+          "acquisition_id": "eb3062c7d9f3e8b978a79c3e31cfc4e9",
+          "acquisition_sha256": "b1fb5eb17014a9c2d54988bb8107b12e40ac0c52efead8aaccc67f0daf124fdd",
+          "preprocessing": [
+            {
+              "end_frame": 422880,
+              "operation": "contiguous_crop",
+              "start_frame": 18720
+            },
+            {
+              "operation": "lossless_float_wav",
+              "sample_rate": 48000
+            }
+          ],
+          "technical_qa": {
+            "clipping_fraction": 0.0,
+            "holds": [],
+            "peak": 0.5885009765625,
+            "silent_fraction": 0.04356937846397466,
+            "status": "pass"
+          },
+          "audition_draft_policy": {
+            "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+            "draft_id": "d6d4db8d388dfb91fd82706b53395451",
+            "evidence_sha256": "a690014f78cade9032efeac5b2fa38f5b96c574e4298e0707e215b9a30a07012",
+            "human_verified": false,
+            "production_approved": false,
+            "schema": "recorded-audition-draft-v1",
+            "selection_requires_human_casting": true,
+            "source_delivery_fit": "unknown"
+          },
+          "human_fit": "unknown",
+          "production_approved": false,
+          "created_at": "2026-10-03T14:33:09.845012+00:00"
+        },
+        "created_at": "2026-10-03T14:33:10.018785Z"
+      },
+      "generation": {
+        "requested_execution_profile": "faster-base-032",
+        "backend": "qwen3tts",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_revision": "4089876d4a5d9966571d7c354925b64a6656eb2ab02631823fe15b94b2c67408",
+        "runtime_version": "0.1.1",
+        "settings": {
+          "render": {
+            "inference_policy_revision": "qwen-base-sampled-v1",
+            "do_sample": true,
+            "subtalker_dosample": true,
+            "temperature": 0.9,
+            "top_k": 50,
+            "top_p": 1.0,
+            "repetition_penalty": 1.05,
+            "subtalker_top_k": 50,
+            "subtalker_top_p": 1.0,
+            "subtalker_temperature": 0.9,
+            "seed_rule": "sha256(identity_id + text) first 8 hex digits",
+            "non_streaming_mode": true,
+            "token_budget": "max(128, ceil((word_count * 0.7 + 4) * 12.5)), capped at 2048"
+          }
+        },
+        "sample_duration_seconds": 39.760083333333334
+      },
+      "approval": {
+        "approved": true,
+        "decision": "explicit_selection",
+        "rating": null,
+        "selection_event": {
+          "event_id": "ffa0a97e-b500-4a7b-b9a9-ce77a6a8e168",
+          "role_id": "snape",
+          "candidate_id": "candidate_b00c8e708c1c8f0fefbf63ff",
+          "round_revision": 5,
+          "assignment_revision": 0,
+          "key": "v_bb9adba3ef1467e9913e0a5c1306",
+          "audio_sha256": "d56cd909f03816d6374399f0b62e6293d119c2cfe3bd6012f4d491cf6c26e764",
+          "action": "use",
+          "selection_confirmed": true,
+          "actor": "brian",
+          "origin": "human",
+          "created_at": "2026-10-03T15:06:53.831978+00:00",
+          "voice_id": "voice_43667fcb4460f71ba5c2ff76",
+          "voice_version": "c2d90cc7e37bb84568a2fa0664deef18",
+          "take_id": "9c7b5a06fb7a4986"
+        },
+        "rating_events": [],
+        "favorite": false,
+        "historical_record_human_review": "pending",
+        "source_decision_pointer": "project.json#/voice_lab/casting/events/ffa0a97e-b500-4a7b-b9a9-ce77a6a8e168"
+      },
+      "frozen_acquisition_flags": {
+        "clone_ready": true,
+        "production_approved": false,
+        "audition_draft_ready": true,
+        "source_fit_review_required": true,
+        "readiness_holds": [],
+        "narration_delivery_fit": {
+          "audio_assessment": null,
+          "context_flags": [],
+          "delivery_decision": "review",
+          "duration_seconds": 8.42,
+          "end_seconds": 8.81,
+          "evidence_strength": "delivery_unknown",
+          "identity_claim": null,
+          "input_pcm_sha256": "0aef280f81c3d85dd3f8ac9d992227c36ff60663955a64484cba1b2af4cd90ae",
+          "metrics": {
+            "clipped_fraction": 0.0,
+            "limitations": "Energy/dynamics are weak gain/EQ/compression/content-confounded proxies; no yelling, overlap, age, accent, or identity inference.",
+            "missing": [
+              "reliable_pitch",
+              "aligned_speech_rate",
+              "calibrated_semantic_delivery_detector"
+            ],
+            "normalized_intensity_range_db_p95_p10": 27.45174270412645,
+            "pitch_hz": null,
+            "raw_peak": 0.5885009765625,
+            "raw_rms": 0.07137335160838595,
+            "relative_energy_active_fraction": 0.8147268408551069,
+            "relative_energy_pause_seconds": [
+              0.04,
+              0.04,
+              0.04,
+              0.02,
+              0.06,
+              0.02,
+              0.08,
+              0.16,
+              0.12,
+              0.02,
+              0.04,
+              0.06,
+              0.02,
+              0.02,
+              0.02,
+              0.06,
+              0.04,
+              0.06,
+              0.02,
+              0.04,
+              0.02
+            ],
+            "relative_energy_phrase_seconds": [
+              0.14,
+              1.16,
+              0.26,
+              0.58,
+              0.22,
+              0.88,
+              0.22,
+              0.12,
+              0.34,
+              0.14,
+              0.08,
+              0.26,
+              0.44,
+              0.06,
+              0.42,
+              0.66,
+              0.1,
+              0.18,
+              0.22,
+              0.02,
+              0.32,
+              0.04
+            ],
+            "semantic_shouting_probability": null,
+            "speech_rate_wpm": null
+          },
+          "outcome": "no_suitable_reference",
+          "pipeline_source_sha256": "63038dad48da7ff3e87f34dae26fbfc1804663932b09cb648524b6e309082ffc",
+          "production_approved": false,
+          "reason_codes": [
+            "INSUFFICIENT_AUDIO_DELIVERY_EVIDENCE"
+          ],
+          "sample_rate": 48000,
+          "schema": "narration-delivery-fit-v1",
+          "score": null,
+          "selected_reference": false,
+          "source": {
+            "context": null,
+            "source_id": "cstr-vctk-p254_021_mic1",
+            "source_label": null,
+            "source_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+            "title": null
+          },
+          "start_seconds": 0.39000000000000135,
+          "target_profile": "sustained_conversational_storytelling",
+          "technical_decision": "pass",
+          "transcript_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2"
+        },
+        "audition_draft_policy": {
+          "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+          "draft_id": "d6d4db8d388dfb91fd82706b53395451",
+          "evidence_sha256": "a690014f78cade9032efeac5b2fa38f5b96c574e4298e0707e215b9a30a07012",
+          "human_verified": false,
+          "production_approved": false,
+          "schema": "recorded-audition-draft-v1",
+          "selection_requires_human_casting": true,
+          "source_delivery_fit": "unknown"
+        }
+      },
+      "acquisition": {
+        "schema": "voice-lab-acquisition-v1",
+        "acquisition_id": "eb3062c7d9f3e8b978a79c3e31cfc4e9",
+        "retrieved_at": "2026-10-03T13:58:59.198825+00:00",
+        "source": {
+          "acquired_utc": "2026-10-03T12:24:21.407156+00:00",
+          "archive_member": "wav48_silence_trimmed/p254/p254_021_mic1.flac",
+          "attribution": "CSTR, University of Edinburgh; VCTK speaker p254",
+          "audio_observations": [],
+          "checksum_origin": "locally_observed_download_not_publisher_checksum",
+          "duration_seconds": 9.022854166666667,
+          "facts_verified_at": "2026-10-03",
+          "intended_use_evidence_scope": "Publisher documented TTS purpose; no inferred personal consent or celebrity identity",
+          "language": "en",
+          "license": "CC BY 4.0",
+          "license_url": "https://creativecommons.org/licenses/by/4.0/",
+          "media_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/535f4286-e54c-4038-838c-a02285e32cb2/content",
+          "mime": "audio/flac",
+          "original_path": null,
+          "performer": "p254",
+          "preprocessing": [],
+          "provider": "reviewed_dataset_recording",
+          "recording_date": null,
+          "recording_license_evidence": "Publisher explicitly describes voice cloning and speaker-adaptive TTS; separate from claiming performer consent",
+          "requires_cached_original": true,
+          "requires_narration_delivery_review": true,
+          "reviewed_original_sha256": "81f928ae9f300206f4cb309db0c77805a6519d6330dc84386bad802b5376e249",
+          "rights_scope": "Exact publisher recording only; local source-bound voice-use decision and human delivery review remain separate",
+          "size_bytes": 434328,
+          "source_id": "cstr-vctk-p254_021_mic1",
+          "source_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+          "source_revision": "VCTK-0.92",
+          "terms_url": "https://datashare.ed.ac.uk/server/api/core/bitstreams/956a1688-0b59-428c-8a2f-10837433dde3/content"
+        },
+        "eligibility": {
+          "acquisition_eligible": true,
+          "clone_ready": false,
+          "download_eligible": true,
+          "hold_reasons": [],
+          "intended_use": "private_synthetic_voice",
+          "intended_use_eligible": true,
+          "intended_use_evidence": {
+            "authority": "voice_license",
+            "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+            "evidence_ref": "https://datashare.ed.ac.uk/handle/10283/3443; publisher Voice Cloning Toolkit/speaker-adaptive TTS purpose; README sha256 ba814954324641403096c224e20061f80819d50dcde6b98dd253dc8c21395d44; CC BY 4.0 license sha256 b34e17103bfb246f2549fc82a279e6ba28834e0cb42f76a92efc14b72e3a3723",
+            "performer_consent_claimed": false,
+            "scope": "private unapproved audition experiment; no sharing or public use",
+            "source_id": "cstr-vctk-p254_021_mic1",
+            "status": "approved",
+            "use": "private_synthetic_voice"
+          },
+          "technical_review": "not_analyzed"
+        },
+        "technical_qa": {
+          "clipping_fraction": 0.0,
+          "holds": [],
+          "peak": 0.5885009765625,
+          "silent_fraction": 0.04356937846397466,
+          "status": "pass"
+        },
+        "audio_review": {
+          "end_seconds": 8.81,
+          "evidence_ref": "prior_private_evidence:recorded-reference-2026-10-03/recorded_draft_evidence.json#d6d4db8d388dfb91fd82706b53395451",
+          "heavy_music": false,
+          "human_verified": false,
+          "method": "local_tools",
+          "original_sha256": "81f928ae9f300206f4cb309db0c77805a6519d6330dc84386bad802b5376e249",
+          "overlapping_speech": false,
+          "single_speaker": true,
+          "source_id": "cstr-vctk-p254_021_mic1",
+          "start_seconds": 0.39000000000000135,
+          "transcript_aligned": true,
+          "transcript_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+          "unsuitable_noise": false
+        },
+        "reference_text": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+        "transcript_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+        "start_seconds": 0.39000000000000135,
+        "end_seconds": 8.81,
+        "sample_rate": 48000,
+        "preprocessing": [
+          {
+            "end_frame": 422880,
+            "operation": "contiguous_crop",
+            "start_frame": 18720
+          },
+          {
+            "operation": "lossless_float_wav",
+            "sample_rate": 48000
+          }
+        ]
+      },
+      "assets": {
+        "sample": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_19807bf67db86f2e7c9d8343/55563b470e0d82a659af08d9/sample-d56cd909f03816d6374399f0b62e6293d119c2cfe3bd6012f4d491cf6c26e764.wav",
+          "sha256": "d56cd909f03816d6374399f0b62e6293d119c2cfe3bd6012f4d491cf6c26e764",
+          "bytes": 1908528,
+          "preserved_copy": "generic/assets/voice_lab/vl_19807bf67db86f2e7c9d8343/55563b470e0d82a659af08d9/sample-d56cd909f03816d6374399f0b62e6293d119c2cfe3bd6012f4d491cf6c26e764.wav"
+        },
+        "reference_audio": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_19807bf67db86f2e7c9d8343/55563b470e0d82a659af08d9/reference_audio-39020682264aba4184645ca8c5780e6dd1f4f98fa344c925e996c3ce2ff172a9.wav",
+          "sha256": "39020682264aba4184645ca8c5780e6dd1f4f98fa344c925e996c3ce2ff172a9",
+          "bytes": 1616720,
+          "preserved_copy": "generic/assets/voice_lab/vl_19807bf67db86f2e7c9d8343/55563b470e0d82a659af08d9/reference_audio-39020682264aba4184645ca8c5780e6dd1f4f98fa344c925e996c3ce2ff172a9.wav"
+        },
+        "prompt_artifact": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_19807bf67db86f2e7c9d8343/55563b470e0d82a659af08d9/prompt_artifact-66a2ec913459b9646810c48fa2db85095a2ee5d4d9d714870efe7ceec7c5bdf3.npz",
+          "sha256": "66a2ec913459b9646810c48fa2db85095a2ee5d4d9d714870efe7ceec7c5bdf3",
+          "bytes": 9342,
+          "preserved_copy": "generic/assets/voice_lab/vl_19807bf67db86f2e7c9d8343/55563b470e0d82a659af08d9/prompt_artifact-66a2ec913459b9646810c48fa2db85095a2ee5d4d9d714870efe7ceec7c5bdf3.npz"
+        },
+        "audition_proof": {
+          "store": "generic_shelf",
+          "path": "voice_lab/vl_19807bf67db86f2e7c9d8343/55563b470e0d82a659af08d9/audition_proof-a4074f021524d48d93b2c0f1be6cc2bb599df54cb11e808e1db5bca95ef728ed.json",
+          "sha256": "a4074f021524d48d93b2c0f1be6cc2bb599df54cb11e808e1db5bca95ef728ed",
+          "bytes": 358803,
+          "preserved_copy": "generic/assets/voice_lab/vl_19807bf67db86f2e7c9d8343/55563b470e0d82a659af08d9/audition_proof-a4074f021524d48d93b2c0f1be6cc2bb599df54cb11e808e1db5bca95ef728ed.json"
+        }
+      },
+      "original_source_assets": {
+        "acquisition_receipt": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/eb3062c7d9f3e8b978a79c3e31cfc4e9/acquisition.json",
+          "sha256": "b1fb5eb17014a9c2d54988bb8107b12e40ac0c52efead8aaccc67f0daf124fdd",
+          "bytes": 6369,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/eb3062c7d9f3e8b978a79c3e31cfc4e9/acquisition.json"
+        },
+        "original_recording": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/downloads/21ce69bcf63f1b4e06ead1513dd60d3166f8ae289056cf08fb13c8412d689b55.audio",
+          "sha256": "81f928ae9f300206f4cb309db0c77805a6519d6330dc84386bad802b5376e249",
+          "bytes": 434328,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/downloads/21ce69bcf63f1b4e06ead1513dd60d3166f8ae289056cf08fb13c8412d689b55.audio"
+        },
+        "acquired_reference": {
+          "store": "source_project",
+          "path": "voice_lab/discovery/acquisitions/eb3062c7d9f3e8b978a79c3e31cfc4e9/reference.wav",
+          "sha256": "39020682264aba4184645ca8c5780e6dd1f4f98fa344c925e996c3ce2ff172a9",
+          "bytes": 1616720,
+          "preserved_copy": "selected-source-assets/voice_lab/discovery/acquisitions/eb3062c7d9f3e8b978a79c3e31cfc4e9/reference.wav"
+        }
+      },
+      "immutable_global_manifest_sha256": "269c642a649f1301f984f1860ebe65728bd540f9e340a78b9f35106c2f3dbef8",
+      "publication": {
+        "newly_registered": true,
+        "portability": {
+          "blocked": "reference narration delivery evidence failed exact audio replay",
+          "source_store_dependency": true,
+          "status": "guarded_hold"
+        }
+      }
+    }
+  ],
+  "global_rated_keepers_separate": [
+    {
+      "library_voice_id": "vl_83c3b467b842583401bb3979",
+      "name": "Rowan 00cbcf",
+      "version": "00cbcfc8e239e00c88d1276a97a9a4b8",
+      "identity_id": "voice_ac31cd8d11795fc5958e43e3",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "07f64cdd-f265-414f-a95f-42238b0e4bef",
+          "project_id": "ba9786ea",
+          "role_id": "role_663ee49c71db",
+          "rating": 4,
+          "key": "v_ec7e678323eb7c6669e69e6b3bb9",
+          "audio_sha256": "91c4eb77ed35cda64be89c154bebba8bfba6c212062c5d6c4f3fe318ae1367ab",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:34:45.316927+00:00"
+        },
+        {
+          "event_id": "a1110eea-695f-46a4-97ab-c503d03e042d",
+          "project_id": "ba9786ea",
+          "role_id": "role_663ee49c71db",
+          "rating": 4,
+          "key": "v_ec7e678323eb7c6669e69e6b3bb9",
+          "audio_sha256": "91c4eb77ed35cda64be89c154bebba8bfba6c212062c5d6c4f3fe318ae1367ab",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:36:03.846760+00:00"
+        },
+        {
+          "event_id": "ade26d34-dd57-437f-b8af-648e28fed540",
+          "project_id": "ba9786ea",
+          "role_id": "role_663ee49c71db",
+          "rating": 5,
+          "key": "v_f05d12c86d55cb34f9faa65862e0",
+          "audio_sha256": "91c4eb77ed35cda64be89c154bebba8bfba6c212062c5d6c4f3fe318ae1367ab",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T17:48:52.042693+00:00"
+        },
+        {
+          "event_id": "dba889eb-4b08-4d72-b909-26b4563fb863",
+          "project_id": "ba9786ea",
+          "role_id": "role_663ee49c71db",
+          "rating": 5,
+          "key": "v_f05d12c86d55cb34f9faa65862e0",
+          "audio_sha256": "91c4eb77ed35cda64be89c154bebba8bfba6c212062c5d6c4f3fe318ae1367ab",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T17:46:39.098864+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "82211481751ee75b3af72e500c36466ea0a55ee4e404c9ee61d93c9e533fd59e"
+    },
+    {
+      "library_voice_id": "vl_d33fe2dd9a286a3ffc8f8b10",
+      "name": "Rowan 47ceb3",
+      "version": "47ceb3fa92317086081a73daa3379e98",
+      "identity_id": "voice_121124f62ba847f09072daeb",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "07fa55f6-982d-4fdd-b5c3-c8950e7abea0",
+          "project_id": "ba9786ea",
+          "role_id": "role_3b679bd55608",
+          "rating": 5,
+          "key": "v_d02f807b47ec899e3d78aaabac73",
+          "audio_sha256": "108210f336e6a1baf9ff959e99d3eeca5a5bec7cd561cc8077208a6f28eb6167",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:47:22.417408+00:00"
+        },
+        {
+          "event_id": "28ddf983-b980-4b62-a195-252b741551df",
+          "project_id": "ba9786ea",
+          "role_id": "role_3b679bd55608",
+          "rating": 5,
+          "key": "v_d02f807b47ec899e3d78aaabac73",
+          "audio_sha256": "108210f336e6a1baf9ff959e99d3eeca5a5bec7cd561cc8077208a6f28eb6167",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:43:51.604606+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "6960f8c53de45a738adee519c70a9945b7cce405919e3ade6357a1289c6a2fbf"
+    },
+    {
+      "library_voice_id": "vl_db8b63d7d54999b5ce828003",
+      "name": "Rowan 98f5a0",
+      "version": "98f5a050489f535eaf3e908f6388b725",
+      "identity_id": "voice_4c82dab92aad4f37fc186ed4",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "0883171d-b95e-4ef0-9ea5-227819a6eb10",
+          "project_id": "ba9786ea",
+          "role_id": "role_53057c194f24",
+          "rating": 4,
+          "key": "v_0c2bd3f03bbf03807677cdaf2a14",
+          "audio_sha256": "2c8b5108173167d68874421ba65a79acc97c10fb94c7e8649895c37b6c367a5f",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:12:26.177414+00:00"
+        },
+        {
+          "event_id": "87fe3538-52df-498c-b527-27d1844244bf",
+          "project_id": "ba9786ea",
+          "role_id": "role_53057c194f24",
+          "rating": 4,
+          "key": "v_0c2bd3f03bbf03807677cdaf2a14",
+          "audio_sha256": "2c8b5108173167d68874421ba65a79acc97c10fb94c7e8649895c37b6c367a5f",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:12:05.904467+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "ad79a4bb47020ca348dd2d6ea1e705b1f7143fac71ead38524460efdb16de987"
+    },
+    {
+      "library_voice_id": "vl_71653b7bdeab1979b5a6c9a9",
+      "name": "Rowan 6cb98c",
+      "version": "6cb98c5d190fd774ae8da548de03ef01",
+      "identity_id": "voice_2f98645a64536f047f0cec9a",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "09dd6acd-2fc4-4e4a-98ab-022dae7cccb1",
+          "project_id": "ba9786ea",
+          "role_id": "role_349ba6e0fdd9",
+          "rating": 4,
+          "key": "v_cf2aa373580015ef7103e3ca0aab",
+          "audio_sha256": "8b61f406534d3b8440155b9070e38aa20dcc35b5f7ab3dfcdfd45df7031910e7",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:45:23.105326+00:00"
+        },
+        {
+          "event_id": "cf5a7d90-9d8c-488d-a1cc-36a7e1e9df43",
+          "project_id": "ba9786ea",
+          "role_id": "role_349ba6e0fdd9",
+          "rating": 4,
+          "key": "v_cf2aa373580015ef7103e3ca0aab",
+          "audio_sha256": "8b61f406534d3b8440155b9070e38aa20dcc35b5f7ab3dfcdfd45df7031910e7",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:45:50.684179+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "3711eb15a4a2f479c86951ac35907f172f5564fc52bc800a9556dd5fe5fb3d50"
+    },
+    {
+      "library_voice_id": "vl_6a1e81bc32291aa98dbde692",
+      "name": "Rowan 0d68ed",
+      "version": "0d68ed674dac3948631a2308e34f7fe3",
+      "identity_id": "voice_bac4960ebf4b31d521a9be90",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "1e137a87-2554-4e47-940c-737fe1a76cb4",
+          "project_id": "ba9786ea",
+          "role_id": "role_9fe45093103d",
+          "rating": 5,
+          "key": "v_fe2bc5ea234ba0854cf3d7f4ed7f",
+          "audio_sha256": "71834d53f54e82e88e9cb35caf6915657263b23a3eea8c05af718476d5804f56",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:16:23.979715+00:00"
+        },
+        {
+          "event_id": "600c728f-4e06-40e4-a3c0-ef4328f5eaeb",
+          "project_id": "ba9786ea",
+          "role_id": "role_9fe45093103d",
+          "rating": 4,
+          "key": "v_63f4955b1345443d8b00eb935d39",
+          "audio_sha256": "71834d53f54e82e88e9cb35caf6915657263b23a3eea8c05af718476d5804f56",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:47:06.545343+00:00"
+        },
+        {
+          "event_id": "9db9137b-e13e-497c-b1e2-25320e238b2d",
+          "project_id": "ba9786ea",
+          "role_id": "role_9fe45093103d",
+          "rating": 4,
+          "key": "v_63f4955b1345443d8b00eb935d39",
+          "audio_sha256": "71834d53f54e82e88e9cb35caf6915657263b23a3eea8c05af718476d5804f56",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:46:38.985430+00:00"
+        },
+        {
+          "event_id": "b21ca5ba-5121-4739-b4e0-5d444f176f82",
+          "project_id": "ba9786ea",
+          "role_id": "role_9fe45093103d",
+          "rating": 5,
+          "key": "v_fe2bc5ea234ba0854cf3d7f4ed7f",
+          "audio_sha256": "71834d53f54e82e88e9cb35caf6915657263b23a3eea8c05af718476d5804f56",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:16:19.268128+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "9c04c01666b9101702214ea0ffc082c78f17b0f37940a4b6d3f530f65a1ff62f"
+    },
+    {
+      "library_voice_id": "vl_b2c74d36de5b651a93c099f9",
+      "name": "Rowan 4d9ee7",
+      "version": "4d9ee706057e9694e3bb0ea7e2a87f0f",
+      "identity_id": "voice_85eef19dd6fa68e17b2de970",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "1eae4d0d-e664-4c91-8945-3c24a05e0228",
+          "project_id": "ba9786ea",
+          "role_id": "role_d27c257c8ee2",
+          "rating": 5,
+          "key": "v_80a32138506185ffb9fc2622a28f",
+          "audio_sha256": "f02972e5e81136f685e94fe197a38a0b819c7de7d3c85fa5969d51414fac7693",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:15:28.948659+00:00"
+        },
+        {
+          "event_id": "344f336c-5af2-4d0a-ae4a-14a5e8f76123",
+          "project_id": "ba9786ea",
+          "role_id": "role_d27c257c8ee2",
+          "rating": 5,
+          "key": "v_80a32138506185ffb9fc2622a28f",
+          "audio_sha256": "f02972e5e81136f685e94fe197a38a0b819c7de7d3c85fa5969d51414fac7693",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:15:23.618639+00:00"
+        },
+        {
+          "event_id": "659f6121-d419-42c5-a871-9132b11db330",
+          "project_id": "ba9786ea",
+          "role_id": "role_d27c257c8ee2",
+          "rating": 5,
+          "key": "v_a48179bb6e919df8e7d0f6d54492",
+          "audio_sha256": "f02972e5e81136f685e94fe197a38a0b819c7de7d3c85fa5969d51414fac7693",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:38:21.604421+00:00"
+        },
+        {
+          "event_id": "7a53a4bc-a3ae-46a6-9e5a-3403185683c6",
+          "project_id": "ba9786ea",
+          "role_id": "role_d27c257c8ee2",
+          "rating": 5,
+          "key": "v_a48179bb6e919df8e7d0f6d54492",
+          "audio_sha256": "f02972e5e81136f685e94fe197a38a0b819c7de7d3c85fa5969d51414fac7693",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:38:26.053257+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "57779a0fedfc33e1d672ece444bbbd8d7bcf073476e39705cf520b314996d064"
+    },
+    {
+      "library_voice_id": "vl_b4724547f799a9f775345ff8",
+      "name": "Rowan c25c1d",
+      "version": "c25c1d743c35498669f7cef23f385be8",
+      "identity_id": "voice_1ce09416ddfea55fe0efecf6",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "265782b8-fa5d-40eb-9cc4-8d74f7a58896",
+          "project_id": "ba9786ea",
+          "role_id": "role_663ee49c71db",
+          "rating": 4,
+          "key": "v_6a25cdbb81763da78d87dc961c44",
+          "audio_sha256": "24bae8d0c6da293422fa0066adec3e20300782e29c6fa54c4279a32348b5016d",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:35:50.207483+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "4959f80288493e329570c253991a84070ee4d752cb15535dc9a13cc14d6f2ece"
+    },
+    {
+      "library_voice_id": "vl_feed98a2dd7e3b828f519a10",
+      "name": "Rowan 776406",
+      "version": "7764063bb162dd151438a101865ebac2",
+      "identity_id": "voice_a06c5c86196342483002fc69",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "2802adae-0f3a-46fa-aff3-32bf682ea2e7",
+          "project_id": "ba9786ea",
+          "role_id": "role_a24680d35f68",
+          "rating": 4,
+          "key": "v_55d19ab2d7a4545d9f8227bb60f4",
+          "audio_sha256": "ea7bf394379418fd2d6a12494f83763aa88d135986fdcca91c50a860eeaa4aad",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:42:22.731227+00:00"
+        },
+        {
+          "event_id": "3e7bab29-0c92-48de-890b-3533c48f761a",
+          "project_id": "ba9786ea",
+          "role_id": "role_a24680d35f68",
+          "rating": 4,
+          "key": "v_55d19ab2d7a4545d9f8227bb60f4",
+          "audio_sha256": "ea7bf394379418fd2d6a12494f83763aa88d135986fdcca91c50a860eeaa4aad",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:42:26.677429+00:00"
+        },
+        {
+          "event_id": "67b4e9e6-e5a1-43e0-8cad-d15b4f7316fb",
+          "project_id": "ba9786ea",
+          "role_id": "role_a24680d35f68",
+          "rating": 4,
+          "key": "v_da609df7aa450379a4e584d8f162",
+          "audio_sha256": "ea7bf394379418fd2d6a12494f83763aa88d135986fdcca91c50a860eeaa4aad",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:14:34.856233+00:00"
+        },
+        {
+          "event_id": "d824dfdd-2a6d-4e70-9bdd-cb9c85f19cbb",
+          "project_id": "ba9786ea",
+          "role_id": "role_a24680d35f68",
+          "rating": 4,
+          "key": "v_da609df7aa450379a4e584d8f162",
+          "audio_sha256": "ea7bf394379418fd2d6a12494f83763aa88d135986fdcca91c50a860eeaa4aad",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:14:29.008428+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "20230266164dc44bc592630ad5ae4ce22f827164e1357ede0f10d03f9835a6d2"
+    },
+    {
+      "library_voice_id": "vl_e40a60a9a7350cc32f2784b9",
+      "name": "Rowan 3baed7",
+      "version": "3baed73c5d4ff4f68a9bfd6fac5dbf79",
+      "identity_id": "voice_0858fbc8a46e7b5f1c5bac69",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "2e194f22-1d46-4f81-bbd6-e1bc72e5c4a3",
+          "project_id": "ba9786ea",
+          "role_id": "role_c2766dd3dab9",
+          "rating": 4,
+          "key": "v_7642e0b8b425205e9fbef2d3551a",
+          "audio_sha256": "87cbbc03203e28bf720a318b436a19b4ceaca27594618a2d8b05495dd513ae56",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:44:46.369590+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "5e5a4255d4db6238c1c4edadee5fda54eb729ac50a61f75664ee343efd23ee32"
+    },
+    {
+      "library_voice_id": "vl_a3659cbafef7aa63106d730f",
+      "name": "Rowan 620f75",
+      "version": "620f75f279b517d8eda4f21587af48f3",
+      "identity_id": "voice_64a87b835e15fac101eb37c8",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "2e8b687a-cda4-4fc4-9a2f-a92b0bba7798",
+          "project_id": "ba9786ea",
+          "role_id": "role_7c0ecf16ed71",
+          "rating": 4,
+          "key": "v_42bacb0bbeb2fc392f5ea66f415f",
+          "audio_sha256": "fe88695864432d37e000791316fc76090627f53b5e3fca70e7c76198392b58aa",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:13:45.994250+00:00"
+        },
+        {
+          "event_id": "452d5e7f-f17f-4de1-9166-03d324ccf0b4",
+          "project_id": "ba9786ea",
+          "role_id": "role_7c0ecf16ed71",
+          "rating": 4,
+          "key": "v_42bacb0bbeb2fc392f5ea66f415f",
+          "audio_sha256": "fe88695864432d37e000791316fc76090627f53b5e3fca70e7c76198392b58aa",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:14:03.391336+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "c163f98229e20c0d64b09f0d4fae2752e943733a2dfcf5b2eede3dcf5b5da21f"
+    },
+    {
+      "library_voice_id": "vl_5d0d79ddbd4065713859882a",
+      "name": "Rowan 4f2c47",
+      "version": "4f2c472646dbb070c34167d4f7833243",
+      "identity_id": "voice_0f6d278f1d525407a868d018",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "2ffc6f90-7e93-41cb-af3e-4f103933f195",
+          "project_id": "ba9786ea",
+          "role_id": "role_c7727eca2577",
+          "rating": 4,
+          "key": "v_56dc7739e0797c1bf0e612e057cb",
+          "audio_sha256": "6a4ea70e1eef42d601849fa2af6f4fcc840d726c539a03f27dd526ef4d73489c",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T03:47:50.178774+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "bf1855d06030dcbe19e28c2042ec401d7ca632a0bbbc034acf4cc3ceb9822d45"
+    },
+    {
+      "library_voice_id": "vl_de767bb88e45412c1b788d81",
+      "name": "Rowan 179aac",
+      "version": "179aac3426974e5943c7431572035996",
+      "identity_id": "voice_6592661f36f47ed83e79ad97",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "3d71e0d9-a8b5-402c-b758-5bd3780a167e",
+          "project_id": "ba9786ea",
+          "role_id": "role_349ba6e0fdd9",
+          "rating": 4,
+          "key": "v_fb1486dd95eab76381797988233c",
+          "audio_sha256": "ba0c33fe783930d5f0c568b797c2022cfef95767c6cd2ff39ca0b89322cb0cae",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:45:45.171067+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "0bfdc3f52cfa6dedd25d0e7d1a091a358edf05cf21151a0e3347ca2e68ea5d55"
+    },
+    {
+      "library_voice_id": "vl_df14bb530db8586ea6384edc",
+      "name": "Rowan d1236a",
+      "version": "d1236ab9102c98e826a38afbdb95c003",
+      "identity_id": "voice_c7253f3f86a17a73cf7758fe",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "3dba69c6-5425-46c0-a7aa-4848a0bf1738",
+          "project_id": "ba9786ea",
+          "role_id": "role_7c4dcc973824",
+          "rating": 5,
+          "key": "v_d3f2d5eba64f7678836f000de16e",
+          "audio_sha256": "87d1008c91c24b78c081a7b0473591fc732ba7b447c3bf10f70689b76372756a",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T12:00:24.803082+00:00"
+        },
+        {
+          "event_id": "4712d932-2617-4b58-9fef-e84e27a0d0d7",
+          "project_id": "ba9786ea",
+          "role_id": "role_7c4dcc973824",
+          "rating": 5,
+          "key": "v_d3f2d5eba64f7678836f000de16e",
+          "audio_sha256": "87d1008c91c24b78c081a7b0473591fc732ba7b447c3bf10f70689b76372756a",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T12:00:28.909402+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "fcd958243d63ce226e7f84f52cffe598c4c72934a36812ed17fb4e260b0842f5"
+    },
+    {
+      "library_voice_id": "vl_fefd61b22ccccad8df3e430e",
+      "name": "Rowan 57f2a8",
+      "version": "57f2a8b653328b81480aeb6c7afe32e9",
+      "identity_id": "voice_08c2e474c0a9ea1fbb1e2f10",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "40bd7c5a-f695-4196-b125-408b972c62d3",
+          "project_id": "ba9786ea",
+          "role_id": "role_349ba6e0fdd9",
+          "rating": 4,
+          "key": "v_37b3d6d0461294cc161a065f4ae8",
+          "audio_sha256": "34081ef8c3bdb169b853a97899a01c0134bfae0a1fd6f5f12d3428ad407beff7",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:48:24.221116+00:00"
+        },
+        {
+          "event_id": "aeb4711f-a877-495f-8e73-4cbdf1ed94df",
+          "project_id": "ba9786ea",
+          "role_id": "role_349ba6e0fdd9",
+          "rating": 4,
+          "key": "v_37b3d6d0461294cc161a065f4ae8",
+          "audio_sha256": "34081ef8c3bdb169b853a97899a01c0134bfae0a1fd6f5f12d3428ad407beff7",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:48:21.751929+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "39b6b69dcb461f077a46a0f4a561ac4d73564c9914fa0348b22023ff4349daa4"
+    },
+    {
+      "library_voice_id": "vl_260b2e29804709f1b9136c7b",
+      "name": "Rowan eb4743",
+      "version": "eb4743c048e8c9cdd0225b46dedbb345",
+      "identity_id": "voice_3f8aab056de585f3182481bc",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "4213e38d-182c-4189-8f8a-b21dc900e121",
+          "project_id": "ba9786ea",
+          "role_id": "role_a5adf7d494ff",
+          "rating": 5,
+          "key": "v_ce5a3be67515a2f0951e7cd50ba0",
+          "audio_sha256": "a327212c645b830e5948431a20883b0b8678c448f5fedba9d2b121d45557eeec",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T17:48:33.513427+00:00"
+        },
+        {
+          "event_id": "512306ce-f52d-4fab-b25c-7459b7cb5e1a",
+          "project_id": "ba9786ea",
+          "role_id": "role_a5adf7d494ff",
+          "rating": 4,
+          "key": "v_18cd7907fe8630a70fb1137cf224",
+          "audio_sha256": "a327212c645b830e5948431a20883b0b8678c448f5fedba9d2b121d45557eeec",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:43:31.370060+00:00"
+        },
+        {
+          "event_id": "646cefab-58de-46e1-94ce-e638271df179",
+          "project_id": "ba9786ea",
+          "role_id": "role_a5adf7d494ff",
+          "rating": 5,
+          "key": "v_ce5a3be67515a2f0951e7cd50ba0",
+          "audio_sha256": "a327212c645b830e5948431a20883b0b8678c448f5fedba9d2b121d45557eeec",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T17:48:47.090841+00:00"
+        },
+        {
+          "event_id": "cd878b34-62e2-4592-8379-e5147f0e5795",
+          "project_id": "ba9786ea",
+          "role_id": "role_a5adf7d494ff",
+          "rating": 4,
+          "key": "v_18cd7907fe8630a70fb1137cf224",
+          "audio_sha256": "a327212c645b830e5948431a20883b0b8678c448f5fedba9d2b121d45557eeec",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:43:34.216637+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "f8f4df619af0b8fdef8302ec987d22b44e9d424360a40b2b63e982cfc3bb78e3"
+    },
+    {
+      "library_voice_id": "vl_25f7e97db9d5ab2e90a223b5",
+      "name": "Rowan 9092d8",
+      "version": "9092d89ca9e1c729c4e6b209f70f98eb",
+      "identity_id": "voice_d3b1849336ed043b5150abde",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "43741421-3f3d-4faf-91ea-5033a5fd79c2",
+          "project_id": "ba9786ea",
+          "role_id": "role_167bf032cc07",
+          "rating": 5,
+          "key": "v_235a2ac14895ffb64a832d55f867",
+          "audio_sha256": "db41dd8e22abe3ffa7068baeb96c82502334114682c41e4e6cb435c04c50b5c2",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:17:38.974430+00:00"
+        },
+        {
+          "event_id": "7eba1fe0-e971-4e64-b2ee-d4dd438e21c1",
+          "project_id": "ba9786ea",
+          "role_id": "role_167bf032cc07",
+          "rating": 4,
+          "key": "v_74a4db44eab947aecb4840f38682",
+          "audio_sha256": "db41dd8e22abe3ffa7068baeb96c82502334114682c41e4e6cb435c04c50b5c2",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:46:02.618833+00:00"
+        },
+        {
+          "event_id": "e6b389bb-dc06-4ed9-9834-c78a7fbf7003",
+          "project_id": "ba9786ea",
+          "role_id": "role_167bf032cc07",
+          "rating": 5,
+          "key": "v_235a2ac14895ffb64a832d55f867",
+          "audio_sha256": "db41dd8e22abe3ffa7068baeb96c82502334114682c41e4e6cb435c04c50b5c2",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:17:30.370539+00:00"
+        },
+        {
+          "event_id": "ec611ec2-5a01-4fb7-af36-916f6a4015d4",
+          "project_id": "ba9786ea",
+          "role_id": "role_167bf032cc07",
+          "rating": 4,
+          "key": "v_74a4db44eab947aecb4840f38682",
+          "audio_sha256": "db41dd8e22abe3ffa7068baeb96c82502334114682c41e4e6cb435c04c50b5c2",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:41:19.352976+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "3af556f64b24211d59060eed7b9d1faee1e741d55aab2803050ee6ec2969790a"
+    },
+    {
+      "library_voice_id": "vl_80114e90ee330ada0050e5db",
+      "name": "Rowan 4bf3a3",
+      "version": "4bf3a385443285f895435cfa85c8570b",
+      "identity_id": "voice_74bcd52ccc45cfc53ad9ca40",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "47346049-970d-403c-a396-755df6b4de16",
+          "project_id": "ba9786ea",
+          "role_id": "role_c2766dd3dab9",
+          "rating": 4,
+          "key": "v_6b84f06e00fc93ae24d836217d98",
+          "audio_sha256": "97896057a576f15938d4deceaeea59e951017a6fbf16b3ec844068672f9b0ec1",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:16:53.544204+00:00"
+        },
+        {
+          "event_id": "6b37bdb0-eab1-4e80-be3a-e76c02d9c97b",
+          "project_id": "ba9786ea",
+          "role_id": "role_c2766dd3dab9",
+          "rating": 5,
+          "key": "v_dc3d67140609ef2dccd13f7ea19c",
+          "audio_sha256": "97896057a576f15938d4deceaeea59e951017a6fbf16b3ec844068672f9b0ec1",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:44:50.930340+00:00"
+        },
+        {
+          "event_id": "7419a811-e081-41ce-93eb-8889c12e46f4",
+          "project_id": "ba9786ea",
+          "role_id": "role_c2766dd3dab9",
+          "rating": 4,
+          "key": "v_6b84f06e00fc93ae24d836217d98",
+          "audio_sha256": "97896057a576f15938d4deceaeea59e951017a6fbf16b3ec844068672f9b0ec1",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:17:11.211345+00:00"
+        },
+        {
+          "event_id": "d18c559d-44ff-48ce-846f-9f1690f2668a",
+          "project_id": "ba9786ea",
+          "role_id": "role_c2766dd3dab9",
+          "rating": 5,
+          "key": "v_dc3d67140609ef2dccd13f7ea19c",
+          "audio_sha256": "97896057a576f15938d4deceaeea59e951017a6fbf16b3ec844068672f9b0ec1",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:44:15.121813+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "d91ddd5d5c60ed9e4392695e7f81da3645e6c513dce3502616d831831eaf79ef"
+    },
+    {
+      "library_voice_id": "vl_38550a660afb4213d7a047e8",
+      "name": "Rowan a51a42",
+      "version": "a51a429815ae72175c32496ac830bc3f",
+      "identity_id": "voice_b0ef372d2c382d12ed82a2a4",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "4f61c467-73f6-47be-8e2b-13ebe5cc6219",
+          "project_id": "ba9786ea",
+          "role_id": "role_7c0ecf16ed71",
+          "rating": 4,
+          "key": "v_02543007f1dd11bf276b2abd812a",
+          "audio_sha256": "2892d245c3a553d86c7f8ae674c13b9547aa2a6989682caf196c7c1a2bba85a5",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T03:32:17.440452+00:00"
+        },
+        {
+          "event_id": "712efb08-2b0c-4412-b2d4-109f4e8d9784",
+          "project_id": "ba9786ea",
+          "role_id": "role_7c0ecf16ed71",
+          "rating": 4,
+          "key": "v_02543007f1dd11bf276b2abd812a",
+          "audio_sha256": "2892d245c3a553d86c7f8ae674c13b9547aa2a6989682caf196c7c1a2bba85a5",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:14:15.725943+00:00"
+        },
+        {
+          "event_id": "9166f77f-b0a8-4a93-946d-185bd61b7256",
+          "project_id": "ba9786ea",
+          "role_id": "role_7c0ecf16ed71",
+          "rating": 4,
+          "key": "v_02543007f1dd11bf276b2abd812a",
+          "audio_sha256": "2892d245c3a553d86c7f8ae674c13b9547aa2a6989682caf196c7c1a2bba85a5",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:14:09.811161+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "a6ae2d072d838d8dfd9b713bd97efe673754a7688f3bbb84e7b718ee64809fd4"
+    },
+    {
+      "library_voice_id": "vl_5235a28355dd03a3cb548792",
+      "name": "Rowan 440706",
+      "version": "440706aeaeea2d5d6d1d154a9e7c4a52",
+      "identity_id": "voice_3110e33d86553517f1977b1e",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "5b91aca8-7953-4fcb-8ef1-fcf2e63faff9",
+          "project_id": "ba9786ea",
+          "role_id": "role_663ee49c71db",
+          "rating": 5,
+          "key": "v_842463884333b041c20ee87066da",
+          "audio_sha256": "909199da520988438105a7018379e42a0cf930c7920e66e49711ced0fde76e8e",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:35:15.229663+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "a645de00aa9f80a6ed98de339461bb6cf1599ddb8f23a46c79c22666c33cb0dd"
+    },
+    {
+      "library_voice_id": "vl_087e4f5c40e60ae88b870009",
+      "name": "Rowan 850b78",
+      "version": "850b78afc1f68e116a51c3ab31be744f",
+      "identity_id": "voice_915a52c6cac7e63751c30c24",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "5d747510-0b9b-45ae-a214-4746b814ddef",
+          "project_id": "ba9786ea",
+          "role_id": "role_d6ef65963339",
+          "rating": 4,
+          "key": "v_88a952c46211043c4458320d088b",
+          "audio_sha256": "2d5abe50ede96c146a8a537e6fe97902e2f8c857849b9db9d0f618c663445043",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T12:00:02.148758+00:00"
+        },
+        {
+          "event_id": "c6e3e3b2-6abc-4b6a-8192-6f6b551d41bb",
+          "project_id": "ba9786ea",
+          "role_id": "role_d6ef65963339",
+          "rating": 4,
+          "key": "v_88a952c46211043c4458320d088b",
+          "audio_sha256": "2d5abe50ede96c146a8a537e6fe97902e2f8c857849b9db9d0f618c663445043",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T12:00:04.589660+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "44d7951f62f0b945ee43d2bef88eab670a7e7f8cad43c5651a7d16a0fc8d3394"
+    },
+    {
+      "library_voice_id": "vl_8f52a766defce0378551a2a0",
+      "name": "Rowan 116640",
+      "version": "11664074df3a77dc130d681dcf7d02fb",
+      "identity_id": "voice_f6ac51a55656ffff5f236ea1",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "71d5609b-4469-4b12-8ad2-c4b550561a1f",
+          "project_id": "ba9786ea",
+          "role_id": "role_53057c194f24",
+          "rating": 4,
+          "key": "v_0724cb7d17a7e6837b34e2c0f24f",
+          "audio_sha256": "07ecd94ec90d1fc1cc07e3beac9e10a7f70dc69832a8dce8d162eddba5589a63",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:37:17.511895+00:00"
+        },
+        {
+          "event_id": "c6edc96f-3c96-4761-b6d8-cea755665b3c",
+          "project_id": "ba9786ea",
+          "role_id": "role_53057c194f24",
+          "rating": 4,
+          "key": "v_0724cb7d17a7e6837b34e2c0f24f",
+          "audio_sha256": "07ecd94ec90d1fc1cc07e3beac9e10a7f70dc69832a8dce8d162eddba5589a63",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:37:12.698350+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "6a496196cba7edc552944251d53a5cd12e4d776e692c2ae75b61403a9fe57b51"
+    },
+    {
+      "library_voice_id": "vl_8c9d2e81d8d8b59cbd865b27",
+      "name": "Rowan 5dfd75",
+      "version": "5dfd7568ce280d88e9f01bea74ff34d6",
+      "identity_id": "voice_4e7b4f0b589c53033300e5ba",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "7b500178-2c1e-449a-bc7e-468d1bc32be2",
+          "project_id": "ba9786ea",
+          "role_id": "role_c7727eca2577",
+          "rating": 4,
+          "key": "v_33c7c5938eb61b7377da73949e78",
+          "audio_sha256": "420a0d44c939df92d6a587a0fe3c8d92c18ceece34a5cc267c70b2a128221db4",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:12:55.573366+00:00"
+        },
+        {
+          "event_id": "fda1c19c-f735-4c87-a48a-cb5376818b2f",
+          "project_id": "ba9786ea",
+          "role_id": "role_c7727eca2577",
+          "rating": 4,
+          "key": "v_33c7c5938eb61b7377da73949e78",
+          "audio_sha256": "420a0d44c939df92d6a587a0fe3c8d92c18ceece34a5cc267c70b2a128221db4",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:12:49.467475+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "358221f96ad4dbf5b36a4dbf54317400b5b766c36b59f4697584d715f2d669c0"
+    },
+    {
+      "library_voice_id": "vl_dd087c622e46f7271ed10f59",
+      "name": "Rowan 10aaa8",
+      "version": "10aaa845635dafe7d8fecc29ac814a54",
+      "identity_id": "voice_9df614d7c4bb65299f3afda1",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "7f7309a2-8a37-486d-bdb2-ec256e50c120",
+          "project_id": "ba9786ea",
+          "role_id": "role_036a16874776",
+          "rating": 4,
+          "key": "v_9bf22ba2b8f67dc9d42fdd47fd78",
+          "audio_sha256": "8d79d5b54232d68160fea924422714fc50f60961e97c657cd3d70dcd23780ca5",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:39:44.041220+00:00"
+        },
+        {
+          "event_id": "a8dc004c-7bef-402c-853a-8a4a9d1c6618",
+          "project_id": "ba9786ea",
+          "role_id": "role_036a16874776",
+          "rating": 4,
+          "key": "v_9bf22ba2b8f67dc9d42fdd47fd78",
+          "audio_sha256": "8d79d5b54232d68160fea924422714fc50f60961e97c657cd3d70dcd23780ca5",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T07:39:37.994030+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "99f0cfee141fe12dc49afbc16ecab23b457ceb23047de59b5ab4cc57dee6b874"
+    },
+    {
+      "library_voice_id": "vl_dabd28331bd7bdcf55839008",
+      "name": "Rowan 7d5429",
+      "version": "7d54293409b86d776a2488a8bcd161a0",
+      "identity_id": "voice_1d5864522a118210f6895f96",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "984e2ece-8024-47c3-8175-a63df9172681",
+          "project_id": "ba9786ea",
+          "role_id": "role_349ba6e0fdd9",
+          "rating": 4,
+          "key": "v_8be3295e445eee3aeb8d6f255e5e",
+          "audio_sha256": "3471b35c27edc357eda48736ec57e812485a719e832b764c97635e684504f74e",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:15:55.422755+00:00"
+        },
+        {
+          "event_id": "d1ae50a8-fccd-4a58-8442-8fdee59bd622",
+          "project_id": "ba9786ea",
+          "role_id": "role_349ba6e0fdd9",
+          "rating": 4,
+          "key": "v_8be3295e445eee3aeb8d6f255e5e",
+          "audio_sha256": "3471b35c27edc357eda48736ec57e812485a719e832b764c97635e684504f74e",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:16:00.012079+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "74bac091e17e2d24f18fb87224b3dd3bdfafb2e7150151530e52d3b3031b4d5e"
+    },
+    {
+      "library_voice_id": "vl_d2bbb43360154c6d72bf8678",
+      "name": "Rowan 1b033f",
+      "version": "1b033ff935b872b383c8be2113ef82d9",
+      "identity_id": "voice_e20ab29c8212292d2f817609",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "9f38b35b-a5d1-4797-ba04-c31ee2c79368",
+          "project_id": "ba9786ea",
+          "role_id": "role_a5adf7d494ff",
+          "rating": 4,
+          "key": "v_4f579441225ebdfcd27fe2b7c7de",
+          "audio_sha256": "4a3e6e8c0bd0866cd54d776d27bc66bf56c32feb1f55e7629bab966b0c6ba5b9",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T17:48:38.957799+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "eff03b0a5fb81867e57ee01b3c4061c6880d6986633353fb529a07f08ca1c3c2"
+    },
+    {
+      "library_voice_id": "vl_18e171f54a8d32ffbfa3a0cb",
+      "name": "Rowan da914b",
+      "version": "da914b430d6792e60f816cd8db3b3255",
+      "identity_id": "voice_04b7d79249e7a63c8b4689cc",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "e3295a8a-2820-45c8-ad32-1f5a43d7ce51",
+          "project_id": "ba9786ea",
+          "role_id": "role_d04c8b480123",
+          "rating": 4,
+          "key": "v_b6a2fcaaf56bd3c525307e414e42",
+          "audio_sha256": "9b888885b94563b952cb858224d940a8fb123ad1fa4acf10b2b04fc848dbf20e",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:14:54.143000+00:00"
+        },
+        {
+          "event_id": "f7de8d66-931a-470a-b534-bdf7f2b43253",
+          "project_id": "ba9786ea",
+          "role_id": "role_d04c8b480123",
+          "rating": 4,
+          "key": "v_b6a2fcaaf56bd3c525307e414e42",
+          "audio_sha256": "9b888885b94563b952cb858224d940a8fb123ad1fa4acf10b2b04fc848dbf20e",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-30T11:14:59.683835+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "11978e19a59d63a37099bf085c9cd6c4e8834cf7501c7a8280208ee6c5908b4b"
+    },
+    {
+      "library_voice_id": "vl_d781f81a0b4abdcc41dd749d",
+      "name": "Rowan 772f35",
+      "version": "772f3568718873d00868ca2a48d9c42b",
+      "identity_id": "voice_2f419503b015ad2bf1d5e08f",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "ed431b24-7c44-4d4c-9005-0b29db90bd9f",
+          "project_id": "ba9786ea",
+          "role_id": "role_663ee49c71db",
+          "rating": 4,
+          "key": "v_60b9f028e377480586d39484da2f",
+          "audio_sha256": "e30c9e96d449f6d4a6e9d2d597e9013935468023d534fd1625da151af75480d2",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T17:47:00.396328+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "385eb0d9ce814d2d34eb65a7d1ad4d7ebad86d73ad2c22b2092af49b4f32163c"
+    },
+    {
+      "library_voice_id": "vl_861165267365b60b3cf7c6f6",
+      "name": "Rowan d1c09a",
+      "version": "d1c09a8c1df72341acb4786ac9a7cd86",
+      "identity_id": "voice_7690180e3ab90fbfb46d67ed",
+      "kind": "original_inspired",
+      "origin": "generated_original_voice",
+      "source_project_id": "ba9786ea",
+      "promoted": true,
+      "highest_rating": 4,
+      "signal": 4,
+      "rating_events": [
+        {
+          "event_id": "fe704425-9113-4ac5-9315-8dce5556aed0",
+          "project_id": "ba9786ea",
+          "role_id": "role_663ee49c71db",
+          "rating": 4,
+          "key": "v_cab83c6e5a2d73f7e3359b768f29",
+          "audio_sha256": "6ae8cea9433498482869c554b5473deb623756586e65f90924f43b01dfe5f3d7",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-09-29T17:46:29.870391+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "a0143a4606389a848db6756d3ace0af394f333acc7e0f8b048f0e7ad9c187bf6"
+    },
+    {
+      "library_voice_id": "vl_4f6b9e95f8bf6c15bc5f99f8",
+      "name": "David Attenborough reference clone - review pending",
+      "version": "9b4ade09539db5213e716465b10e9866",
+      "identity_id": "voice_a37dcda4814f13ec41fad2d6",
+      "kind": "reference_clone",
+      "origin": "eligible_reference_clone",
+      "source_project_id": "80b99ad8",
+      "promoted": true,
+      "highest_rating": 5,
+      "signal": 5,
+      "rating_events": [
+        {
+          "event_id": "18e34989-6fa9-42be-a833-fc111b0bf0db",
+          "project_id": "80b99ad8",
+          "role_id": "narrator",
+          "rating": 5,
+          "key": "v_decc8c575172b4692bb99d9f6d53",
+          "audio_sha256": "9a7faae94812326fb1a0b0f85fdb84ba824d28894925a268130b0a8e218dd284",
+          "actor": "brian",
+          "origin": "human",
+          "recorded_at": "2026-10-02T11:54:10.511157+00:00"
+        }
+      ],
+      "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "runtime_version": "0.1.1",
+      "immutable_manifest_sha256": "8574cf7adb8859a939e5fd91bd8c09dc96aee4e430e5ee4c8cf613a1073baab5"
+    }
+  ],
+  "rules": [
+    "Selection, rating and favorite remain separate; only narrator in this accepted set has five stars.",
+    "Five accepted voices use human-recorded references; Dumbledore uses an original synthetic VoiceDesign reference. VCTK dataset speakers are not claimed to be actors.",
+    "Historical names and human_review=pending are retained; explicit approved assignments supply current acceptance evidence.",
+    "Frozen acquisition production/source-fit flags and Hermione processing warnings are preserved independently of candidate selection.",
+    "Immutable generic publication is separate from preferred auto-reuse promotion; no new preferred ratings were invented.",
+    "Guarded portability holds for Harry/Ron/Snape remain fail-closed; recorded assets still exist in both source store and local preservation.",
+    "Full private source project JSON and audiobook chapter text stay outside Git; this manifest carries relative assets, hashes and approval/source evidence only.",
+    "Actual default-profile details and software tests belong in the checkpoint handoff; preserved historical runtime identities must not be rewritten."
+  ],
+  "chapter_status": {
+    "project_id": "1de4bf49",
+    "scope": "chapters 256-258",
+    "selected_takes": 631,
+    "total_segments": 634,
+    "persisted_tier1_qa_passes": 631,
+    "selected_audio_hashes_matched": 631,
+    "unchanged_by_publication": true,
+    "listening_claim": null
+  }
+}

@@ -41,6 +41,7 @@ from dubbing_service.app.models.project import (
     Role,
     Segment,
 )
+from dubbing_service.app.models.enums import RoleType
 from dubbing_service.app.storage.projects import (
     create_project,
     load_project,
@@ -58,6 +59,12 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 RUNNER_MODULE = "dubbing_service.app.audiobook._audiobooker_runner"
 
 ATTRIBUTION_SOURCES = frozenset({"tag", "turn", "nlp", "inline", "user", "unknown"})
+
+
+def _noncharacter_speaker(name: str) -> bool:
+    """Reject known analyzer sentinels and clearly captured dialogue sentences."""
+    return (name.strip().casefold() in {"narrator", "narration", "unknown", "unattributed"}
+            or len(name) > 80 or name.rstrip().endswith((",", "?", "!", "。", "？", "！")))
 
 
 class AdapterError(RuntimeError):
@@ -451,17 +458,47 @@ class AudiobookerAdapter:
         project.metadata["audiobooker_pinned_version"] = PINNED_AUDIOBOOKER_VERSION
         record_pronunciation_suggestions(project, analysis)
 
+        if source_revision_id is None:
+            from .provenance import register_source_revision
+            source_file = Path(analysis.source_path) if analysis.source_path else None
+            payload = (source_file.read_bytes() if source_file and source_file.is_file() else
+                       json.dumps([{ "index": c.index, "title": c.title,
+                                     "utterances": [u.__dict__ for u in c.utterances] }
+                                   for c in analysis.chapters], ensure_ascii=False, sort_keys=True).encode("utf-8"))
+            revision, _ = register_source_revision(
+                project_id, project, uri=analysis.source_path or "inline:analyzed-book",
+                data=payload, kind="file" if source_file and source_file.is_file() else "inline",
+                media_type="application/octet-stream" if source_file else "application/json",
+                title=analysis.title,
+                notes="Original file bytes when available; offsets are analyzer chapter-local; occurrence_index identifies the extracted utterance.",
+            )
+            source_revision_id = revision.id
+
         result = ImportResult(project_id=project_id)
         existing_roles = {role.name: role for role in project.roles}
+        normalized_roles = {role.name.strip().casefold(): role for role in project.roles}
+        from .character_research import _active_aliases
+        for dossier in project.character_cast.dossiers.values():
+            target_role = next((r for r in project.roles if r.id == dossier.role_id), None)
+            if target_role:
+                for alias in _active_aliases(dossier, project.character_cast.policy):
+                    normalized_roles.setdefault(alias.strip().casefold(), target_role)
         role_by_speaker: Dict[str, Role] = {}
         for speaker in _declared_speakers(analysis):
             name = speaker.strip() or "未指定"
-            role = existing_roles.get(name)
+            role = existing_roles.get(name) or normalized_roles.get(name.casefold())
             if role is None:
-                role = Role(id=_role_id(name), name=name)
+                role = Role(id=_role_id(name), name=name,
+                            role_type="narrator" if _noncharacter_speaker(name) else "character")
                 project.roles.append(role)
                 existing_roles[name] = role
+                normalized_roles[name.casefold()] = role
                 result.roles_created += 1
+            if _noncharacter_speaker(name):
+                # These are Audiobooker attribution labels, not people. Keep
+                # their existing role/segment IDs for old projects, but do not
+                # invent a character dossier or cast an unknown speaker.
+                role.role_type = RoleType.NARRATOR
             role_by_speaker[speaker] = role
         narrator_role = _narrator_role(project, existing_roles)
 
@@ -502,6 +539,20 @@ class AudiobookerAdapter:
                     claimed=claimed,
                 )
 
+        from .character_casting import research_and_profile
+        research_and_profile(project, segments)
+        # Restore the identity invariant at the authoritative write: the alias
+        # map now exists, so both stored representations of a speaker can be
+        # collapsed onto one canonical Role.id before the project is committed.
+        from .character_identity import reconcile_identities
+        reconcile_identities(project, segments)
+        unresolved = sum(1 for c in analysis.chapters for u in c.utterances
+                         if u.speaker and _noncharacter_speaker(u.speaker)
+                         and u.speaker.strip().casefold() not in {"narrator", "narration"})
+        if unresolved:
+            reason = f"Unresolved speaker attribution on {unresolved} utterances; review the source attribution before character casting"
+            project.character_cast.review_reasons = [r for r in project.character_cast.review_reasons
+                                                     if not r.startswith("Unresolved speaker attribution on ")] + [reason]
         persistence_module.commit_project_state(
             project_id, project=project, segments=segments
         )
@@ -668,11 +719,17 @@ def _merge_utterance(
     if role is None and not utterance.speaker:
         role = default_role
     source = attribution_source(utterance.attribution_source)
+    # ``Attribution.speaker_id`` is the one identity unit and always holds a
+    # canonical Role.id.  The analyzer's raw label is retained separately as
+    # evidence.  Storing the raw name here made every reader that compares the
+    # two fields see a phantom "attribution conflicts with the assigned
+    # character" error.
     attribution = Attribution(
-        speaker_id=utterance.speaker,
+        speaker_id=role.id if role is not None else None,
         source=source,
         confidence=utterance.confidence,
         reviewed=source == "user",
+        label=utterance.speaker or None,
     )
 
     if existing is None:

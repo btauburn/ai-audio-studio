@@ -1,0 +1,8 @@
+- [x] Verify Snow I/II source, job, MP3/master hashes and decoded duration
+- [x] Record preservation baseline and responsibility contracts
+- [x] Implement and test bounded request recovery
+- [x] Implement and test artifact-bound private completion pushes
+- [x] Integrate published recordings catalog and visible home UI
+- [x] Exercise private media and completion deep link through the app
+- [x] Complete independent review and preservation checks
+- [x] Send one verified Snow completion push and record delivery result

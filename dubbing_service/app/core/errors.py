@@ -54,7 +54,13 @@ def install_exception_handlers(app: FastAPI) -> None:
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
         """统一请求参数校验错误响应格式。"""
-        errors = exc.errors()
+        # Pydantic includes raw exception instances under ``ctx.error`` for
+        # value validators. Those cannot be encoded by JSONResponse and used
+        # to turn ordinary 422 validation failures into unhandled 500s.
+        errors = [
+            {key: value for key, value in item.items() if key != "ctx"}
+            for item in exc.errors()
+        ]
         # 提取第一个错误作为主消息
         first = errors[0] if errors else {}
         loc = " → ".join(str(x) for x in first.get("loc", []))

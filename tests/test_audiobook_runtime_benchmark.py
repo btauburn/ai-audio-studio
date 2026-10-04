@@ -138,6 +138,68 @@ def test_summarize_reports_medians_and_failure_counts() -> None:
     assert summary["median_chars_per_second"] == 50.0
     assert summary["median_wall_seconds"] == 4.0
     assert summary["total_audio_seconds"] == 8.0
+    assert summary["first_pass_acceptance"] == pytest.approx(2 / 3, abs=1e-6)
+    assert summary["end_to_end_rtf_wall_over_accepted_audio"] == 1.05
+    assert summary["accepted_source_characters_per_wall_second"] == pytest.approx(
+        400 / 8.4, abs=1e-6
+    )
+
+
+def test_summarize_uses_total_synthesis_wall_over_total_audio() -> None:
+    samples = [
+        harness.RenderSample(
+            sample_id="short",
+            segment_id="short",
+            slot="a",
+            chars=10,
+            wall_seconds=10.0,
+            exit_code=0,
+            audio_seconds=2.0,
+            chars_per_second=1.0,
+            rtf=5.0,
+            audio_sha256="a",
+            take_id="t1",
+            renderer_id="backend-renderer",
+            engine_id="qwen3tts_customvoice",
+            model_id="qwen3_tts_customvoice",
+            qa_passed=True,
+            chunked=False,
+            peak_vram_mib=6000,
+            baseline_vram_mib=2500,
+            selected=True,
+            accepted=True,
+            synthesis_seconds=1.0,
+        ),
+        harness.RenderSample(
+            sample_id="long",
+            segment_id="long",
+            slot="a",
+            chars=100,
+            wall_seconds=20.0,
+            exit_code=0,
+            audio_seconds=10.0,
+            chars_per_second=5.0,
+            rtf=2.0,
+            audio_sha256="b",
+            take_id="t2",
+            renderer_id="backend-renderer",
+            engine_id="qwen3tts_customvoice",
+            model_id="qwen3_tts_customvoice",
+            qa_passed=True,
+            chunked=False,
+            peak_vram_mib=6000,
+            baseline_vram_mib=2500,
+            selected=True,
+            accepted=True,
+            synthesis_seconds=4.0,
+        ),
+    ]
+
+    summary = harness.summarize(samples)
+
+    assert summary["rtf_wall_over_audio"] == pytest.approx(5 / 12, abs=1e-6)
+    assert summary["audio_seconds_per_wall_second"] == pytest.approx(12 / 5, abs=1e-6)
+    assert summary["end_to_end_rtf_wall_over_accepted_audio"] == 2.5
 
 
 def test_query_gpu_parses_a_single_sample(monkeypatch: pytest.MonkeyPatch) -> None:

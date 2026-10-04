@@ -49,6 +49,7 @@ AUDIO_AFFECTING_COMPONENTS = frozenset(
         "emotion_vector",
         "emotion_intensity",
         "speed",
+        "volume",
         "pitch",
         "emphasis",
         "style_instruction",
@@ -142,6 +143,7 @@ class SynthesisRequirement(BaseModel):
     emotion_vector: Optional[List[float]] = None
     emotion_intensity: Optional[float] = None
     speed: float = 1.0
+    volume: Optional[float] = None
     pitch: Optional[float] = None
     emphasis: Optional[str] = None
     style_instruction: Optional[str] = None
@@ -154,7 +156,7 @@ class SynthesisRequirement(BaseModel):
     def components(self) -> Dict[str, str]:
         """Normalized, stable component map (the hashed payload)."""
 
-        return {
+        components = {
             "utterance_id": self.utterance_id or "",
             "spoken_text_hash": self.spoken_text_hash or "",
             "voice_revision": self.voice_revision or "",
@@ -182,6 +184,11 @@ class SynthesisRequirement(BaseModel):
             "top_p": _num(self.top_p),
             "continuation_context_hash": self.continuation_context_hash or "",
         }
+        # Legacy renderers leave volume to non-destructive playback. Preserve
+        # their v1 fingerprints; include gain only when the renderer bakes it.
+        if self.volume is not None:
+            components["volume"] = _num(self.volume)
+        return components
 
     def fingerprint(self) -> str:
         payload = {
@@ -209,6 +216,15 @@ def voice_revision_for_role(role: Optional[Role]) -> Optional[str]:
 
     if role is None:
         return None
+    if role.voice_identity is not None:
+        identity = role.voice_identity
+        return sha256_bytes(canonical_json_bytes({
+            "id": identity.id, "mechanism": identity.mechanism,
+            "reference": identity.reference_audio_sha256, "prompt": identity.prompt_sha256,
+            "speaker": identity.builtin_speaker, "model": identity.model,
+            "model_revision": identity.model_revision, "runtime": identity.runtime_version,
+            "settings": identity.generation_settings,
+        }))[:32]
     payload = {
         "role_id": role.id,
         "speaker_audio": role.speaker_audio or "",
@@ -243,6 +259,7 @@ def build_requirement(
     emotion_vector: Optional[Sequence[float]] = None,
     emotion_intensity: Optional[float] = None,
     speed: float = 1.0,
+    volume: Optional[float] = None,
     pitch: Optional[float] = None,
     emphasis: Optional[str] = None,
     style_instruction: Optional[str] = None,
@@ -271,6 +288,7 @@ def build_requirement(
         emotion_vector=list(emotion_vector) if emotion_vector else None,
         emotion_intensity=emotion_intensity,
         speed=speed,
+        volume=volume,
         pitch=pitch,
         emphasis=emphasis,
         style_instruction=style_instruction,
@@ -333,6 +351,8 @@ def requirement_for_segment(
         emotion_vector=segment.emotion_vector,
         emotion_intensity=segment.emotion_alpha,
         speed=segment.playback_speed,
+        volume=(segment.volume_gain if effective_role and effective_role.voice_identity
+                and effective_role.voice_identity.mechanism == "qwen_reference" else None),
         style_instruction=style_instruction,
         seed=seed,
         pitch=pitch,

@@ -1,5 +1,17 @@
 # Tasks
 
+> Current decision, 2026-10-04: **USER-APPROVED DEFAULT** is the implemented
+> `faster-base-032` Base cloning/character profile. This supersedes the earlier
+> native-current/auto preference and blind-listening promotion gate. CustomVoice
+> remains a separate lane. Explicit runtime choices and immutable job/Take bindings
+> are preserved; mismatched historical resume must fail before synthesis. User
+> approval does not assert universal audio parity or that every sample was heard.
+> The October 1-2 experimental/default/pending-approval statements below describe
+> historical state. Frozen A/B audio, ASR flags, word endings, chunk boundaries,
+> voice identity and longform listening remain useful quality evidence.
+> See `docs/audiobook-current-checkpoint.md` for the current implementation receipt.
+
+
 - [x] Inspect local ownership, checkpoint and existing voice/casting state.
 - [x] Research and verify pinned lowest-dependency-change candidate.
 - [x] Freeze identities, prompts, references, text, settings, seeds and chunking.

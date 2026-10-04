@@ -21,6 +21,7 @@ from dubbing_service.app.services.takes import (
     capture_active_legacy_settings,
     ensure_take_state,
 )
+from dubbing_service.app.storage.atomic import ensure_metadata_writable, replace_metadata_file
 from dubbing_service.app.storage.projects import ProjectStorageError, load_project
 
 
@@ -159,17 +160,19 @@ def save_segments(project_id: str, segments: List[Segment]) -> None:
         seen_ids.add(segment_id)
 
     path = _segments_path(project_id, ensure_dir=True)
+    ensure_metadata_writable(path.parent)
     data = [s.model_dump(mode="json") for s in segments]
 
     # 原子写入：先写临时文件，再重命名
     fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp", prefix="segments_")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write(json.dumps(data, ensure_ascii=False, separators=(",", ":")))   # compact: see save_project
             f.flush()
             os.fsync(f.fileno())
-        # os.replace 是原子操作，即使并发也能保证文件完整性
-        os.replace(tmp_path, path)
+        # 原子替换，但 Windows 上另一个句柄可能短暂持有该文件；共享的重试助手
+        # 覆盖这个窗口，否则并发的读者会把生成轮次变成一次失败。
+        replace_metadata_file(tmp_path, path)
     except Exception:
         # 写入失败时清理临时文件
         try:

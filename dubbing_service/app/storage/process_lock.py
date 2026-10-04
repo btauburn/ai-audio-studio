@@ -25,7 +25,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Generator, Optional
 
@@ -62,21 +62,8 @@ def pid_is_alive(pid: int) -> bool:
     if pid <= 0:
         return False
     if os.name == "nt":
-        import ctypes
-
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        STILL_ACTIVE = 259
-        kernel32 = ctypes.windll.kernel32
-        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-        if not handle:
-            return False
-        try:
-            code = ctypes.c_ulong()
-            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
-                return False
-            return code.value == STILL_ACTIVE
-        finally:
-            kernel32.CloseHandle(handle)
+        alive, _created_at = _windows_process_identity(pid)
+        return alive
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -86,6 +73,72 @@ def pid_is_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+def _windows_process_identity(pid: int) -> tuple[bool, Optional[datetime]]:
+    """Return process liveness and creation time; unknown API results fail closed."""
+    import ctypes
+    from ctypes import wintypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+    ERROR_INVALID_PARAMETER = 87
+    kernel32 = ctypes.windll.kernel32
+
+    # Explicit signatures are required because HANDLE is pointer-sized on 64-bit
+    # Windows, while ctypes otherwise assumes a C int return value.
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.DWORD),
+    )
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.GetProcessTimes.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+    )
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.GetLastError.argtypes = ()
+    kernel32.GetLastError.restype = wintypes.DWORD
+
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        # ERROR_INVALID_PARAMETER identifies a PID with no process. Access denied
+        # and unknown failures cannot prove death, so retain the lock.
+        return kernel32.GetLastError() != ERROR_INVALID_PARAMETER, None
+
+    try:
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            return True, None
+        if exit_code.value != STILL_ACTIVE:
+            return False, None
+
+        created = wintypes.FILETIME()
+        exited = wintypes.FILETIME()
+        kernel = wintypes.FILETIME()
+        user = wintypes.FILETIME()
+        if not kernel32.GetProcessTimes(
+            handle,
+            ctypes.byref(created),
+            ctypes.byref(exited),
+            ctypes.byref(kernel),
+            ctypes.byref(user),
+        ):
+            return True, None
+        ticks = (created.dwHighDateTime << 32) | created.dwLowDateTime
+        created_at = datetime(1601, 1, 1, tzinfo=timezone.utc) + timedelta(
+            microseconds=ticks // 10
+        )
+        return True, created_at
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 @dataclass(frozen=True)
@@ -98,9 +151,10 @@ class LockOwner:
     acquired_at: str
     heartbeat_at: str
     depth: int = 1
+    process_created_at: Optional[str] = None
 
     def to_payload(self) -> dict:
-        return {
+        payload = {
             "token": self.token,
             "pid": self.pid,
             "host": self.host,
@@ -109,6 +163,9 @@ class LockOwner:
             "acquired_at": self.acquired_at,
             "heartbeat_at": self.heartbeat_at,
         }
+        if self.process_created_at is not None:
+            payload["process_created_at"] = self.process_created_at
+        return payload
 
     @classmethod
     def from_payload(cls, payload: dict) -> "LockOwner":
@@ -120,6 +177,11 @@ class LockOwner:
             root=str(payload.get("root") or ""),
             acquired_at=str(payload.get("acquired_at") or ""),
             heartbeat_at=str(payload.get("heartbeat_at") or ""),
+            process_created_at=(
+                str(payload["process_created_at"])
+                if payload.get("process_created_at") is not None
+                else None
+            ),
         )
 
     def describe(self) -> str:
@@ -139,9 +201,31 @@ class LockOwner:
         return max(0.0, (now - stamp).total_seconds())
 
     def is_live(self, *, stale_after_seconds: float) -> bool:
+        # A local process can outlive a quiet interval: application lifespans
+        # hold this lock but do not currently refresh its heartbeat. Local PID
+        # liveness is authoritative; the heartbeat remains the fallback for
+        # hosts whose process table cannot be queried from this machine.
+        if self.host == socket.gethostname():
+            if os.name == "nt":
+                alive, created_at = _windows_process_identity(self.pid)
+                if not alive:
+                    return False
+                # Compare process-instance identity, not wall-clock acquisition
+                # time: the system clock can move between process birth and lock
+                # creation. Legacy records without this field stay fail-closed.
+                try:
+                    recorded_created_at = datetime.fromisoformat(
+                        self.process_created_at or ""
+                    )
+                except ValueError:
+                    return True
+                if created_at is None:
+                    return True
+                if recorded_created_at.tzinfo is None:
+                    recorded_created_at = recorded_created_at.replace(tzinfo=timezone.utc)
+                return created_at == recorded_created_at
+            return pid_is_alive(self.pid)
         if self.heartbeat_age() > stale_after_seconds:
-            return False
-        if self.host == socket.gethostname() and not pid_is_alive(self.pid):
             return False
         return True
 
@@ -246,6 +330,7 @@ class ProjectsRootLock:
                 acquired_at=local.acquired_at,
                 heartbeat_at=_iso(_utc_now()),
                 depth=local.depth + 1,
+                process_created_at=local.process_created_at,
             )
             _remember(self.lock_path, nested)
             return nested
@@ -296,6 +381,11 @@ class ProjectsRootLock:
 
         token = uuid.uuid4().hex
         now = _utc_now()
+        process_created_at = None
+        if os.name == "nt":
+            _alive, process_start = _windows_process_identity(os.getpid())
+            if process_start is not None:
+                process_created_at = _iso(process_start)
         candidate = LockOwner(
             token=token,
             pid=os.getpid(),
@@ -304,6 +394,7 @@ class ProjectsRootLock:
             root=str(self.root),
             acquired_at=_iso(now),
             heartbeat_at=_iso(now),
+            process_created_at=process_created_at,
         )
         try:
             fd = os.open(str(self.lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -355,6 +446,7 @@ class ProjectsRootLock:
             acquired_at=local.acquired_at,
             heartbeat_at=_iso(_utc_now()),
             depth=local.depth,
+            process_created_at=local.process_created_at,
         )
         tmp = self.lock_path.with_suffix(".hb")
         try:
@@ -389,6 +481,7 @@ class ProjectsRootLock:
                     acquired_at=local.acquired_at,
                     heartbeat_at=local.heartbeat_at,
                     depth=local.depth - 1,
+                    process_created_at=local.process_created_at,
                 ),
             )
             return

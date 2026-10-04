@@ -1,0 +1,1721 @@
+{
+  "schema": "reviewed-recorded-audition-drafts-v1",
+  "records": [
+    {
+      "source_id": "cstr-vctk-p226_021_mic1",
+      "speaker": "p226",
+      "original_sha256": "d39d5079350e82d9d49983b72abee0484bff56158b2f585c4117afe709e8586f",
+      "input_pcm_sha256": "326078585b94fb56d14606ca12828b412e66e39f7f6aff58da39402f0a4d0cd8",
+      "sample_rate": 48000,
+      "start_seconds": 0,
+      "end_seconds": 9.21,
+      "transcript": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+      "transcript_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+      "publisher_transcript": "The difference in the rainbow depends considerably upon the size of the drops, and the width of the colored band increases as the size of the drops increases.",
+      "publisher_transcript_sha256": "fa711b93cf04896ea54d6864785a190e7a01317453377f9e32937db7b574cb06",
+      "quality": {
+        "schema": "reference-quality-v1",
+        "audio_sha256": "a7a839daf7a80e033d6182367ca9beb51f5b1a235024f2ffcc08b440fc8b20f0",
+        "expected_text": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+        "expected_text_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+        "language": "en",
+        "expected_text_origin": "provided",
+        "device": "cpu",
+        "created_at_unix": 1791034219.7789254,
+        "pipeline": {
+          "version": "reference-quality-v1",
+          "source_sha256": "d319422e6452b7fb7b90b2b0ddb4b6d4a8588e1b378e2b773d5fe1ee8ec25b46",
+          "asr_source_sha256": "fea431f01fb06ef19679c1f0dc5cb66359a7bca071dc545bc933283915231cb6",
+          "versions": {
+            "faster-whisper": "1.2.1",
+            "ctranslate2": "4.8.2",
+            "onnxruntime": "1.30.0",
+            "numpy": "2.0.2",
+            "scipy": "1.18.1",
+            "soundfile": "0.14.0",
+            "av": "18.1.0"
+          },
+          "vad_model_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+          "asr_model_sha256": "c95d9223c0008d68daada3f6776fb386729f8a8621ed76e9e38968b1afa0e6fe",
+          "settings": {
+            "vad_rate": 16000,
+            "vad_threshold": 0.5,
+            "min_speech_ms": 250,
+            "min_silence_ms": 200,
+            "speech_pad_ms": 30,
+            "max_bytes": 24000000,
+            "duration_min": 3,
+            "duration_max": 30.01,
+            "clip_fraction_max": 0.001,
+            "speech_seconds_min": 1.5,
+            "speech_fraction_min": 0.25,
+            "background_ratio_review_below_db": 8,
+            "word_confidence_mean_min": 0.85,
+            "low_word_probability": 0.5,
+            "low_word_fraction_max": 0.1,
+            "wer_pass_max": 0.1,
+            "wer_fail_min": 0.5,
+            "uncovered_speech_max_seconds": 0.65,
+            "word_vad_coverage_min": 0.6
+          },
+          "asr_settings": {
+            "device": "cpu",
+            "compute_type": "int8",
+            "cpu_threads": 2,
+            "beam_size": 5,
+            "word_timestamps": true,
+            "vad_filter": false,
+            "condition_on_previous_text": false,
+            "temperature": 0.0
+          }
+        },
+        "cache_key": "09ddcf9354dbd29058231736a23204cea796b2f825454afbf68a02d9ebc24c90",
+        "status": "pass",
+        "scope": "supported technical checks only",
+        "checks": {
+          "decode": {
+            "status": "pass",
+            "reason": "Finite mono audio, bounded 3-30 second crop."
+          },
+          "clipping": {
+            "status": "pass",
+            "reason": "Peak 0.8698; clipped sample fraction 0.000000."
+          },
+          "signal": {
+            "status": "pass",
+            "reason": "RMS 0.0916; near-silent sample fraction 0.055."
+          },
+          "speech": {
+            "status": "pass",
+            "reason": "VAD found 8.25s of speech; this does not count speakers."
+          },
+          "background_energy": {
+            "status": "pass",
+            "reason": "Speech/non-speech RMS ratio 27.3dB; a heuristic, not measured SNR or music detection."
+          },
+          "music": {
+            "status": "unavailable",
+            "reason": "No installed validated music classifier; not assessed."
+          },
+          "overlap_speakers": {
+            "status": "unavailable",
+            "reason": "No installed overlap detector or diarizer; speaker count and overlap not assessed."
+          },
+          "identity_rights": {
+            "status": "unavailable",
+            "reason": "Audio metrics do not prove performer identity, consent, licensing or endorsement."
+          },
+          "asr": {
+            "status": "pass",
+            "reason": "Mean word confidence 0.976; low-confidence fraction 0.000. Confidence is not transcript truth."
+          },
+          "transcript_alignment": {
+            "status": "pass",
+            "reason": "Normalized word error rate 0.036 against the supplied transcript; word timing is ASR-estimated, not forced alignment."
+          },
+          "crop_coverage": {
+            "status": "pass",
+            "reason": "Uncovered edge speech 0.25s; word/VAD overlap 0.950. Clipped phonemes still require listening when uncertain."
+          }
+        },
+        "metrics": {
+          "duration_seconds": 9.21,
+          "sample_rate": 48000,
+          "peak": 0.8697509765625,
+          "rms": 0.09161933466269137,
+          "clipping_fraction": 0.0,
+          "near_silence_fraction": 0.05494254433586681,
+          "speech_seconds": 8.248,
+          "speech_fraction": 0.8955483170466882,
+          "speech_spans": [
+            {
+              "start": 0.962,
+              "end": 9.21
+            }
+          ],
+          "speech_background_ratio_db": 27.276,
+          "mean_word_probability": 0.9759,
+          "low_confidence_word_fraction": 0.0,
+          "recognized_text": "The difference in the rainbow depends considerably upon the size of the drops and the width of the coloured band increases as the size of the drops increases.",
+          "asr_word_count": 28,
+          "word_error_rate": 0.03571428571428571,
+          "uncovered_edge_speech_seconds": 0.25,
+          "word_vad_coverage": 0.9498812351543943,
+          "first_word_seconds": 0.5399999999999996,
+          "last_word_seconds": 8.96
+        },
+        "unavailable_checks": [
+          "music",
+          "overlap_speakers",
+          "identity_rights"
+        ],
+        "source_isolation_status": "unverified",
+        "automatic_source_approval": false,
+        "clone_eligibility_changed": false,
+        "human_verified": false,
+        "cache_hit": false,
+        "elapsed_seconds": 2.4888
+      },
+      "source_classifier": {
+        "contaminated": false,
+        "input_pcm_sha256": "326078585b94fb56d14606ca12828b412e66e39f7f6aff58da39402f0a4d0cd8",
+        "pipeline": {
+          "models": {
+            "ast_audioset/config.json": "a93d525511d77e8ecc933d09674b85099815bbbb417c228a4edd655e252fb9ff",
+            "ast_audioset/model.safetensors": "ae0c1e2ad4e1381d851fa9bf298ba13ebc9c5a914cdee2dbe427a6583869924d",
+            "ast_audioset/preprocessor_config.json": "8d04ba5a9c6fca5d39d0de2b1fd05ecf79deb589fbba279728bbebac39934231",
+            "pyannote_segmentation/model.onnx": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+          },
+          "settings": {
+            "device": "cpu",
+            "music_max": 0.2,
+            "noise_max": 0.2,
+            "overlap_peak_max": 0.1,
+            "schema": "source-classifier-v1",
+            "speech_min": 0.5,
+            "threads": 2,
+            "window_seconds": 10
+          },
+          "source_sha256": "07b90df2984732b357561ef49df92b6dd53ef5f497110477ef780ea77794d8c5",
+          "versions": {
+            "numpy": "2.4.6",
+            "onnxruntime": "1.27.0",
+            "scipy": "1.18.0",
+            "soundfile": "0.13.1",
+            "torch": "2.10.0+cu130",
+            "transformers": "4.57.3"
+          }
+        },
+        "reason": "Window-local classifier evidence; no performer identity or human quality acceptance.",
+        "sample_rate": 48000,
+        "single_local_speaker": true,
+        "speech_detected": true,
+        "status": "pass",
+        "windows": [
+          {
+            "duration_seconds": 9.21,
+            "music": 0.0006257228669710457,
+            "noise": 8.961898129200563e-05,
+            "overlap_frames": 0,
+            "overlap_peak": 0.002499829512089491,
+            "singleton_count": 1,
+            "speech": 0.7969319820404053,
+            "start_seconds": 0.0
+          }
+        ]
+      },
+      "technical_ready": true,
+      "source_delivery_fit": "unknown",
+      "human_verified": false,
+      "casting_approved": false,
+      "production_approved": false,
+      "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+      "authorization_utc": "2026-10-03T13:20:50Z",
+      "scope": "unapproved_recorded_audition_draft",
+      "draft_id": "be9a11f03342e628f7f73571fb988919"
+    },
+    {
+      "source_id": "cstr-vctk-p226_023_mic1",
+      "speaker": "p226",
+      "original_sha256": "e1fd78e41082e9966e2036283d8aa727397d50b111ebf2d008cfab6fb5f18792",
+      "input_pcm_sha256": "1dd8b331de4e4222768f6704523263bbc16ecbd77657f590045ba13d02cd2858",
+      "sample_rate": 48000,
+      "start_seconds": 0.4099999999999998,
+      "end_seconds": 10.35,
+      "transcript": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light",
+      "transcript_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872",
+      "publisher_transcript": "If the red of the second bow falls upon the green of the first, the result is to give a bow with an abnormally wide yellow band, since red and green light when mixed form yellow.",
+      "publisher_transcript_sha256": "477b72cb77c71a2ab7b43510fcc347d9106e4b68b07b6742dd1e6b2cce9c48ce",
+      "quality": {
+        "schema": "reference-quality-v1",
+        "audio_sha256": "2fee7f401ff2bfdfc3732ad90669d71a7f2aac4611083ac25e7bf3a0d5afe4f6",
+        "expected_text": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light",
+        "expected_text_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872",
+        "language": "en",
+        "expected_text_origin": "provided",
+        "device": "cpu",
+        "created_at_unix": 1791034222.2827148,
+        "pipeline": {
+          "version": "reference-quality-v1",
+          "source_sha256": "d319422e6452b7fb7b90b2b0ddb4b6d4a8588e1b378e2b773d5fe1ee8ec25b46",
+          "asr_source_sha256": "fea431f01fb06ef19679c1f0dc5cb66359a7bca071dc545bc933283915231cb6",
+          "versions": {
+            "faster-whisper": "1.2.1",
+            "ctranslate2": "4.8.2",
+            "onnxruntime": "1.30.0",
+            "numpy": "2.0.2",
+            "scipy": "1.18.1",
+            "soundfile": "0.14.0",
+            "av": "18.1.0"
+          },
+          "vad_model_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+          "asr_model_sha256": "c95d9223c0008d68daada3f6776fb386729f8a8621ed76e9e38968b1afa0e6fe",
+          "settings": {
+            "vad_rate": 16000,
+            "vad_threshold": 0.5,
+            "min_speech_ms": 250,
+            "min_silence_ms": 200,
+            "speech_pad_ms": 30,
+            "max_bytes": 24000000,
+            "duration_min": 3,
+            "duration_max": 30.01,
+            "clip_fraction_max": 0.001,
+            "speech_seconds_min": 1.5,
+            "speech_fraction_min": 0.25,
+            "background_ratio_review_below_db": 8,
+            "word_confidence_mean_min": 0.85,
+            "low_word_probability": 0.5,
+            "low_word_fraction_max": 0.1,
+            "wer_pass_max": 0.1,
+            "wer_fail_min": 0.5,
+            "uncovered_speech_max_seconds": 0.65,
+            "word_vad_coverage_min": 0.6
+          },
+          "asr_settings": {
+            "device": "cpu",
+            "compute_type": "int8",
+            "cpu_threads": 2,
+            "beam_size": 5,
+            "word_timestamps": true,
+            "vad_filter": false,
+            "condition_on_previous_text": false,
+            "temperature": 0.0
+          }
+        },
+        "cache_key": "a8758aa217041dead62dd830be895469197144cfe532aa705590ca51359d5465",
+        "status": "pass",
+        "scope": "supported technical checks only",
+        "checks": {
+          "decode": {
+            "status": "pass",
+            "reason": "Finite mono audio, bounded 3-30 second crop."
+          },
+          "clipping": {
+            "status": "pass",
+            "reason": "Peak 0.7614; clipped sample fraction 0.000000."
+          },
+          "signal": {
+            "status": "pass",
+            "reason": "RMS 0.0892; near-silent sample fraction 0.042."
+          },
+          "speech": {
+            "status": "pass",
+            "reason": "VAD found 9.43s of speech; this does not count speakers."
+          },
+          "background_energy": {
+            "status": "pass",
+            "reason": "Speech/non-speech RMS ratio 24.1dB; a heuristic, not measured SNR or music detection."
+          },
+          "music": {
+            "status": "unavailable",
+            "reason": "No installed validated music classifier; not assessed."
+          },
+          "overlap_speakers": {
+            "status": "unavailable",
+            "reason": "No installed overlap detector or diarizer; speaker count and overlap not assessed."
+          },
+          "identity_rights": {
+            "status": "unavailable",
+            "reason": "Audio metrics do not prove performer identity, consent, licensing or endorsement."
+          },
+          "asr": {
+            "status": "pass",
+            "reason": "Mean word confidence 0.976; low-confidence fraction 0.000. Confidence is not transcript truth."
+          },
+          "transcript_alignment": {
+            "status": "pass",
+            "reason": "Normalized word error rate 0.000 against the supplied transcript; word timing is ASR-estimated, not forced alignment."
+          },
+          "crop_coverage": {
+            "status": "pass",
+            "reason": "Uncovered edge speech 0.18s; word/VAD overlap 0.940. Clipped phonemes still require listening when uncertain."
+          }
+        },
+        "metrics": {
+          "duration_seconds": 9.94,
+          "sample_rate": 48000,
+          "peak": 0.76141357421875,
+          "rms": 0.08916387741622653,
+          "clipping_fraction": 0.0,
+          "near_silence_fraction": 0.04207956069751844,
+          "speech_seconds": 9.426,
+          "speech_fraction": 0.9482897384305836,
+          "speech_spans": [
+            {
+              "start": 0.514,
+              "end": 9.94
+            }
+          ],
+          "speech_background_ratio_db": 24.061,
+          "mean_word_probability": 0.9765,
+          "low_confidence_word_fraction": 0.0,
+          "recognized_text": "If the red of the second bow falls upon the green of the first, the result is to give a bow with an abnormally wide yellow band, since red and green light",
+          "asr_word_count": 32,
+          "word_error_rate": 0.0,
+          "uncovered_edge_speech_seconds": 0.17999999999999972,
+          "word_vad_coverage": 0.9399532710280373,
+          "first_word_seconds": 0.0,
+          "last_word_seconds": 9.76
+        },
+        "unavailable_checks": [
+          "music",
+          "overlap_speakers",
+          "identity_rights"
+        ],
+        "source_isolation_status": "unverified",
+        "automatic_source_approval": false,
+        "clone_eligibility_changed": false,
+        "human_verified": false,
+        "cache_hit": false,
+        "elapsed_seconds": 1.512
+      },
+      "source_classifier": {
+        "contaminated": false,
+        "input_pcm_sha256": "1dd8b331de4e4222768f6704523263bbc16ecbd77657f590045ba13d02cd2858",
+        "pipeline": {
+          "models": {
+            "ast_audioset/config.json": "a93d525511d77e8ecc933d09674b85099815bbbb417c228a4edd655e252fb9ff",
+            "ast_audioset/model.safetensors": "ae0c1e2ad4e1381d851fa9bf298ba13ebc9c5a914cdee2dbe427a6583869924d",
+            "ast_audioset/preprocessor_config.json": "8d04ba5a9c6fca5d39d0de2b1fd05ecf79deb589fbba279728bbebac39934231",
+            "pyannote_segmentation/model.onnx": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+          },
+          "settings": {
+            "device": "cpu",
+            "music_max": 0.2,
+            "noise_max": 0.2,
+            "overlap_peak_max": 0.1,
+            "schema": "source-classifier-v1",
+            "speech_min": 0.5,
+            "threads": 2,
+            "window_seconds": 10
+          },
+          "source_sha256": "07b90df2984732b357561ef49df92b6dd53ef5f497110477ef780ea77794d8c5",
+          "versions": {
+            "numpy": "2.4.6",
+            "onnxruntime": "1.27.0",
+            "scipy": "1.18.0",
+            "soundfile": "0.13.1",
+            "torch": "2.10.0+cu130",
+            "transformers": "4.57.3"
+          }
+        },
+        "reason": "Window-local classifier evidence; no performer identity or human quality acceptance.",
+        "sample_rate": 48000,
+        "single_local_speaker": true,
+        "speech_detected": true,
+        "status": "pass",
+        "windows": [
+          {
+            "duration_seconds": 9.94,
+            "music": 0.0008878434309735894,
+            "noise": 2.237238732050173e-05,
+            "overlap_frames": 0,
+            "overlap_peak": 0.0033262642100453377,
+            "singleton_count": 1,
+            "speech": 0.8399488925933838,
+            "start_seconds": 0.0
+          }
+        ]
+      },
+      "technical_ready": true,
+      "source_delivery_fit": "unknown",
+      "human_verified": false,
+      "casting_approved": false,
+      "production_approved": false,
+      "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+      "authorization_utc": "2026-10-03T13:20:50Z",
+      "scope": "unapproved_recorded_audition_draft",
+      "draft_id": "0162f4ebcec99b6d72f43ddc7f740e8d"
+    },
+    {
+      "source_id": "cstr-vctk-p232_021_mic1",
+      "speaker": "p232",
+      "original_sha256": "7d376b412e120a23e9d799c9b404eaf2f0e1df5dac45a77e1b5b24b0b5ed25d3",
+      "input_pcm_sha256": "8e15e47462061dd70f8cc2f118d410be963a5cf92a6e2b7a01a0df816f442727",
+      "sample_rate": 48000,
+      "start_seconds": 0.4499999999999996,
+      "end_seconds": 8.57,
+      "transcript": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+      "transcript_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+      "publisher_transcript": "The difference in the rainbow depends considerably upon the size of the drops, and the width of the colored band increases as the size of the drops increases.",
+      "publisher_transcript_sha256": "fa711b93cf04896ea54d6864785a190e7a01317453377f9e32937db7b574cb06",
+      "quality": {
+        "schema": "reference-quality-v1",
+        "audio_sha256": "165d265d7eca017dd97eadef3a3826e6450ef9e1def960a36ccc96d0562895b1",
+        "expected_text": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+        "expected_text_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+        "language": "en",
+        "expected_text_origin": "provided",
+        "device": "cpu",
+        "created_at_unix": 1791034223.807733,
+        "pipeline": {
+          "version": "reference-quality-v1",
+          "source_sha256": "d319422e6452b7fb7b90b2b0ddb4b6d4a8588e1b378e2b773d5fe1ee8ec25b46",
+          "asr_source_sha256": "fea431f01fb06ef19679c1f0dc5cb66359a7bca071dc545bc933283915231cb6",
+          "versions": {
+            "faster-whisper": "1.2.1",
+            "ctranslate2": "4.8.2",
+            "onnxruntime": "1.30.0",
+            "numpy": "2.0.2",
+            "scipy": "1.18.1",
+            "soundfile": "0.14.0",
+            "av": "18.1.0"
+          },
+          "vad_model_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+          "asr_model_sha256": "c95d9223c0008d68daada3f6776fb386729f8a8621ed76e9e38968b1afa0e6fe",
+          "settings": {
+            "vad_rate": 16000,
+            "vad_threshold": 0.5,
+            "min_speech_ms": 250,
+            "min_silence_ms": 200,
+            "speech_pad_ms": 30,
+            "max_bytes": 24000000,
+            "duration_min": 3,
+            "duration_max": 30.01,
+            "clip_fraction_max": 0.001,
+            "speech_seconds_min": 1.5,
+            "speech_fraction_min": 0.25,
+            "background_ratio_review_below_db": 8,
+            "word_confidence_mean_min": 0.85,
+            "low_word_probability": 0.5,
+            "low_word_fraction_max": 0.1,
+            "wer_pass_max": 0.1,
+            "wer_fail_min": 0.5,
+            "uncovered_speech_max_seconds": 0.65,
+            "word_vad_coverage_min": 0.6
+          },
+          "asr_settings": {
+            "device": "cpu",
+            "compute_type": "int8",
+            "cpu_threads": 2,
+            "beam_size": 5,
+            "word_timestamps": true,
+            "vad_filter": false,
+            "condition_on_previous_text": false,
+            "temperature": 0.0
+          }
+        },
+        "cache_key": "1ca42cadf896164fc6146700cdf6f9016d740a7951464f6d2cb2dee501abc702",
+        "status": "pass",
+        "scope": "supported technical checks only",
+        "checks": {
+          "decode": {
+            "status": "pass",
+            "reason": "Finite mono audio, bounded 3-30 second crop."
+          },
+          "clipping": {
+            "status": "pass",
+            "reason": "Peak 0.7286; clipped sample fraction 0.000000."
+          },
+          "signal": {
+            "status": "pass",
+            "reason": "RMS 0.1136; near-silent sample fraction 0.041."
+          },
+          "speech": {
+            "status": "pass",
+            "reason": "VAD found 7.22s of speech; this does not count speakers."
+          },
+          "background_energy": {
+            "status": "pass",
+            "reason": "Speech/non-speech RMS ratio 25.7dB; a heuristic, not measured SNR or music detection."
+          },
+          "music": {
+            "status": "unavailable",
+            "reason": "No installed validated music classifier; not assessed."
+          },
+          "overlap_speakers": {
+            "status": "unavailable",
+            "reason": "No installed overlap detector or diarizer; speaker count and overlap not assessed."
+          },
+          "identity_rights": {
+            "status": "unavailable",
+            "reason": "Audio metrics do not prove performer identity, consent, licensing or endorsement."
+          },
+          "asr": {
+            "status": "pass",
+            "reason": "Mean word confidence 0.972; low-confidence fraction 0.000. Confidence is not transcript truth."
+          },
+          "transcript_alignment": {
+            "status": "pass",
+            "reason": "Normalized word error rate 0.036 against the supplied transcript; word timing is ASR-estimated, not forced alignment."
+          },
+          "crop_coverage": {
+            "status": "pass",
+            "reason": "Uncovered edge speech 0.30s; word/VAD overlap 0.908. Clipped phonemes still require listening when uncertain."
+          }
+        },
+        "metrics": {
+          "duration_seconds": 8.12,
+          "sample_rate": 48000,
+          "peak": 0.72857666015625,
+          "rms": 0.1135990793702439,
+          "clipping_fraction": 0.0,
+          "near_silence_fraction": 0.04114326765188834,
+          "speech_seconds": 7.218,
+          "speech_fraction": 0.8889162561576356,
+          "speech_spans": [
+            {
+              "start": 0.514,
+              "end": 4.478
+            },
+            {
+              "start": 4.866,
+              "end": 8.12
+            }
+          ],
+          "speech_background_ratio_db": 25.711,
+          "mean_word_probability": 0.9718,
+          "low_confidence_word_fraction": 0.0,
+          "recognized_text": "The difference in the rainbow depends considerably upon the size of the drops, and the width of the coloured band increases as the size of the drops increases.",
+          "asr_word_count": 28,
+          "word_error_rate": 0.03571428571428571,
+          "uncovered_edge_speech_seconds": 0.29999999999999893,
+          "word_vad_coverage": 0.9078212290502793,
+          "first_word_seconds": 0.0,
+          "last_word_seconds": 7.82
+        },
+        "unavailable_checks": [
+          "music",
+          "overlap_speakers",
+          "identity_rights"
+        ],
+        "source_isolation_status": "unverified",
+        "automatic_source_approval": false,
+        "clone_eligibility_changed": false,
+        "human_verified": false,
+        "cache_hit": false,
+        "elapsed_seconds": 1.4471
+      },
+      "source_classifier": {
+        "contaminated": false,
+        "input_pcm_sha256": "8e15e47462061dd70f8cc2f118d410be963a5cf92a6e2b7a01a0df816f442727",
+        "pipeline": {
+          "models": {
+            "ast_audioset/config.json": "a93d525511d77e8ecc933d09674b85099815bbbb417c228a4edd655e252fb9ff",
+            "ast_audioset/model.safetensors": "ae0c1e2ad4e1381d851fa9bf298ba13ebc9c5a914cdee2dbe427a6583869924d",
+            "ast_audioset/preprocessor_config.json": "8d04ba5a9c6fca5d39d0de2b1fd05ecf79deb589fbba279728bbebac39934231",
+            "pyannote_segmentation/model.onnx": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+          },
+          "settings": {
+            "device": "cpu",
+            "music_max": 0.2,
+            "noise_max": 0.2,
+            "overlap_peak_max": 0.1,
+            "schema": "source-classifier-v1",
+            "speech_min": 0.5,
+            "threads": 2,
+            "window_seconds": 10
+          },
+          "source_sha256": "07b90df2984732b357561ef49df92b6dd53ef5f497110477ef780ea77794d8c5",
+          "versions": {
+            "numpy": "2.4.6",
+            "onnxruntime": "1.27.0",
+            "scipy": "1.18.0",
+            "soundfile": "0.13.1",
+            "torch": "2.10.0+cu130",
+            "transformers": "4.57.3"
+          }
+        },
+        "reason": "Window-local classifier evidence; no performer identity or human quality acceptance.",
+        "sample_rate": 48000,
+        "single_local_speaker": true,
+        "speech_detected": true,
+        "status": "pass",
+        "windows": [
+          {
+            "duration_seconds": 8.12,
+            "music": 0.0012064212933182716,
+            "noise": 5.403030081652105e-05,
+            "overlap_frames": 0,
+            "overlap_peak": 0.0043508922681212425,
+            "singleton_count": 1,
+            "speech": 0.822685718536377,
+            "start_seconds": 0.0
+          }
+        ]
+      },
+      "technical_ready": true,
+      "source_delivery_fit": "unknown",
+      "human_verified": false,
+      "casting_approved": false,
+      "production_approved": false,
+      "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+      "authorization_utc": "2026-10-03T13:20:50Z",
+      "scope": "unapproved_recorded_audition_draft",
+      "draft_id": "8638ab826612ab05071ba1863853705d"
+    },
+    {
+      "source_id": "cstr-vctk-p232_023_mic1",
+      "speaker": "p232",
+      "original_sha256": "96818a3d08cc16fbc10bb985136aa5645e3f1c58fb134c94a0d46e76b6f1ab11",
+      "input_pcm_sha256": "1ca75539c03831ac4d608ef779f9556e3bb47a8e55f5d610de54be88afddbc14",
+      "sample_rate": 48000,
+      "start_seconds": 0.34999999999999865,
+      "end_seconds": 9.69,
+      "transcript": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light when mixed form yellow",
+      "transcript_sha256": "b3f56711be1be040cea08689fc6f52f001f6bf3622b2d212f84176ccfc7ddcfe",
+      "publisher_transcript": "If the red of the second bow falls upon the green of the first, the result is to give a bow with an abnormally wide yellow band, since red and green light when mixed form yellow.",
+      "publisher_transcript_sha256": "477b72cb77c71a2ab7b43510fcc347d9106e4b68b07b6742dd1e6b2cce9c48ce",
+      "quality": {
+        "schema": "reference-quality-v1",
+        "audio_sha256": "3593e4a5bf3abfc830cc590de7b1c588cc1f6c4ab065d1898b85c3f4a56b4907",
+        "expected_text": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light when mixed form yellow",
+        "expected_text_sha256": "b3f56711be1be040cea08689fc6f52f001f6bf3622b2d212f84176ccfc7ddcfe",
+        "language": "en",
+        "expected_text_origin": "provided",
+        "device": "cpu",
+        "created_at_unix": 1791034225.269858,
+        "pipeline": {
+          "version": "reference-quality-v1",
+          "source_sha256": "d319422e6452b7fb7b90b2b0ddb4b6d4a8588e1b378e2b773d5fe1ee8ec25b46",
+          "asr_source_sha256": "fea431f01fb06ef19679c1f0dc5cb66359a7bca071dc545bc933283915231cb6",
+          "versions": {
+            "faster-whisper": "1.2.1",
+            "ctranslate2": "4.8.2",
+            "onnxruntime": "1.30.0",
+            "numpy": "2.0.2",
+            "scipy": "1.18.1",
+            "soundfile": "0.14.0",
+            "av": "18.1.0"
+          },
+          "vad_model_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+          "asr_model_sha256": "c95d9223c0008d68daada3f6776fb386729f8a8621ed76e9e38968b1afa0e6fe",
+          "settings": {
+            "vad_rate": 16000,
+            "vad_threshold": 0.5,
+            "min_speech_ms": 250,
+            "min_silence_ms": 200,
+            "speech_pad_ms": 30,
+            "max_bytes": 24000000,
+            "duration_min": 3,
+            "duration_max": 30.01,
+            "clip_fraction_max": 0.001,
+            "speech_seconds_min": 1.5,
+            "speech_fraction_min": 0.25,
+            "background_ratio_review_below_db": 8,
+            "word_confidence_mean_min": 0.85,
+            "low_word_probability": 0.5,
+            "low_word_fraction_max": 0.1,
+            "wer_pass_max": 0.1,
+            "wer_fail_min": 0.5,
+            "uncovered_speech_max_seconds": 0.65,
+            "word_vad_coverage_min": 0.6
+          },
+          "asr_settings": {
+            "device": "cpu",
+            "compute_type": "int8",
+            "cpu_threads": 2,
+            "beam_size": 5,
+            "word_timestamps": true,
+            "vad_filter": false,
+            "condition_on_previous_text": false,
+            "temperature": 0.0
+          }
+        },
+        "cache_key": "393f02fd2181bb97c0ed4cffcc81896bbd3e97c766f068022320ada19966922f",
+        "status": "pass",
+        "scope": "supported technical checks only",
+        "checks": {
+          "decode": {
+            "status": "pass",
+            "reason": "Finite mono audio, bounded 3-30 second crop."
+          },
+          "clipping": {
+            "status": "pass",
+            "reason": "Peak 0.9927; clipped sample fraction 0.000000."
+          },
+          "signal": {
+            "status": "pass",
+            "reason": "RMS 0.1349; near-silent sample fraction 0.043."
+          },
+          "speech": {
+            "status": "pass",
+            "reason": "VAD found 8.89s of speech; this does not count speakers."
+          },
+          "background_energy": {
+            "status": "pass",
+            "reason": "Speech/non-speech RMS ratio 27.0dB; a heuristic, not measured SNR or music detection."
+          },
+          "music": {
+            "status": "unavailable",
+            "reason": "No installed validated music classifier; not assessed."
+          },
+          "overlap_speakers": {
+            "status": "unavailable",
+            "reason": "No installed overlap detector or diarizer; speaker count and overlap not assessed."
+          },
+          "identity_rights": {
+            "status": "unavailable",
+            "reason": "Audio metrics do not prove performer identity, consent, licensing or endorsement."
+          },
+          "asr": {
+            "status": "pass",
+            "reason": "Mean word confidence 0.968; low-confidence fraction 0.000. Confidence is not transcript truth."
+          },
+          "transcript_alignment": {
+            "status": "pass",
+            "reason": "Normalized word error rate 0.000 against the supplied transcript; word timing is ASR-estimated, not forced alignment."
+          },
+          "crop_coverage": {
+            "status": "pass",
+            "reason": "Uncovered edge speech 0.14s; word/VAD overlap 0.948. Clipped phonemes still require listening when uncertain."
+          }
+        },
+        "metrics": {
+          "duration_seconds": 9.34,
+          "sample_rate": 48000,
+          "peak": 0.99273681640625,
+          "rms": 0.13486949792794478,
+          "clipping_fraction": 0.0,
+          "near_silence_fraction": 0.04346895074946467,
+          "speech_seconds": 8.89,
+          "speech_fraction": 0.9518201284796575,
+          "speech_spans": [
+            {
+              "start": 0.45,
+              "end": 9.34
+            }
+          ],
+          "speech_background_ratio_db": 26.993,
+          "mean_word_probability": 0.9685,
+          "low_confidence_word_fraction": 0.0,
+          "recognized_text": "If the red of the second bow falls upon the green of the first, the result is to give a bow with an abnormally wide yellow band since red and green light when mixed form yellow.",
+          "asr_word_count": 36,
+          "word_error_rate": 0.0,
+          "uncovered_edge_speech_seconds": 0.14000000000000057,
+          "word_vad_coverage": 0.9479166666666663,
+          "first_word_seconds": 0.0,
+          "last_word_seconds": 9.2
+        },
+        "unavailable_checks": [
+          "music",
+          "overlap_speakers",
+          "identity_rights"
+        ],
+        "source_isolation_status": "unverified",
+        "automatic_source_approval": false,
+        "clone_eligibility_changed": false,
+        "human_verified": false,
+        "cache_hit": false,
+        "elapsed_seconds": 1.5191
+      },
+      "source_classifier": {
+        "contaminated": false,
+        "input_pcm_sha256": "1ca75539c03831ac4d608ef779f9556e3bb47a8e55f5d610de54be88afddbc14",
+        "pipeline": {
+          "models": {
+            "ast_audioset/config.json": "a93d525511d77e8ecc933d09674b85099815bbbb417c228a4edd655e252fb9ff",
+            "ast_audioset/model.safetensors": "ae0c1e2ad4e1381d851fa9bf298ba13ebc9c5a914cdee2dbe427a6583869924d",
+            "ast_audioset/preprocessor_config.json": "8d04ba5a9c6fca5d39d0de2b1fd05ecf79deb589fbba279728bbebac39934231",
+            "pyannote_segmentation/model.onnx": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+          },
+          "settings": {
+            "device": "cpu",
+            "music_max": 0.2,
+            "noise_max": 0.2,
+            "overlap_peak_max": 0.1,
+            "schema": "source-classifier-v1",
+            "speech_min": 0.5,
+            "threads": 2,
+            "window_seconds": 10
+          },
+          "source_sha256": "07b90df2984732b357561ef49df92b6dd53ef5f497110477ef780ea77794d8c5",
+          "versions": {
+            "numpy": "2.4.6",
+            "onnxruntime": "1.27.0",
+            "scipy": "1.18.0",
+            "soundfile": "0.13.1",
+            "torch": "2.10.0+cu130",
+            "transformers": "4.57.3"
+          }
+        },
+        "reason": "Window-local classifier evidence; no performer identity or human quality acceptance.",
+        "sample_rate": 48000,
+        "single_local_speaker": true,
+        "speech_detected": true,
+        "status": "pass",
+        "windows": [
+          {
+            "duration_seconds": 9.34,
+            "music": 0.0010309804929420352,
+            "noise": 8.742943464312702e-05,
+            "overlap_frames": 0,
+            "overlap_peak": 0.00364477070979774,
+            "singleton_count": 1,
+            "speech": 0.8016553521156311,
+            "start_seconds": 0.0
+          }
+        ]
+      },
+      "technical_ready": true,
+      "source_delivery_fit": "unknown",
+      "human_verified": false,
+      "casting_approved": false,
+      "production_approved": false,
+      "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+      "authorization_utc": "2026-10-03T13:20:50Z",
+      "scope": "unapproved_recorded_audition_draft",
+      "draft_id": "e5b8cb4c657d1fbaf91adb9c4a2d298a"
+    },
+    {
+      "source_id": "cstr-vctk-p254_021_mic1",
+      "speaker": "p254",
+      "original_sha256": "81f928ae9f300206f4cb309db0c77805a6519d6330dc84386bad802b5376e249",
+      "input_pcm_sha256": "0aef280f81c3d85dd3f8ac9d992227c36ff60663955a64484cba1b2af4cd90ae",
+      "sample_rate": 48000,
+      "start_seconds": 0.39000000000000135,
+      "end_seconds": 8.81,
+      "transcript": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+      "transcript_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+      "publisher_transcript": "The difference in the rainbow depends considerably upon the size of the drops, and the width of the colored band increases as the size of the drops increases.",
+      "publisher_transcript_sha256": "fa711b93cf04896ea54d6864785a190e7a01317453377f9e32937db7b574cb06",
+      "quality": {
+        "schema": "reference-quality-v1",
+        "audio_sha256": "a7ce8663a203489661be6e9078efe5c6d8c17a87e9e99732433e7d729cc3fa7f",
+        "expected_text": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+        "expected_text_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+        "language": "en",
+        "expected_text_origin": "provided",
+        "device": "cpu",
+        "created_at_unix": 1791034226.8019497,
+        "pipeline": {
+          "version": "reference-quality-v1",
+          "source_sha256": "d319422e6452b7fb7b90b2b0ddb4b6d4a8588e1b378e2b773d5fe1ee8ec25b46",
+          "asr_source_sha256": "fea431f01fb06ef19679c1f0dc5cb66359a7bca071dc545bc933283915231cb6",
+          "versions": {
+            "faster-whisper": "1.2.1",
+            "ctranslate2": "4.8.2",
+            "onnxruntime": "1.30.0",
+            "numpy": "2.0.2",
+            "scipy": "1.18.1",
+            "soundfile": "0.14.0",
+            "av": "18.1.0"
+          },
+          "vad_model_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+          "asr_model_sha256": "c95d9223c0008d68daada3f6776fb386729f8a8621ed76e9e38968b1afa0e6fe",
+          "settings": {
+            "vad_rate": 16000,
+            "vad_threshold": 0.5,
+            "min_speech_ms": 250,
+            "min_silence_ms": 200,
+            "speech_pad_ms": 30,
+            "max_bytes": 24000000,
+            "duration_min": 3,
+            "duration_max": 30.01,
+            "clip_fraction_max": 0.001,
+            "speech_seconds_min": 1.5,
+            "speech_fraction_min": 0.25,
+            "background_ratio_review_below_db": 8,
+            "word_confidence_mean_min": 0.85,
+            "low_word_probability": 0.5,
+            "low_word_fraction_max": 0.1,
+            "wer_pass_max": 0.1,
+            "wer_fail_min": 0.5,
+            "uncovered_speech_max_seconds": 0.65,
+            "word_vad_coverage_min": 0.6
+          },
+          "asr_settings": {
+            "device": "cpu",
+            "compute_type": "int8",
+            "cpu_threads": 2,
+            "beam_size": 5,
+            "word_timestamps": true,
+            "vad_filter": false,
+            "condition_on_previous_text": false,
+            "temperature": 0.0
+          }
+        },
+        "cache_key": "d40ce09de24f94e5fc74afe86d3a124d0fa862def712bb361cbb1e62204776c7",
+        "status": "pass",
+        "scope": "supported technical checks only",
+        "checks": {
+          "decode": {
+            "status": "pass",
+            "reason": "Finite mono audio, bounded 3-30 second crop."
+          },
+          "clipping": {
+            "status": "pass",
+            "reason": "Peak 0.5885; clipped sample fraction 0.000000."
+          },
+          "signal": {
+            "status": "pass",
+            "reason": "RMS 0.0714; near-silent sample fraction 0.044."
+          },
+          "speech": {
+            "status": "pass",
+            "reason": "VAD found 7.84s of speech; this does not count speakers."
+          },
+          "background_energy": {
+            "status": "pass",
+            "reason": "Speech/non-speech RMS ratio 22.3dB; a heuristic, not measured SNR or music detection."
+          },
+          "music": {
+            "status": "unavailable",
+            "reason": "No installed validated music classifier; not assessed."
+          },
+          "overlap_speakers": {
+            "status": "unavailable",
+            "reason": "No installed overlap detector or diarizer; speaker count and overlap not assessed."
+          },
+          "identity_rights": {
+            "status": "unavailable",
+            "reason": "Audio metrics do not prove performer identity, consent, licensing or endorsement."
+          },
+          "asr": {
+            "status": "pass",
+            "reason": "Mean word confidence 0.970; low-confidence fraction 0.000. Confidence is not transcript truth."
+          },
+          "transcript_alignment": {
+            "status": "pass",
+            "reason": "Normalized word error rate 0.036 against the supplied transcript; word timing is ASR-estimated, not forced alignment."
+          },
+          "crop_coverage": {
+            "status": "pass",
+            "reason": "Uncovered edge speech 0.28s; word/VAD overlap 0.929. Clipped phonemes still require listening when uncertain."
+          }
+        },
+        "metrics": {
+          "duration_seconds": 8.42,
+          "sample_rate": 48000,
+          "peak": 0.5885009765625,
+          "rms": 0.07137335160838595,
+          "clipping_fraction": 0.0,
+          "near_silence_fraction": 0.04356937846397466,
+          "speech_seconds": 7.842020833333334,
+          "speech_fraction": 0.9313563935075219,
+          "speech_spans": [
+            {
+              "start": 0.578,
+              "end": 8.42
+            }
+          ],
+          "speech_background_ratio_db": 22.334,
+          "mean_word_probability": 0.9699,
+          "low_confidence_word_fraction": 0.0,
+          "recognized_text": "The difference in the rainbow depends considerably upon the size of the drops and the width of the coloured band increases as the size of the drops increases.",
+          "asr_word_count": 28,
+          "word_error_rate": 0.03571428571428571,
+          "uncovered_edge_speech_seconds": 0.27999999999999936,
+          "word_vad_coverage": 0.9289926289926289,
+          "first_word_seconds": 0.0,
+          "last_word_seconds": 8.14
+        },
+        "unavailable_checks": [
+          "music",
+          "overlap_speakers",
+          "identity_rights"
+        ],
+        "source_isolation_status": "unverified",
+        "automatic_source_approval": false,
+        "clone_eligibility_changed": false,
+        "human_verified": false,
+        "cache_hit": false,
+        "elapsed_seconds": 1.441
+      },
+      "source_classifier": {
+        "contaminated": false,
+        "input_pcm_sha256": "0aef280f81c3d85dd3f8ac9d992227c36ff60663955a64484cba1b2af4cd90ae",
+        "pipeline": {
+          "models": {
+            "ast_audioset/config.json": "a93d525511d77e8ecc933d09674b85099815bbbb417c228a4edd655e252fb9ff",
+            "ast_audioset/model.safetensors": "ae0c1e2ad4e1381d851fa9bf298ba13ebc9c5a914cdee2dbe427a6583869924d",
+            "ast_audioset/preprocessor_config.json": "8d04ba5a9c6fca5d39d0de2b1fd05ecf79deb589fbba279728bbebac39934231",
+            "pyannote_segmentation/model.onnx": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+          },
+          "settings": {
+            "device": "cpu",
+            "music_max": 0.2,
+            "noise_max": 0.2,
+            "overlap_peak_max": 0.1,
+            "schema": "source-classifier-v1",
+            "speech_min": 0.5,
+            "threads": 2,
+            "window_seconds": 10
+          },
+          "source_sha256": "07b90df2984732b357561ef49df92b6dd53ef5f497110477ef780ea77794d8c5",
+          "versions": {
+            "numpy": "2.4.6",
+            "onnxruntime": "1.27.0",
+            "scipy": "1.18.0",
+            "soundfile": "0.13.1",
+            "torch": "2.10.0+cu130",
+            "transformers": "4.57.3"
+          }
+        },
+        "reason": "Window-local classifier evidence; no performer identity or human quality acceptance.",
+        "sample_rate": 48000,
+        "single_local_speaker": true,
+        "speech_detected": true,
+        "status": "pass",
+        "windows": [
+          {
+            "duration_seconds": 8.42,
+            "music": 0.0032085624989122152,
+            "noise": 2.869165109586902e-05,
+            "overlap_frames": 0,
+            "overlap_peak": 0.0036860774271190166,
+            "singleton_count": 1,
+            "speech": 0.7533227801322937,
+            "start_seconds": 0.0
+          }
+        ]
+      },
+      "technical_ready": true,
+      "source_delivery_fit": "unknown",
+      "human_verified": false,
+      "casting_approved": false,
+      "production_approved": false,
+      "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+      "authorization_utc": "2026-10-03T13:20:50Z",
+      "scope": "unapproved_recorded_audition_draft",
+      "draft_id": "d6d4db8d388dfb91fd82706b53395451"
+    },
+    {
+      "source_id": "cstr-vctk-p254_023_mic1",
+      "speaker": "p254",
+      "original_sha256": "fa649e9a28750e7a14ac5929f447ea501ecdf100c9dcc6313f1432eba7634da4",
+      "input_pcm_sha256": "07867d8b8d407b3e29b643f9076a9af492ba9b5ad99d27779a6fdbf53260461e",
+      "sample_rate": 48000,
+      "start_seconds": 0.41000000000000136,
+      "end_seconds": 9.93,
+      "transcript": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light when mixed form yellow",
+      "transcript_sha256": "b3f56711be1be040cea08689fc6f52f001f6bf3622b2d212f84176ccfc7ddcfe",
+      "publisher_transcript": "If the red of the second bow falls upon the green of the first, the result is to give a bow with an abnormally wide yellow band, since red and green light when mixed form yellow.",
+      "publisher_transcript_sha256": "477b72cb77c71a2ab7b43510fcc347d9106e4b68b07b6742dd1e6b2cce9c48ce",
+      "quality": {
+        "schema": "reference-quality-v1",
+        "audio_sha256": "f0c7aa5f35e76cc2c5e0a2f0585ff6287eb9563c4e761b1d186324a7a3affcbc",
+        "expected_text": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light when mixed form yellow",
+        "expected_text_sha256": "b3f56711be1be040cea08689fc6f52f001f6bf3622b2d212f84176ccfc7ddcfe",
+        "language": "en",
+        "expected_text_origin": "provided",
+        "device": "cpu",
+        "created_at_unix": 1791034228.2569497,
+        "pipeline": {
+          "version": "reference-quality-v1",
+          "source_sha256": "d319422e6452b7fb7b90b2b0ddb4b6d4a8588e1b378e2b773d5fe1ee8ec25b46",
+          "asr_source_sha256": "fea431f01fb06ef19679c1f0dc5cb66359a7bca071dc545bc933283915231cb6",
+          "versions": {
+            "faster-whisper": "1.2.1",
+            "ctranslate2": "4.8.2",
+            "onnxruntime": "1.30.0",
+            "numpy": "2.0.2",
+            "scipy": "1.18.1",
+            "soundfile": "0.14.0",
+            "av": "18.1.0"
+          },
+          "vad_model_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+          "asr_model_sha256": "c95d9223c0008d68daada3f6776fb386729f8a8621ed76e9e38968b1afa0e6fe",
+          "settings": {
+            "vad_rate": 16000,
+            "vad_threshold": 0.5,
+            "min_speech_ms": 250,
+            "min_silence_ms": 200,
+            "speech_pad_ms": 30,
+            "max_bytes": 24000000,
+            "duration_min": 3,
+            "duration_max": 30.01,
+            "clip_fraction_max": 0.001,
+            "speech_seconds_min": 1.5,
+            "speech_fraction_min": 0.25,
+            "background_ratio_review_below_db": 8,
+            "word_confidence_mean_min": 0.85,
+            "low_word_probability": 0.5,
+            "low_word_fraction_max": 0.1,
+            "wer_pass_max": 0.1,
+            "wer_fail_min": 0.5,
+            "uncovered_speech_max_seconds": 0.65,
+            "word_vad_coverage_min": 0.6
+          },
+          "asr_settings": {
+            "device": "cpu",
+            "compute_type": "int8",
+            "cpu_threads": 2,
+            "beam_size": 5,
+            "word_timestamps": true,
+            "vad_filter": false,
+            "condition_on_previous_text": false,
+            "temperature": 0.0
+          }
+        },
+        "cache_key": "04c3a00f2665dd0622d11959f8ec02d19f99b96ceeff7dc257d1265378728d89",
+        "status": "pass",
+        "scope": "supported technical checks only",
+        "checks": {
+          "decode": {
+            "status": "pass",
+            "reason": "Finite mono audio, bounded 3-30 second crop."
+          },
+          "clipping": {
+            "status": "pass",
+            "reason": "Peak 0.7231; clipped sample fraction 0.000000."
+          },
+          "signal": {
+            "status": "pass",
+            "reason": "RMS 0.0774; near-silent sample fraction 0.047."
+          },
+          "speech": {
+            "status": "pass",
+            "reason": "VAD found 8.97s of speech; this does not count speakers."
+          },
+          "background_energy": {
+            "status": "pass",
+            "reason": "Speech/non-speech RMS ratio 25.5dB; a heuristic, not measured SNR or music detection."
+          },
+          "music": {
+            "status": "unavailable",
+            "reason": "No installed validated music classifier; not assessed."
+          },
+          "overlap_speakers": {
+            "status": "unavailable",
+            "reason": "No installed overlap detector or diarizer; speaker count and overlap not assessed."
+          },
+          "identity_rights": {
+            "status": "unavailable",
+            "reason": "Audio metrics do not prove performer identity, consent, licensing or endorsement."
+          },
+          "asr": {
+            "status": "pass",
+            "reason": "Mean word confidence 0.979; low-confidence fraction 0.000. Confidence is not transcript truth."
+          },
+          "transcript_alignment": {
+            "status": "pass",
+            "reason": "Normalized word error rate 0.000 against the supplied transcript; word timing is ASR-estimated, not forced alignment."
+          },
+          "crop_coverage": {
+            "status": "pass",
+            "reason": "Uncovered edge speech 0.16s; word/VAD overlap 0.936. Clipped phonemes still require listening when uncertain."
+          }
+        },
+        "metrics": {
+          "duration_seconds": 9.52,
+          "sample_rate": 48000,
+          "peak": 0.72308349609375,
+          "rms": 0.07740678074354514,
+          "clipping_fraction": 0.0,
+          "near_silence_fraction": 0.04747461484593837,
+          "speech_seconds": 8.974,
+          "speech_fraction": 0.9426470588235295,
+          "speech_spans": [
+            {
+              "start": 0.546,
+              "end": 9.52
+            }
+          ],
+          "speech_background_ratio_db": 25.496,
+          "mean_word_probability": 0.9792,
+          "low_confidence_word_fraction": 0.0,
+          "recognized_text": "If the red of the second bow falls upon the green of the first, the result is to give a bow with an abnormally wide yellow band, since red and green light when mixed form yellow.",
+          "asr_word_count": 36,
+          "word_error_rate": 0.0,
+          "uncovered_edge_speech_seconds": 0.16000000000000014,
+          "word_vad_coverage": 0.9360655737704918,
+          "first_word_seconds": 0.0,
+          "last_word_seconds": 9.36
+        },
+        "unavailable_checks": [
+          "music",
+          "overlap_speakers",
+          "identity_rights"
+        ],
+        "source_isolation_status": "unverified",
+        "automatic_source_approval": false,
+        "clone_eligibility_changed": false,
+        "human_verified": false,
+        "cache_hit": false,
+        "elapsed_seconds": 1.521
+      },
+      "source_classifier": {
+        "contaminated": false,
+        "input_pcm_sha256": "07867d8b8d407b3e29b643f9076a9af492ba9b5ad99d27779a6fdbf53260461e",
+        "pipeline": {
+          "models": {
+            "ast_audioset/config.json": "a93d525511d77e8ecc933d09674b85099815bbbb417c228a4edd655e252fb9ff",
+            "ast_audioset/model.safetensors": "ae0c1e2ad4e1381d851fa9bf298ba13ebc9c5a914cdee2dbe427a6583869924d",
+            "ast_audioset/preprocessor_config.json": "8d04ba5a9c6fca5d39d0de2b1fd05ecf79deb589fbba279728bbebac39934231",
+            "pyannote_segmentation/model.onnx": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+          },
+          "settings": {
+            "device": "cpu",
+            "music_max": 0.2,
+            "noise_max": 0.2,
+            "overlap_peak_max": 0.1,
+            "schema": "source-classifier-v1",
+            "speech_min": 0.5,
+            "threads": 2,
+            "window_seconds": 10
+          },
+          "source_sha256": "07b90df2984732b357561ef49df92b6dd53ef5f497110477ef780ea77794d8c5",
+          "versions": {
+            "numpy": "2.4.6",
+            "onnxruntime": "1.27.0",
+            "scipy": "1.18.0",
+            "soundfile": "0.13.1",
+            "torch": "2.10.0+cu130",
+            "transformers": "4.57.3"
+          }
+        },
+        "reason": "Window-local classifier evidence; no performer identity or human quality acceptance.",
+        "sample_rate": 48000,
+        "single_local_speaker": true,
+        "speech_detected": true,
+        "status": "pass",
+        "windows": [
+          {
+            "duration_seconds": 9.52,
+            "music": 0.0016404906054958701,
+            "noise": 2.9035942134214565e-05,
+            "overlap_frames": 0,
+            "overlap_peak": 0.00823027454316616,
+            "singleton_count": 1,
+            "speech": 0.7524728775024414,
+            "start_seconds": 0.0
+          }
+        ]
+      },
+      "technical_ready": true,
+      "source_delivery_fit": "unknown",
+      "human_verified": false,
+      "casting_approved": false,
+      "production_approved": false,
+      "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+      "authorization_utc": "2026-10-03T13:20:50Z",
+      "scope": "unapproved_recorded_audition_draft",
+      "draft_id": "3f5ecda8eeaea83762348c83c6fab6e3"
+    },
+    {
+      "source_id": "cstr-vctk-p273_021_mic1",
+      "speaker": "p273",
+      "original_sha256": "9bd52a8d607a8d8537de32ed35a64c972d3ad2e0b0b7e7ab1032542953e5d4b7",
+      "input_pcm_sha256": "6e46da30e638d2b9bef02798980343b4e88edb47ee93ffbb09427fc002999124",
+      "sample_rate": 48000,
+      "start_seconds": 0.3100000000000005,
+      "end_seconds": 8.790000000000001,
+      "transcript": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+      "transcript_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+      "publisher_transcript": "The difference in the rainbow depends considerably upon the size of the drops, and the width of the colored band increases as the size of the drops increases.",
+      "publisher_transcript_sha256": "fa711b93cf04896ea54d6864785a190e7a01317453377f9e32937db7b574cb06",
+      "quality": {
+        "schema": "reference-quality-v1",
+        "audio_sha256": "fc5259e22be9d3eae9e453ff47e574fb392c12b2991b6ed7ec8b52f8db62edc0",
+        "expected_text": "the difference in the rainbow depends considerably upon the size of the drops and the width of the colored band increases as the size of the drops increases",
+        "expected_text_sha256": "4858c3c0056e5dfa426cb8df8be038d88da87b503fa6f9bc5e23602c3d0bbbb2",
+        "language": "en",
+        "expected_text_origin": "provided",
+        "device": "cpu",
+        "created_at_unix": 1791034229.7909503,
+        "pipeline": {
+          "version": "reference-quality-v1",
+          "source_sha256": "d319422e6452b7fb7b90b2b0ddb4b6d4a8588e1b378e2b773d5fe1ee8ec25b46",
+          "asr_source_sha256": "fea431f01fb06ef19679c1f0dc5cb66359a7bca071dc545bc933283915231cb6",
+          "versions": {
+            "faster-whisper": "1.2.1",
+            "ctranslate2": "4.8.2",
+            "onnxruntime": "1.30.0",
+            "numpy": "2.0.2",
+            "scipy": "1.18.1",
+            "soundfile": "0.14.0",
+            "av": "18.1.0"
+          },
+          "vad_model_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+          "asr_model_sha256": "c95d9223c0008d68daada3f6776fb386729f8a8621ed76e9e38968b1afa0e6fe",
+          "settings": {
+            "vad_rate": 16000,
+            "vad_threshold": 0.5,
+            "min_speech_ms": 250,
+            "min_silence_ms": 200,
+            "speech_pad_ms": 30,
+            "max_bytes": 24000000,
+            "duration_min": 3,
+            "duration_max": 30.01,
+            "clip_fraction_max": 0.001,
+            "speech_seconds_min": 1.5,
+            "speech_fraction_min": 0.25,
+            "background_ratio_review_below_db": 8,
+            "word_confidence_mean_min": 0.85,
+            "low_word_probability": 0.5,
+            "low_word_fraction_max": 0.1,
+            "wer_pass_max": 0.1,
+            "wer_fail_min": 0.5,
+            "uncovered_speech_max_seconds": 0.65,
+            "word_vad_coverage_min": 0.6
+          },
+          "asr_settings": {
+            "device": "cpu",
+            "compute_type": "int8",
+            "cpu_threads": 2,
+            "beam_size": 5,
+            "word_timestamps": true,
+            "vad_filter": false,
+            "condition_on_previous_text": false,
+            "temperature": 0.0
+          }
+        },
+        "cache_key": "bf9988b8babb0ddabf528ea9d3ddb32c005d24fde8cd41427a390166a1b725a8",
+        "status": "pass",
+        "scope": "supported technical checks only",
+        "checks": {
+          "decode": {
+            "status": "pass",
+            "reason": "Finite mono audio, bounded 3-30 second crop."
+          },
+          "clipping": {
+            "status": "pass",
+            "reason": "Peak 0.6065; clipped sample fraction 0.000000."
+          },
+          "signal": {
+            "status": "pass",
+            "reason": "RMS 0.0618; near-silent sample fraction 0.060."
+          },
+          "speech": {
+            "status": "pass",
+            "reason": "VAD found 7.32s of speech; this does not count speakers."
+          },
+          "background_energy": {
+            "status": "pass",
+            "reason": "Speech/non-speech RMS ratio 22.2dB; a heuristic, not measured SNR or music detection."
+          },
+          "music": {
+            "status": "unavailable",
+            "reason": "No installed validated music classifier; not assessed."
+          },
+          "overlap_speakers": {
+            "status": "unavailable",
+            "reason": "No installed overlap detector or diarizer; speaker count and overlap not assessed."
+          },
+          "identity_rights": {
+            "status": "unavailable",
+            "reason": "Audio metrics do not prove performer identity, consent, licensing or endorsement."
+          },
+          "asr": {
+            "status": "pass",
+            "reason": "Mean word confidence 0.959; low-confidence fraction 0.000. Confidence is not transcript truth."
+          },
+          "transcript_alignment": {
+            "status": "pass",
+            "reason": "Normalized word error rate 0.036 against the supplied transcript; word timing is ASR-estimated, not forced alignment."
+          },
+          "crop_coverage": {
+            "status": "pass",
+            "reason": "Uncovered edge speech 0.34s; word/VAD overlap 0.858. Clipped phonemes still require listening when uncertain."
+          }
+        },
+        "metrics": {
+          "duration_seconds": 8.48,
+          "sample_rate": 48000,
+          "peak": 0.60650634765625,
+          "rms": 0.06180902703191153,
+          "clipping_fraction": 0.0,
+          "near_silence_fraction": 0.05953223270440251,
+          "speech_seconds": 7.322,
+          "speech_fraction": 0.8634433962264151,
+          "speech_spans": [
+            {
+              "start": 0.674,
+              "end": 4.35
+            },
+            {
+              "start": 4.834,
+              "end": 8.48
+            }
+          ],
+          "speech_background_ratio_db": 22.177,
+          "mean_word_probability": 0.9586,
+          "low_confidence_word_fraction": 0.0,
+          "recognized_text": "The difference in the rainbow depends considerably upon the size of the drops and the width of the coloured band increases as the size of the drops increases.",
+          "asr_word_count": 28,
+          "word_error_rate": 0.03571428571428571,
+          "uncovered_edge_speech_seconds": 0.33999999999999986,
+          "word_vad_coverage": 0.8577395577395578,
+          "first_word_seconds": 0.0,
+          "last_word_seconds": 8.14
+        },
+        "unavailable_checks": [
+          "music",
+          "overlap_speakers",
+          "identity_rights"
+        ],
+        "source_isolation_status": "unverified",
+        "automatic_source_approval": false,
+        "clone_eligibility_changed": false,
+        "human_verified": false,
+        "cache_hit": false,
+        "elapsed_seconds": 1.4771
+      },
+      "source_classifier": {
+        "contaminated": false,
+        "input_pcm_sha256": "6e46da30e638d2b9bef02798980343b4e88edb47ee93ffbb09427fc002999124",
+        "pipeline": {
+          "models": {
+            "ast_audioset/config.json": "a93d525511d77e8ecc933d09674b85099815bbbb417c228a4edd655e252fb9ff",
+            "ast_audioset/model.safetensors": "ae0c1e2ad4e1381d851fa9bf298ba13ebc9c5a914cdee2dbe427a6583869924d",
+            "ast_audioset/preprocessor_config.json": "8d04ba5a9c6fca5d39d0de2b1fd05ecf79deb589fbba279728bbebac39934231",
+            "pyannote_segmentation/model.onnx": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+          },
+          "settings": {
+            "device": "cpu",
+            "music_max": 0.2,
+            "noise_max": 0.2,
+            "overlap_peak_max": 0.1,
+            "schema": "source-classifier-v1",
+            "speech_min": 0.5,
+            "threads": 2,
+            "window_seconds": 10
+          },
+          "source_sha256": "07b90df2984732b357561ef49df92b6dd53ef5f497110477ef780ea77794d8c5",
+          "versions": {
+            "numpy": "2.4.6",
+            "onnxruntime": "1.27.0",
+            "scipy": "1.18.0",
+            "soundfile": "0.13.1",
+            "torch": "2.10.0+cu130",
+            "transformers": "4.57.3"
+          }
+        },
+        "reason": "Window-local classifier evidence; no performer identity or human quality acceptance.",
+        "sample_rate": 48000,
+        "single_local_speaker": true,
+        "speech_detected": true,
+        "status": "pass",
+        "windows": [
+          {
+            "duration_seconds": 8.48,
+            "music": 0.0016508916160091758,
+            "noise": 0.0001126307834056206,
+            "overlap_frames": 0,
+            "overlap_peak": 0.004047703929245472,
+            "singleton_count": 1,
+            "speech": 0.7889551520347595,
+            "start_seconds": 0.0
+          }
+        ]
+      },
+      "technical_ready": true,
+      "source_delivery_fit": "unknown",
+      "human_verified": false,
+      "casting_approved": false,
+      "production_approved": false,
+      "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+      "authorization_utc": "2026-10-03T13:20:50Z",
+      "scope": "unapproved_recorded_audition_draft",
+      "draft_id": "a2e2da5975ae4482d5368a5eecdcc5b0"
+    },
+    {
+      "source_id": "cstr-vctk-p273_023_mic1",
+      "speaker": "p273",
+      "original_sha256": "8df10564a331615dc6d7f3358bf8f79bbb07105de7bc45f8e1696dbdb2c698cc",
+      "input_pcm_sha256": "a3d732a294d2440df98dc7fef63ba906d73c9370500a08c5fd21bf305d3089d8",
+      "sample_rate": 48000,
+      "start_seconds": 0.4299999999999996,
+      "end_seconds": 10.23,
+      "transcript": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light",
+      "transcript_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872",
+      "publisher_transcript": "If the red of the second bow falls upon the green of the first, the result is to give a bow with an abnormally wide yellow band, since red and green light when mixed form yellow.",
+      "publisher_transcript_sha256": "477b72cb77c71a2ab7b43510fcc347d9106e4b68b07b6742dd1e6b2cce9c48ce",
+      "quality": {
+        "schema": "reference-quality-v1",
+        "audio_sha256": "fd9287c7b4aa8bdba592210cfaabb88fab6bdf9347ad16c9b63ecb9ab04017bb",
+        "expected_text": "if the red of the second bow falls upon the green of the first the result is to give a bow with an abnormally wide yellow band since red and green light",
+        "expected_text_sha256": "4aa8e54d82c72f62ba8cf48b48ea1025fe66b3f12dfe2b570b562648ec645872",
+        "language": "en",
+        "expected_text_origin": "provided",
+        "device": "cpu",
+        "created_at_unix": 1791034231.2840748,
+        "pipeline": {
+          "version": "reference-quality-v1",
+          "source_sha256": "d319422e6452b7fb7b90b2b0ddb4b6d4a8588e1b378e2b773d5fe1ee8ec25b46",
+          "asr_source_sha256": "fea431f01fb06ef19679c1f0dc5cb66359a7bca071dc545bc933283915231cb6",
+          "versions": {
+            "faster-whisper": "1.2.1",
+            "ctranslate2": "4.8.2",
+            "onnxruntime": "1.30.0",
+            "numpy": "2.0.2",
+            "scipy": "1.18.1",
+            "soundfile": "0.14.0",
+            "av": "18.1.0"
+          },
+          "vad_model_sha256": "4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2",
+          "asr_model_sha256": "c95d9223c0008d68daada3f6776fb386729f8a8621ed76e9e38968b1afa0e6fe",
+          "settings": {
+            "vad_rate": 16000,
+            "vad_threshold": 0.5,
+            "min_speech_ms": 250,
+            "min_silence_ms": 200,
+            "speech_pad_ms": 30,
+            "max_bytes": 24000000,
+            "duration_min": 3,
+            "duration_max": 30.01,
+            "clip_fraction_max": 0.001,
+            "speech_seconds_min": 1.5,
+            "speech_fraction_min": 0.25,
+            "background_ratio_review_below_db": 8,
+            "word_confidence_mean_min": 0.85,
+            "low_word_probability": 0.5,
+            "low_word_fraction_max": 0.1,
+            "wer_pass_max": 0.1,
+            "wer_fail_min": 0.5,
+            "uncovered_speech_max_seconds": 0.65,
+            "word_vad_coverage_min": 0.6
+          },
+          "asr_settings": {
+            "device": "cpu",
+            "compute_type": "int8",
+            "cpu_threads": 2,
+            "beam_size": 5,
+            "word_timestamps": true,
+            "vad_filter": false,
+            "condition_on_previous_text": false,
+            "temperature": 0.0
+          }
+        },
+        "cache_key": "5c2188267a1b640863f3cf6afda1f01fe98499c24ff42e0eecf1aeb6b214e65e",
+        "status": "pass",
+        "scope": "supported technical checks only",
+        "checks": {
+          "decode": {
+            "status": "pass",
+            "reason": "Finite mono audio, bounded 3-30 second crop."
+          },
+          "clipping": {
+            "status": "pass",
+            "reason": "Peak 0.4802; clipped sample fraction 0.000000."
+          },
+          "signal": {
+            "status": "pass",
+            "reason": "RMS 0.0713; near-silent sample fraction 0.046."
+          },
+          "speech": {
+            "status": "pass",
+            "reason": "VAD found 9.29s of speech; this does not count speakers."
+          },
+          "background_energy": {
+            "status": "pass",
+            "reason": "Speech/non-speech RMS ratio 21.1dB; a heuristic, not measured SNR or music detection."
+          },
+          "music": {
+            "status": "unavailable",
+            "reason": "No installed validated music classifier; not assessed."
+          },
+          "overlap_speakers": {
+            "status": "unavailable",
+            "reason": "No installed overlap detector or diarizer; speaker count and overlap not assessed."
+          },
+          "identity_rights": {
+            "status": "unavailable",
+            "reason": "Audio metrics do not prove performer identity, consent, licensing or endorsement."
+          },
+          "asr": {
+            "status": "pass",
+            "reason": "Mean word confidence 0.953; low-confidence fraction 0.031. Confidence is not transcript truth."
+          },
+          "transcript_alignment": {
+            "status": "pass",
+            "reason": "Normalized word error rate 0.000 against the supplied transcript; word timing is ASR-estimated, not forced alignment."
+          },
+          "crop_coverage": {
+            "status": "pass",
+            "reason": "Uncovered edge speech 0.14s; word/VAD overlap 0.945. Clipped phonemes still require listening when uncertain."
+          }
+        },
+        "metrics": {
+          "duration_seconds": 9.8,
+          "sample_rate": 48000,
+          "peak": 0.480224609375,
+          "rms": 0.07134709666478349,
+          "clipping_fraction": 0.0,
+          "near_silence_fraction": 0.046007653061224486,
+          "speech_seconds": 9.286,
+          "speech_fraction": 0.9475510204081632,
+          "speech_spans": [
+            {
+              "start": 0.514,
+              "end": 9.8
+            }
+          ],
+          "speech_background_ratio_db": 21.101,
+          "mean_word_probability": 0.9535,
+          "low_confidence_word_fraction": 0.03125,
+          "recognized_text": "If the red of the second bow falls upon the green of the first, the result is to give a bow with an abnormally wide yellow band. since red and green light",
+          "asr_word_count": 32,
+          "word_error_rate": 0.0,
+          "uncovered_edge_speech_seconds": 0.14000000000000057,
+          "word_vad_coverage": 0.9446120689655171,
+          "first_word_seconds": 0.0,
+          "last_word_seconds": 9.66
+        },
+        "unavailable_checks": [
+          "music",
+          "overlap_speakers",
+          "identity_rights"
+        ],
+        "source_isolation_status": "unverified",
+        "automatic_source_approval": false,
+        "clone_eligibility_changed": false,
+        "human_verified": false,
+        "cache_hit": false,
+        "elapsed_seconds": 2.129
+      },
+      "source_classifier": {
+        "contaminated": false,
+        "input_pcm_sha256": "a3d732a294d2440df98dc7fef63ba906d73c9370500a08c5fd21bf305d3089d8",
+        "pipeline": {
+          "models": {
+            "ast_audioset/config.json": "a93d525511d77e8ecc933d09674b85099815bbbb417c228a4edd655e252fb9ff",
+            "ast_audioset/model.safetensors": "ae0c1e2ad4e1381d851fa9bf298ba13ebc9c5a914cdee2dbe427a6583869924d",
+            "ast_audioset/preprocessor_config.json": "8d04ba5a9c6fca5d39d0de2b1fd05ecf79deb589fbba279728bbebac39934231",
+            "pyannote_segmentation/model.onnx": "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+          },
+          "settings": {
+            "device": "cpu",
+            "music_max": 0.2,
+            "noise_max": 0.2,
+            "overlap_peak_max": 0.1,
+            "schema": "source-classifier-v1",
+            "speech_min": 0.5,
+            "threads": 2,
+            "window_seconds": 10
+          },
+          "source_sha256": "07b90df2984732b357561ef49df92b6dd53ef5f497110477ef780ea77794d8c5",
+          "versions": {
+            "numpy": "2.4.6",
+            "onnxruntime": "1.27.0",
+            "scipy": "1.18.0",
+            "soundfile": "0.13.1",
+            "torch": "2.10.0+cu130",
+            "transformers": "4.57.3"
+          }
+        },
+        "reason": "Window-local classifier evidence; no performer identity or human quality acceptance.",
+        "sample_rate": 48000,
+        "single_local_speaker": true,
+        "speech_detected": true,
+        "status": "pass",
+        "windows": [
+          {
+            "duration_seconds": 9.8,
+            "music": 0.001295223250053823,
+            "noise": 2.8814385586883873e-05,
+            "overlap_frames": 0,
+            "overlap_peak": 0.020515810698270798,
+            "singleton_count": 1,
+            "speech": 0.8647358417510986,
+            "start_seconds": 0.0
+          }
+        ]
+      },
+      "technical_ready": true,
+      "source_delivery_fit": "unknown",
+      "human_verified": false,
+      "casting_approved": false,
+      "production_approved": false,
+      "authorization_event": "Sentinel_b862b312ba848191ba41f987ce2c4dfe",
+      "authorization_utc": "2026-10-03T13:20:50Z",
+      "scope": "unapproved_recorded_audition_draft",
+      "draft_id": "db46be4384880f035f6a0f51703c073c"
+    }
+  ],
+  "reviewed_utc": "2026-10-03T13:30:33.418094+00:00",
+  "role_fit_unknown": true,
+  "human_approval": false,
+  "user_authorized_unapproved_auditions": true
+}

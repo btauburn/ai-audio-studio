@@ -101,6 +101,11 @@ class Attribution(BaseModel):
     reviewed: bool = False
     updated_at: Optional[datetime] = None
     note: Optional[str] = None
+    # The raw analyzer speaker label, retained as evidence only. It is never an
+    # authority: ``speaker_id`` is the one identity unit and always holds a
+    # canonical Role.id. Keeping the label here lets a human review the original
+    # analyzer proposal after the identity has been canonicalized.
+    label: Optional[str] = Field(None, description="分析器原始说话人标签（仅证据，非身份）")
 
     @property
     def human_authoritative(self) -> bool:

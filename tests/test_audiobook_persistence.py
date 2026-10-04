@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import subprocess
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -21,6 +23,7 @@ from dubbing_service.app.core.config import safe_project_root
 from dubbing_service.app.storage.process_lock import (
     LOCK_FILENAME,
     LockBusyError,
+    LockOwner,
     ProjectsRootLock,
     pid_is_alive,
 )
@@ -538,6 +541,211 @@ def test_second_writer_is_refused_while_another_process_holds_the_root(
     assert lock.read_owner() is None
     owner = lock.acquire(timeout=1.0)
     assert owner.pid == os.getpid()
+    lock.release()
+
+
+def test_second_writer_refuses_live_local_owner_after_heartbeat_age_expires(
+    studio, tmp_path
+):
+    root, _tmp_path = studio
+    child, ready, child_pid = _hold_child(tmp_path, root, "hold")
+    try:
+        lock = ProjectsRootLock(root, stale_after_seconds=0.01)
+        owner = lock.read_owner()
+        assert owner is not None and owner.pid == child_pid
+
+        # Simulate a long-lived Studio owner whose process is alive but whose
+        # lock heartbeat was not refreshed during an idle period.
+        stale = replace(owner, heartbeat_at="2000-01-01T00:00:00+00:00")
+        lock.lock_path.write_text(json.dumps(stale.to_payload()), encoding="utf-8")
+        assert stale.heartbeat_age() > 0.01
+        assert stale.is_live(stale_after_seconds=0.01)
+        assert pid_is_alive(child_pid)
+
+        with pytest.raises(LockBusyError):
+            lock.acquire(timeout=0.1, poll_interval=0.01)
+        assert lock.read_owner().pid == child_pid
+    finally:
+        Path(str(ready) + ".release").write_text("go", encoding="utf-8")
+        child.wait(timeout=120)
+
+
+@pytest.mark.parametrize("error_code,expected", [(5, True), (87, False), (123, True)])
+def test_windows_pid_query_errors_fail_closed_except_missing_pid(
+    monkeypatch, error_code, expected
+):
+    import ctypes
+    from types import SimpleNamespace
+
+    from dubbing_service.app.storage import process_lock
+
+    class ApiFunction:
+        def __init__(self, callback):
+            self.callback = callback
+
+        def __call__(self, *args):
+            return self.callback(*args)
+
+    kernel32 = SimpleNamespace(
+        OpenProcess=ApiFunction(lambda *args: None),
+        GetLastError=ApiFunction(lambda: error_code),
+        GetExitCodeProcess=ApiFunction(lambda *args: 0),
+        GetProcessTimes=ApiFunction(lambda *args: 0),
+        CloseHandle=ApiFunction(lambda *args: 1),
+    )
+    with monkeypatch.context() as patch:
+        patch.setattr(process_lock.os, "name", "nt")
+        patch.setattr(ctypes, "windll", SimpleNamespace(kernel32=kernel32), raising=False)
+        actual = process_lock.pid_is_alive(987654321)
+    assert actual is expected
+
+
+def test_windows_process_handle_uses_pointer_width_and_reads_creation_time(
+    monkeypatch,
+):
+    import ctypes
+    from ctypes import wintypes
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+
+    from dubbing_service.app.storage import process_lock
+
+    class ApiFunction:
+        def __init__(self, callback):
+            self.callback = callback
+            self.argtypes = None
+            self.restype = None
+
+        def __call__(self, *args):
+            return self.callback(*args)
+
+    handle_value = 0x123456789ABC
+    creation_ticks = 0x01DD123456789ABC
+    observed_handles = []
+
+    def set_dword(handle, output):
+        observed_handles.append(handle)
+        ctypes.cast(output, ctypes.POINTER(wintypes.DWORD))[0] = 259
+        return 1
+
+    def set_times(handle, creation, exit_time, kernel, user):
+        observed_handles.append(handle)
+        filetime = ctypes.cast(creation, ctypes.POINTER(wintypes.FILETIME))[0]
+        filetime.dwLowDateTime = creation_ticks & 0xFFFFFFFF
+        filetime.dwHighDateTime = creation_ticks >> 32
+        return 1
+
+    kernel32 = SimpleNamespace(
+        OpenProcess=ApiFunction(lambda *_args: handle_value),
+        GetLastError=ApiFunction(lambda: 0),
+        GetExitCodeProcess=ApiFunction(set_dword),
+        GetProcessTimes=ApiFunction(set_times),
+        CloseHandle=ApiFunction(lambda handle: 1),
+    )
+    with monkeypatch.context() as patch:
+        patch.setattr(process_lock.os, "name", "nt")
+        patch.setattr(ctypes, "windll", SimpleNamespace(kernel32=kernel32), raising=False)
+        alive, created_at = process_lock._windows_process_identity(2468)
+
+    assert alive is True
+    assert created_at == datetime(1601, 1, 1, tzinfo=timezone.utc) + timedelta(
+        microseconds=creation_ticks // 10
+    )
+    assert kernel32.OpenProcess.argtypes == (
+        wintypes.DWORD,
+        wintypes.BOOL,
+        wintypes.DWORD,
+    )
+    assert kernel32.OpenProcess.restype is wintypes.HANDLE
+    assert kernel32.GetExitCodeProcess.argtypes[0] is wintypes.HANDLE
+    assert kernel32.CloseHandle.argtypes == (wintypes.HANDLE,)
+    assert ctypes.sizeof(wintypes.HANDLE) == ctypes.sizeof(ctypes.c_void_p)
+    assert observed_handles == [handle_value, handle_value]
+
+
+def test_windows_pid_reuse_requires_matching_process_creation_identity(monkeypatch):
+    from datetime import datetime, timezone
+
+    from dubbing_service.app.storage import process_lock
+
+    # acquired_at can be behind process birth after a system clock adjustment;
+    # process instance identity remains stable and is the deciding evidence.
+    acquired_at = datetime(2022, 1, 1, tzinfo=timezone.utc)
+    recorded_birth = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    reused_pid_birth = datetime(2027, 1, 1, tzinfo=timezone.utc)
+    owner = LockOwner(
+        token="legacy",
+        pid=12345,
+        host=socket.gethostname(),
+        label="test",
+        root="root",
+        acquired_at=acquired_at.isoformat(),
+        heartbeat_at="2000-01-01T00:00:00+00:00",
+        process_created_at=recorded_birth.isoformat(),
+    )
+    with monkeypatch.context() as patch:
+        patch.setattr(process_lock.os, "name", "nt")
+        patch.setattr(
+            process_lock,
+            "_windows_process_identity",
+            lambda _pid: (True, recorded_birth),
+        )
+        assert owner.is_live(stale_after_seconds=0.01) is True
+
+        patch.setattr(
+            process_lock,
+            "_windows_process_identity",
+            lambda _pid: (True, reused_pid_birth),
+        )
+        assert owner.is_live(stale_after_seconds=0.01) is False
+
+        legacy_owner = replace(owner, process_created_at=None)
+        patch.setattr(
+            process_lock,
+            "_windows_process_identity",
+            lambda _pid: (True, reused_pid_birth),
+        )
+        assert legacy_owner.is_live(stale_after_seconds=0.01) is True
+
+        patch.setattr(
+            process_lock,
+            "_windows_process_identity",
+            lambda _pid: (True, None),
+        )
+        assert owner.is_live(stale_after_seconds=0.01) is True
+        patch.setattr(process_lock, "_windows_process_identity", lambda _pid: (False, None))
+        assert owner.is_live(stale_after_seconds=0.01) is False
+
+
+def test_process_creation_identity_survives_nested_lock_and_heartbeat(
+    monkeypatch, studio
+):
+    from datetime import datetime, timezone
+
+    from dubbing_service.app.storage import process_lock
+
+    root, _tmp_path = studio
+    created_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    monkeypatch.setattr(process_lock.os, "name", "nt")
+    monkeypatch.setattr(
+        process_lock,
+        "_windows_process_identity",
+        lambda _pid: (True, created_at),
+    )
+
+    lock = ProjectsRootLock(root)
+    owner = lock.acquire(timeout=0.5)
+    assert owner.process_created_at == created_at.isoformat()
+    assert lock.read_owner().process_created_at == owner.process_created_at
+
+    nested = lock.acquire(timeout=0.5)
+    assert nested.process_created_at == owner.process_created_at
+    refreshed = lock.heartbeat()
+    assert refreshed.process_created_at == owner.process_created_at
+    assert lock.read_owner().process_created_at == owner.process_created_at
+
+    lock.release()
+    assert lock.read_owner().process_created_at == owner.process_created_at
     lock.release()
 
 

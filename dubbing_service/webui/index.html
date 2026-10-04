@@ -55,6 +55,7 @@
           </div>
 
           <div class="flex items-center gap-4 text-[11px] text-slate-400">
+            <a :href="'/web/voice-lab.html' + (currentProject ? '?project=' + encodeURIComponent(currentProject.id) : '')" class="px-3 py-3 rounded-full border border-slate-700 text-slate-100 hover:bg-slate-800" style="min-height:44px;display:inline-flex;align-items:center">Voice Lab</a>
             <div class="hidden sm:flex items-center gap-1">
               <span class="text-slate-500">API 基础路径</span>
               <span class="font-mono text-slate-200">/api</span>
@@ -2427,6 +2428,27 @@
                     <li><strong>可选情感指令</strong>：输入情感指令如"用愤怒的语气说"、"用开心的声音说"</li>
                     <li><strong>语言选择</strong>：支持中文、英文、日文、韩文等 10 种语言</li>
                   </ul>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                  <label class="block space-y-1">
+                    <span class="text-slate-300">Qwen CustomVoice 执行配置</span>
+                    <select v-model="ttsParams.qwen3_execution_profile" class="w-full rounded bg-slate-950 border border-slate-700 px-2 py-1">
+                      <option value="native-current">当前原生实现</option>
+                      <option value="native-sdpa">原生 SDPA</option>
+                      <option value="qwen-cudagraph">隔离 CUDA 图运行时（实验）</option>
+                    </select>
+                    <span class="text-[10px] text-slate-500">默认: {{ ttsParams.defaults.qwen3_execution_profile }}。CUDA 图配置使用独立环境，并在缓存上限处拒绝截断结果。</span>
+                  </label>
+                  <label class="block space-y-1">
+                    <span class="text-slate-300">原生注意力实现</span>
+                    <select v-model="ttsParams.qwen3_attention" class="w-full rounded bg-slate-950 border border-slate-700 px-2 py-1">
+                      <option value="auto">自动（保留当前策略）</option>
+                      <option value="eager">Eager</option>
+                      <option value="sdpa">PyTorch SDPA</option>
+                      <option value="flash_attention_2">FlashAttention 2</option>
+                    </select>
+                    <span class="text-[10px] text-slate-500">执行配置为原生 SDPA 或 CUDA 图时会强制 SDPA。更改后重启 TTS 服务生效。</span>
+                  </label>
                 </div>
               </div>
 

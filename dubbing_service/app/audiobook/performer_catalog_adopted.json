@@ -1,0 +1,33 @@
+{
+  "schema": "performer-catalog-adopted-v1",
+  "version": "1",
+  "performers": [
+    {
+      "candidate_id": "lithgow-white-house-reading-2011",
+      "performer": "John Lithgow",
+      "performance": "2011 White House Easter Egg Roll, reading from his books",
+      "tags": [
+        "male",
+        "mature",
+        "warm",
+        "measured",
+        "theatrical",
+        "expressive",
+        "american",
+        "reassuring"
+      ],
+      "creative_direction": "An original mature storyteller with theatrical warmth, measured reassurance and expressive shifts.",
+      "source_urls": [
+        "https://obamawhitehouse.archives.gov/photos-and-video/video/2011/04/25/2011-white-house-easter-egg-roll-john-lithgow-reads-his-books"
+      ],
+      "verified_facts": [
+        "The official White House archive identifies actor John Lithgow reading his books at the 2011 Easter Egg Roll."
+      ],
+      "facts_verified_at": "2026-10-02",
+      "language": "en",
+      "evidence_level": "official_recording_metadata",
+      "audio_observations": [],
+      "creative_interpretation": "Delivery, vocal age and accent tags are creative casting directions, not acoustic measurements or biographical facts."
+    }
+  ]
+}

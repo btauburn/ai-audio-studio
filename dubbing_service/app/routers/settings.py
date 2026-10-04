@@ -1,6 +1,7 @@
 """Platform-level configuration APIs (LLM/TTS service settings)."""
 
 from __future__ import annotations
+from typing import Literal
 
 import json
 import logging
@@ -31,6 +32,7 @@ from dubbing_service.app.core.config import (
 )
 from dubbing_service.app.core.tts_backends import (
     BACKEND_SPECS,
+    DEFAULT_QWEN_BASE_PROFILE,
     build_backend_command,
     public_backend_definitions,
 )
@@ -129,6 +131,10 @@ TTS_PARAMS_DEFAULTS = {
     "context_injection_length": 50,  # 上下文注入：取前一分段后N个字符作为前情提要
     "cosyvoice_speed": 1.0,  # CosyVoice3 语速，0.5-2.0
     "qwen3_default_language": "Chinese",  # Qwen3 默认语言：Chinese/English/.../Auto
+    # auto intentionally preserves the historical FlashAttention-or-eager policy.
+    # Faster but numerically distinct modes stay opt-in until listening review.
+    "qwen3_attention": "auto",
+    "qwen3_execution_profile": "native-current",
 }
 
 
@@ -145,6 +151,8 @@ QWEN3_ALLOWED_LANGUAGES = {
     "Spanish",
     "Italian",
 }
+QWEN3_ALLOWED_ATTENTION = {"auto", "eager", "sdpa", "flash_attention_2"}
+QWEN3_ALLOWED_EXECUTION_PROFILES = {"native-current", "native-sdpa", "qwen-cudagraph"}
 
 
 class TTSParamsPayload(BaseModel):
@@ -166,6 +174,14 @@ class TTSParamsPayload(BaseModel):
         default=None,
         description="Qwen3 默认语言：Auto/Chinese/English/Japanese/Korean/German/French/Russian/Portuguese/Spanish/Italian",
     )
+    qwen3_attention: str | None = Field(
+        default=None,
+        description="Qwen3 注意力实现：auto/eager/sdpa/flash_attention_2",
+    )
+    qwen3_execution_profile: str | None = Field(
+        default=None,
+        description="Qwen3 CustomVoice 执行配置：native-current/native-sdpa/qwen-cudagraph",
+    )
 
     @field_validator("qwen3_default_language")
     @classmethod
@@ -179,6 +195,32 @@ class TTSParamsPayload(BaseModel):
             if text.lower() == option.lower():
                 return option
         raise ValueError("qwen3_default_language 必须是 Auto/Chinese/English/Japanese/Korean/German/French/Russian/Portuguese/Spanish/Italian")
+
+    @field_validator("qwen3_attention")
+    @classmethod
+    def _validate_qwen3_attention(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip().lower()
+        if not text:
+            return None
+        if text not in QWEN3_ALLOWED_ATTENTION:
+            raise ValueError("qwen3_attention 必须是 auto/eager/sdpa/flash_attention_2")
+        return text
+
+    @field_validator("qwen3_execution_profile")
+    @classmethod
+    def _validate_qwen3_execution_profile(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip().lower()
+        if not text:
+            return None
+        if text not in QWEN3_ALLOWED_EXECUTION_PROFILES:
+            raise ValueError(
+                "qwen3_execution_profile 必须是 native-current/native-sdpa/qwen-cudagraph"
+            )
+        return text
 
 
 class TTSParamsResponse(BaseModel):
@@ -197,6 +239,8 @@ class TTSParamsResponse(BaseModel):
     context_injection_length: int
     cosyvoice_speed: float
     qwen3_default_language: str
+    qwen3_attention: str
+    qwen3_execution_profile: str
     # 默认值，方便前端显示"恢复默认"
     defaults: dict
 
@@ -857,6 +901,8 @@ def _wait_for_tts_ready(
     backend: str,
     *,
     expected_instance_token: str,
+    expected_execution_profile: str | None = None,
+    expected_attention: str | None = None,
     timeout_seconds: float = 45.0,
 ) -> dict[str, object]:
     """Wait until the worker has bound its health endpoint or exited."""
@@ -882,6 +928,20 @@ def _wait_for_tts_ready(
                 )
             if payload.get("instance_token") != expected_instance_token:
                 raise RuntimeError("TTS 健康检查实例令牌不匹配，端口可能属于旧进程")
+            if expected_execution_profile is not None and payload.get(
+                "configured_execution_profile"
+            ) != expected_execution_profile:
+                raise RuntimeError(
+                    "TTS 健康检查执行配置不匹配: "
+                    f"{payload.get('configured_execution_profile')} != {expected_execution_profile}"
+                )
+            if expected_attention is not None and payload.get(
+                "configured_attention"
+            ) != expected_attention:
+                raise RuntimeError(
+                    "TTS 健康检查注意力配置不匹配: "
+                    f"{payload.get('configured_attention')} != {expected_attention}"
+                )
             return payload
         except Exception as exc:
             last_error = exc
@@ -936,6 +996,9 @@ class TTSServiceStartPayload(BaseModel):
     """启动 TTS 服务请求"""
     backend: str = Field("indextts", description="TTS 后端: indextts/cosyvoice3/qwen3tts/qwen3tts_cv")
     fp32: bool = Field(False, description="是否使用 FP32（仅 IndexTTS2）")
+    only_if_absent: bool = Field(False, description="Refuse replacing an existing managed worker")
+    preserve_outputs: bool = Field(False, description="Disable Qwen VoiceDesign/Base output retention cleanup for this launch")
+    qwen_execution_profile: Literal["native-current", "native-sdpa", "qwen-cudagraph", "faster-base-032"] | None = None
     persist_default: bool = Field(
         True,
         description="是否同时将本次启动的后端保存为平台默认后端；自动任务切换 worker 时应设为 false",
@@ -948,7 +1011,7 @@ class TTSServiceLoadModelPayload(BaseModel):
 
 
 @router.get("/settings/tts-service/status", response_model=TTSServiceStatusResponse)
-async def api_get_tts_service_status() -> TTSServiceStatusResponse:
+def api_get_tts_service_status() -> TTSServiceStatusResponse:
     """获取 TTS 服务运行状态"""
     running, pid, runtime_backend = _get_tts_runtime_state()
     
@@ -1010,12 +1073,24 @@ def _start_tts_service_exclusive(
 
     project_root = _get_project_root()
     config_backend = _get_configured_tts_backend()
+    tts_params = _get_tts_params_from_config()
+    # The legacy qwen3_execution_profile setting belongs to CustomVoice.
+    # Base uses its approved default unless the caller explicitly selects a lane.
+    default_profile = (DEFAULT_QWEN_BASE_PROFILE if payload.backend == "qwen3tts"
+                       else tts_params.get("qwen3_execution_profile") or "native-current")
+    qwen_profile = str(payload.qwen_execution_profile or default_profile)
+    qwen_attention = str(tts_params.get("qwen3_attention") or "auto")
+    if qwen_profile in {"native-sdpa", "qwen-cudagraph"}:
+        qwen_attention = "sdpa"
     try:
         cmd = build_backend_command(
             project_root,
             payload.backend,
             Path(sys.executable),
             fp32=payload.fp32,
+            qwen_attention=qwen_attention,
+            qwen_execution_profile=qwen_profile,
+            preserve_outputs=payload.preserve_outputs,
         )
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(
@@ -1024,6 +1099,8 @@ def _start_tts_service_exclusive(
         ) from exc
 
     with _tts_process_lock:
+        if payload.only_if_absent and _tts_process is not None and _tts_process.poll() is None:
+            raise HTTPException(status_code=409, detail="Another voice worker started; resume after it finishes. No worker was stopped.")
         # 如果已经在运行，先停止
         if _tts_process is not None and _tts_process.poll() is None:
             _tts_log_queue.put("[TTS 服务] 正在停止旧服务...\n")
@@ -1121,6 +1198,12 @@ def _start_tts_service_exclusive(
                 proc,
                 payload.backend,
                 expected_instance_token=instance_token,
+                expected_execution_profile=(
+                    qwen_profile if payload.backend == "qwen3tts_cv" else None
+                ),
+                expected_attention=(
+                    qwen_attention if payload.backend == "qwen3tts_cv" else None
+                ),
             )
             _tts_log_queue.put(
                 f"[TTS 服务] 已就绪 (PID={proc.pid}, backend={payload.backend}, status={health.get('status')})\n"

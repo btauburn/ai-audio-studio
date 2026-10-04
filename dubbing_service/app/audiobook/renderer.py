@@ -23,11 +23,12 @@ import shutil
 import struct
 import subprocess
 import tempfile
+import time
 import uuid
 import wave
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Literal, Optional, Protocol, Sequence
+from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, Sequence
 
 from dubbing_service.app.core.audio_validation import (
     normalize_audio_extension,
@@ -42,6 +43,8 @@ from dubbing_service.app.providers.tts import TTSProvider, TTSProviderFactory
 # the chunker.
 CHUNK_TRIGGER_CHARS = 400
 CHUNK_MAX_CHARS = 220
+CHUNK_MIN_TRAILING_CHARS = 40
+CHUNK_POLICY_VERSION = "sentence-greedy-v2"
 _CHUNK_BREAK_CHARS = ("。", "！", "？", "；", ".", "!", "?", ";", "，", ",", " ")
 
 
@@ -75,6 +78,18 @@ def _split_long_piece(piece: str, limit: int) -> List[str]:
         remaining = remaining[cut:]
     if remaining:
         parts.append(remaining)
+    if len(parts) > 1 and len(parts[-1]) < min(CHUNK_MIN_TRAILING_CHARS, limit):
+        combined = parts[-2] + parts[-1]
+        lower = max(1, len(combined) - limit)
+        upper = min(limit, len(combined) - min(CHUNK_MIN_TRAILING_CHARS, limit))
+        cut = -1
+        for index in range(upper - 1, lower - 1, -1):
+            if combined[index] in _CHUNK_BREAK_CHARS:
+                cut = index + 1
+                break
+        if cut <= 0:
+            cut = upper
+        parts[-2:] = [combined[:cut], combined[cut:]]
     return parts
 
 
@@ -91,19 +106,7 @@ def plan_chunks(
     if len(text) <= trigger_chars:
         return [text]
 
-    pieces: List[str] = []
-    buffer = ""
-    for character in text:
-        buffer += character
-        if character in _CHUNK_BREAK_CHARS and len(buffer) >= max_chars:
-            pieces.append(buffer)
-            buffer = ""
-    if buffer:
-        pieces.append(buffer)
-
-    expanded: List[str] = []
-    for piece in pieces:
-        expanded.extend(_split_long_piece(piece, max_chars))
+    expanded = _split_long_piece(text, max_chars)
     if len(expanded) == 1:
         return [text]
     return [piece for piece in expanded if piece]
@@ -160,6 +163,7 @@ class RenderedChunk:
     text_end: int = 0
     source: Literal["provider", "chunk"] = "provider"
     provider_calls: int = 1
+    generation_metadata: Dict[str, Any] = field(default_factory=dict)
 
     def as_record(self, *, audio_start_ms: int = 0) -> ChunkRecord:
         """Chunk provenance with text and audio offsets, never a guessed split."""
@@ -184,6 +188,8 @@ class RenderOutcome:
     provider_calls: int = 0
     chunked: bool = False
     error: Optional[str] = None
+    generation_metadata: Dict[str, Any] = field(default_factory=dict)
+    stage_timings: Dict[str, Any] = field(default_factory=dict)
 
     def chunk_map(self) -> List[ChunkRecord]:
         records: List[ChunkRecord] = []
@@ -345,8 +351,32 @@ class BackendRenderer:
 
     def _get_provider(self) -> TTSProvider:
         if self.provider is None:
-            self.provider = TTSProviderFactory.create(self.backend)
+            from .runtime_binding import canonical_backend
+            self.provider = TTSProviderFactory.create(canonical_backend(self.backend))
+            if canonical_backend(self.backend) == "qwen3tts" and self.project_root is not None:
+                from .project_qwen_runtime import project_profile
+                self.provider._project_runtime_profile = project_profile(self.project_root.name)
         return self.provider
+
+    def runtime_contract(self):
+        if self.backend not in {"qwen3tts", "qwen3tts_voicedesign"}:
+            return None
+        provider = self._get_provider()
+        if not callable(getattr(provider, "runtime_identity", None)):
+            return None  # Injected local test providers have no remote Qwen worker.
+        from .runtime_binding import digest, RuntimeBindingError, RENDERER_IMPLEMENTATION_SHA256
+        worker = provider.runtime_identity()
+        contract = {"worker": worker, "renderer_id": self.renderer_id, "engine_id": self.engine_id,
+            "renderer_implementation_sha256": RENDERER_IMPLEMENTATION_SHA256,
+            "chunking": {"version": CHUNK_POLICY_VERSION, "trigger_chars": CHUNK_TRIGGER_CHARS,
+                         "max_chars": CHUNK_MAX_CHARS, "min_trailing_chars": CHUNK_MIN_TRAILING_CHARS}}
+        binding = {"contract": contract, "worker": worker, "sha256": digest(contract)}
+        prior = getattr(self, "_bound_runtime", None)
+        if prior is not None and prior != binding:
+            raise RuntimeBindingError("Worker changed within the renderer job; no mixed-runtime output is allowed")
+        self._bound_runtime = binding
+        provider._expected_runtime_identity = worker
+        return binding
 
     def _chunk_target(self, request: RenderRequest, index: int) -> Path:
         if self.project_root is None:
@@ -367,6 +397,7 @@ class BackendRenderer:
         self, request: RenderRequest, text: str, index: int
     ) -> RenderedChunk:
         provider = self._get_provider()
+        self.runtime_contract()
         chunk_segment = request.segment.model_copy(deep=True)
         chunk_segment.text = text
         # The language was resolved once for the whole transaction.  Presenting
@@ -374,9 +405,11 @@ class BackendRenderer:
         # actually received, instead of the provider re-deriving its own.
         if request.language is not None:
             chunk_segment.qwen3_language = request.language
+        provider_started = time.perf_counter()
         result = provider.synthesize_segment(
             request.project_id, request.role, chunk_segment
         )
+        provider_http_seconds = time.perf_counter() - provider_started
         if not result.success or not result.audio_path:
             message = "TTS 未返回音频路径" if result.success else "TTS 调用失败"
             detail = result.raw.get("error") if isinstance(result.raw, dict) else None
@@ -391,21 +424,78 @@ class BackendRenderer:
         destination = self._chunk_target(request, index).with_suffix(
             normalize_audio_extension(source.suffix)
         )
+        file_copy_started = time.perf_counter()
         if source.resolve() != destination.resolve():
             shutil.copy2(source, destination)
+        identity = request.role.voice_identity if request.role else None
+        performance_applied = False
+        if identity and identity.mechanism == "qwen_reference":
+            from .performance import apply_scene_audio
+            performance_applied = apply_scene_audio(destination, pace=request.segment.playback_speed,
+                                                    volume=request.segment.volume_gain)
+        file_copy_seconds = time.perf_counter() - file_copy_started
+        validation_started = time.perf_counter()
         if self.validate_audio:
             validate_decodable_audio(destination)
+        validation_seconds = time.perf_counter() - validation_started
+        facts_started = time.perf_counter()
+        audio_sha256 = sha256_file(destination)
+        duration_ms = self.probe(destination)
+        facts_seconds = time.perf_counter() - facts_started
+        raw = result.raw if isinstance(result.raw, dict) else {}
+        provider_metadata = {
+            key: raw[key]
+            for key in (
+                "request_id",
+                "utterance_id",
+                "execution_profile",
+                "worker_runtime_identity",
+                "stage_timings",
+                "generation",
+                "generation_settings",
+                "inference_policy_revision",
+                "identity_id",
+                "effective_speaker",
+                "provider_voice_resolution",
+                "prompt_sha256",
+                "unsupported_performance_fields",
+                "performance",
+            )
+            if key in raw
+        }
+        provider_metadata["transport_and_renderer"] = {
+            "schema": "backend-renderer-stage-timings-v1",
+            "clock": "time.perf_counter",
+            "exclusive": {
+                "provider_http_round_trip_seconds": round(provider_http_seconds, 6),
+                "immutable_file_copy_seconds": round(file_copy_seconds, 6),
+                "audio_validation_seconds": round(validation_seconds, 6),
+                "hash_and_duration_probe_seconds": round(facts_seconds, 6),
+            },
+            "provider_http_round_trip_contains": [
+                "service_queue",
+                "service_generation",
+                "service_file_write",
+                "local_http_transport",
+            ],
+        }
+        provider_metadata["scene_audio_applied"] = performance_applied
         return RenderedChunk(
             index=index,
             text=text,
             audio_path=str(destination),
-            audio_sha256=sha256_file(destination),
-            duration_ms=self.probe(destination),
+            audio_sha256=audio_sha256,
+            duration_ms=duration_ms,
             source="chunk",
             provider_calls=1,
+            generation_metadata=provider_metadata,
         )
 
     def render(self, request: RenderRequest) -> RenderOutcome:
+        render_started = time.perf_counter()
+        identity = request.role.voice_identity if request.role else None
+        if identity and identity.mechanism != "fixture" and self.backend != identity.backend:
+            return RenderOutcome(success=False, error="Locked character identity requires its recorded backend; propose a new identity before changing engines")
         parts = plan_chunks(request.text)
         chunked = len(parts) > 1
         try:
@@ -419,6 +509,7 @@ class BackendRenderer:
                 provider_calls=len(parts),
                 chunked=chunked,
                 error=str(exc),
+                generation_metadata={"retryable": False} if getattr(self, "_bound_runtime", None) else {},
             )
 
         _annotate_chunk_offsets(chunks, parts)
@@ -434,6 +525,24 @@ class BackendRenderer:
                 duration_ms=single.duration_ms,
                 provider_calls=1,
                 chunked=False,
+                generation_metadata={
+                    "schema": "audiobook-generation-metadata-v1",
+                    "scene_audio_applied": single.generation_metadata.get("scene_audio_applied", False),
+                    "provider_calls": [single.generation_metadata],
+                    "chunking_policy": {
+                        "version": CHUNK_POLICY_VERSION,
+                        "trigger_chars": CHUNK_TRIGGER_CHARS,
+                        "max_chars": CHUNK_MAX_CHARS,
+                        "chunk_count": 1,
+                    },
+                },
+                stage_timings={
+                    "schema": "backend-renderer-stage-timings-v1",
+                    "clock": "time.perf_counter",
+                    "inclusive": {
+                        "renderer_seconds": round(time.perf_counter() - render_started, 6)
+                    },
+                },
             )
             validate_reassembly(request.text, outcome)
             return outcome
@@ -441,6 +550,7 @@ class BackendRenderer:
         destination = self._chunk_target(request, 0).parent / (
             f"{(request.take_id or new_take_id())}.wav"
         )
+        concat_started = time.perf_counter()
         try:
             self.concat([chunk.audio_path for chunk in chunks], destination)
             if self.validate_audio:
@@ -453,6 +563,7 @@ class BackendRenderer:
                 chunked=True,
                 error=f"分块重建失败: {exc}",
             )
+        concat_seconds = time.perf_counter() - concat_started
 
         outcome = RenderOutcome(
             success=True,
@@ -462,6 +573,26 @@ class BackendRenderer:
             duration_ms=self.probe(destination),
             provider_calls=len(chunks),
             chunked=True,
+            generation_metadata={
+                "schema": "audiobook-generation-metadata-v1",
+                "scene_audio_applied": any(c.generation_metadata.get("scene_audio_applied") for c in chunks),
+                "provider_calls": [chunk.generation_metadata for chunk in chunks],
+                "batching_policy": "sequential-independent-provider-calls",
+                "chunking_policy": {
+                    "version": CHUNK_POLICY_VERSION,
+                    "trigger_chars": CHUNK_TRIGGER_CHARS,
+                    "max_chars": CHUNK_MAX_CHARS,
+                    "chunk_count": len(chunks),
+                },
+            },
+            stage_timings={
+                "schema": "backend-renderer-stage-timings-v1",
+                "clock": "time.perf_counter",
+                "inclusive": {
+                    "renderer_seconds": round(time.perf_counter() - render_started, 6)
+                },
+                "exclusive": {"reassembly_seconds": round(concat_seconds, 6)},
+            },
         )
         validate_reassembly(request.text, outcome)
         return outcome
@@ -553,7 +684,7 @@ def reassemble_with_retry(
 
     outcome = renderer.render(request)
     attempt = 1
-    while not outcome.success and attempt < attempts:
+    while not outcome.success and attempt < attempts and outcome.generation_metadata.get("retryable") is not False:
         attempt += 1
         retry = renderer.render(request)
         if retry.success:

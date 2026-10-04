@@ -15,6 +15,7 @@ from typing import Iterable, Sequence
 from dubbing_service.app.core.config import safe_project_root
 from dubbing_service.app.models.enums import SegmentStatus
 from dubbing_service.app.models.project import Project, Role, Segment
+from dubbing_service.app.storage.atomic import ensure_metadata_writable, replace_metadata_file
 from dubbing_service.app.storage.projects import load_project, project_meta_lock
 from dubbing_service.app.storage.segments import load_segments, project_segments_lock
 from dubbing_service.app.services.takes import mark_slots_dirty
@@ -72,6 +73,8 @@ def _replace_files_transactionally(files: Sequence[tuple[Path, bytes]]) -> None:
     back already-promoted paths if any later promotion fails.
     """
 
+    for directory in {target.parent for target, _ in files}:
+        ensure_metadata_writable(directory)
     stages: dict[Path, Path] = {}
     backups: dict[Path, Path | None] = {}
     promoted: list[Path] = []
@@ -91,7 +94,7 @@ def _replace_files_transactionally(files: Sequence[tuple[Path, bytes]]) -> None:
                 backups[target] = None
 
         for target, _ in files:
-            os.replace(stages[target], target)
+            replace_metadata_file(stages[target], target)
             promoted.append(target)
 
     except Exception:
@@ -99,7 +102,7 @@ def _replace_files_transactionally(files: Sequence[tuple[Path, bytes]]) -> None:
             backup = backups.get(target)
             try:
                 if backup is not None and backup.is_file():
-                    os.replace(backup, target)
+                    replace_metadata_file(backup, target)
                 elif target.exists():
                     target.unlink()
             except OSError:

@@ -113,6 +113,8 @@ createApp({
       context_injection_length: 50,
       cosyvoice_speed: 1.0,
       qwen3_default_language: "Chinese",
+      qwen3_attention: "auto",
+      qwen3_execution_profile: "native-current",
       // 默认值，用于显示"默认: xxx"
       defaults: {
         max_text_tokens_per_segment: 120,
@@ -128,6 +130,8 @@ createApp({
         context_injection_length: 50,
         cosyvoice_speed: 1.0,
         qwen3_default_language: "Chinese",
+        qwen3_attention: "auto",
+        qwen3_execution_profile: "native-current",
       },
     });
 
@@ -145,6 +149,8 @@ createApp({
       context_injection_length: 50,
       cosyvoice_speed: 1.0,
       qwen3_default_language: "Chinese",
+      qwen3_attention: "auto",
+      qwen3_execution_profile: "native-current",
     });
     const TTS_NUMERIC_PARAM_KEYS = [
       "max_text_tokens_per_segment",
@@ -172,6 +178,12 @@ createApp({
       "Spanish",
       "Italian",
       "Auto",
+    ]);
+    const QWEN3_ATTENTION_IDS = new Set(["auto", "eager", "sdpa", "flash_attention_2"]);
+    const QWEN3_EXECUTION_PROFILE_IDS = new Set([
+      "native-current",
+      "native-sdpa",
+      "qwen-cudagraph",
     ]);
 
     function normalizeTtsParamsResponse(data, fallback, resetToDefaults = false) {
@@ -201,6 +213,20 @@ createApp({
       defaults.qwen3_default_language = QWEN3_LANGUAGE_IDS.has(defaultLanguage)
         ? defaultLanguage
         : TTS_PARAM_DEFAULTS.qwen3_default_language;
+      const defaultAttention =
+        typeof mergedDefaults.qwen3_attention === "string"
+          ? mergedDefaults.qwen3_attention.trim().toLowerCase()
+          : "";
+      defaults.qwen3_attention = QWEN3_ATTENTION_IDS.has(defaultAttention)
+        ? defaultAttention
+        : TTS_PARAM_DEFAULTS.qwen3_attention;
+      const defaultProfile =
+        typeof mergedDefaults.qwen3_execution_profile === "string"
+          ? mergedDefaults.qwen3_execution_profile.trim().toLowerCase()
+          : "";
+      defaults.qwen3_execution_profile = QWEN3_EXECUTION_PROFILE_IDS.has(defaultProfile)
+        ? defaultProfile
+        : TTS_PARAM_DEFAULTS.qwen3_execution_profile;
       const valueFallback = resetToDefaults ? defaults : { ...defaults, ...current };
       const normalized = {};
 
@@ -233,6 +259,28 @@ createApp({
         : QWEN3_LANGUAGE_IDS.has(fallbackLanguage)
           ? fallbackLanguage
           : TTS_PARAM_DEFAULTS.qwen3_default_language;
+      const responseAttention = typeof response.qwen3_attention === "string"
+        ? response.qwen3_attention.trim().toLowerCase()
+        : "";
+      const fallbackAttention = typeof valueFallback.qwen3_attention === "string"
+        ? valueFallback.qwen3_attention.trim().toLowerCase()
+        : "";
+      normalized.qwen3_attention = QWEN3_ATTENTION_IDS.has(responseAttention)
+        ? responseAttention
+        : QWEN3_ATTENTION_IDS.has(fallbackAttention)
+          ? fallbackAttention
+          : TTS_PARAM_DEFAULTS.qwen3_attention;
+      const responseProfile = typeof response.qwen3_execution_profile === "string"
+        ? response.qwen3_execution_profile.trim().toLowerCase()
+        : "";
+      const fallbackProfile = typeof valueFallback.qwen3_execution_profile === "string"
+        ? valueFallback.qwen3_execution_profile.trim().toLowerCase()
+        : "";
+      normalized.qwen3_execution_profile = QWEN3_EXECUTION_PROFILE_IDS.has(responseProfile)
+        ? responseProfile
+        : QWEN3_EXECUTION_PROFILE_IDS.has(fallbackProfile)
+          ? fallbackProfile
+          : TTS_PARAM_DEFAULTS.qwen3_execution_profile;
       normalized.defaults = defaults;
       return normalized;
     }

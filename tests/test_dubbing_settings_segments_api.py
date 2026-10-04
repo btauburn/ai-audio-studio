@@ -905,7 +905,7 @@ class TestDubbingSettingsAndSegmentsApi(unittest.TestCase):
                 with TestClient(app) as client:
                     resp = client.put(
                         "/api/v1/settings/tts-params",
-                        json={"top_k": 44},
+                        json={"top_k": 44, "qwen3_execution_profile": "native-sdpa"},
                     )
 
             self.assertEqual(resp.status_code, 200)
@@ -914,6 +914,19 @@ class TestDubbingSettingsAndSegmentsApi(unittest.TestCase):
             self.assertEqual(tts_params.get("temperature"), 0.7)
             self.assertEqual(tts_params.get("top_p"), 0.85)
             self.assertEqual(tts_params.get("top_k"), 44)
+            self.assertEqual(tts_params.get("qwen3_execution_profile"), "native-sdpa")
+            self.assertEqual(resp.json()["qwen3_execution_profile"], "native-sdpa")
+
+    def test_update_tts_params_rejects_unknown_qwen_execution_profile(self) -> None:
+        clear_config_caches()
+        app = create_app()
+        with TestClient(app) as client:
+            response = client.put(
+                "/api/v1/settings/tts-params",
+                json={"qwen3_execution_profile": "silent-fallback"},
+            )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("qwen3_execution_profile", response.json()["detail"]["message"])
 
     def test_update_raw_file_config_is_thread_safe(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

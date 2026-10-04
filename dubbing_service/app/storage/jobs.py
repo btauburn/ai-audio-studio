@@ -16,6 +16,7 @@ from pydantic import ValidationError
 
 from dubbing_service.app.core.config import safe_project_root
 from dubbing_service.app.core.path_safety import validate_simple_component_id
+from dubbing_service.app.storage.atomic import replace_metadata_file
 from dubbing_service.app.models.jobs import (
     SynthesisJob,
     SynthesisJobStatus,
@@ -60,6 +61,16 @@ def mark_job_active(project_id: str, job_id: str, active: bool) -> None:
 def is_job_active(project_id: str, job_id: str) -> bool:
     with _ACTIVE_LOCK:
         return (project_id, job_id) in _ACTIVE_JOB_IDS
+
+
+def try_mark_job_active(project_id: str, job_id: str) -> bool:
+    """Atomically claim a resumable operation in the existing job owner."""
+    key = (project_id, job_id)
+    with _ACTIVE_LOCK:
+        if key in _ACTIVE_JOB_IDS:
+            return False
+        _ACTIVE_JOB_IDS.add(key)
+        return True
 
 
 def _jobs_path(project_id: str) -> str:
@@ -108,10 +119,14 @@ def save_jobs(project_id: str, jobs: Iterable[SynthesisJob]) -> None:
     fd, temp_path = tempfile.mkstemp(dir=parent, prefix="jobs_", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=False, indent=2)
+            handle.write(json.dumps(data, ensure_ascii=False, separators=(",", ":")))   # compact: see save_project
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temp_path, path)
+        # Job state is written by the API process and by casting workers, so this
+        # replacement can meet another handle holding jobs.json open. A bare
+        # os.replace turns that transient Windows sharing violation into a failed
+        # round; the shared helper retries exactly that window.
+        replace_metadata_file(temp_path, path)
     except Exception:
         try:
             os.unlink(temp_path)

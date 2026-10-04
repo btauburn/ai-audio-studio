@@ -107,6 +107,42 @@ def build_segments(
     return segments
 
 
+def anchored_candidate(candidate_id: str = "original", *, index: int = 0, count: int = 1,
+                       design_instruction: str | None = None, **extra) -> dict:
+    """One shortlist candidate in the shape production now creates.
+
+    Since the performer-reference layer, a generated candidate is always cast
+    against a specific performance and always carries the acoustic
+    characterization derived from it; a fixture that omits both is a shape
+    production can no longer emit. The values come from the real anchoring,
+    inference and reference modules, so a test exercises the same numbers.
+    """
+    from dubbing_service.app.audiobook import casting_anchors, performer_reference
+
+    anchor = casting_anchors.anchored_plan(None, None, count=count)[index]
+    concept = anchor["concept"]
+    evidence = performer_reference.resolve(anchor, concept)
+    candidate = {
+        "candidate_id": candidate_id,
+        "original_casting": True,
+        "design_instruction": design_instruction or (
+            f"Create an original synthetic voice. {casting_anchors.design_fragment(anchor)}"),
+        "creative_direction": "Clear natural delivery.",
+        "anchor": anchor,
+        "concept": concept,
+        "reference": performer_reference.describe(evidence),
+        "conditioning": performer_reference.conditioning_payload(evidence),
+        "match_rationale": evidence["rationale"],
+        "inspiration": {"performer": anchor["performer"], "performance": anchor["performance"],
+                        "source_urls": list(anchor.get("source_urls") or [])},
+        "tags": list(anchor.get("tags") or []),
+        "source_urls": list(anchor.get("source_urls") or []),
+        "score": 1,
+    }
+    candidate.update(extra)
+    return candidate
+
+
 def reload(project: Project):
     from dubbing_service.app.storage.projects import load_project
     from dubbing_service.app.storage.segments import load_segments

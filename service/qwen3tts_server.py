@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 from threading import Lock
 import logging
 import traceback
+import gc
 
 import uvicorn
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -36,6 +37,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from service.model_path_policy import require_project_model_dir  # noqa: E402
+from service.qwen_character_voice import CharacterVoiceRuntime  # noqa: E402
+from service.pinned_model_verification import PinnedModelVerificationCache  # noqa: E402
 from dubbing_service.app.core.audio_path_policy import (  # noqa: E402
     AudioFileNotFoundError,
     InvalidAudioPathError,
@@ -47,6 +50,7 @@ parser = argparse.ArgumentParser(description="Qwen3-TTS VoiceDesign API Server")
 parser.add_argument("--host", type=str, default="127.0.0.1", help="服务器地址")
 parser.add_argument("--port", type=int, default=8003, help="服务器端口")
 parser.add_argument("--model_dir", type=str, default="models/qwen3_tts/Qwen3-TTS-VoiceDesign", help="模型目录")
+parser.add_argument("--base-model-dir", type=str, default="models/qwen3_tts/Qwen3-TTS-Base")
 parser.add_argument("--device", type=str, default="cuda:0", help="运行设备")
 parser.add_argument("--dtype", type=str, default="bfloat16", choices=["float16", "bfloat16", "float32"], help="数据类型")
 parser.add_argument("--outputs-keep-days", type=int, default=30, help="输出文件保留天数，0 表示不清理")
@@ -64,10 +68,20 @@ def _parse_server_args() -> argparse.Namespace:
 
 # 全局变量
 qwen3tts_model = None
+_active_model_kind = None
+_active_attention = None
 config = None
+from service.qwen_runtime_identity import WorkerIdentitySnapshot, source_snapshot
+_runtime_sources = source_snapshot(Path(project_root), ("service/qwen3tts_server.py", "service/qwen_character_voice.py", "service/qwen_runtime_identity.py"))
+_runtime_profile = "native-base"
+_runtime_snapshot = WorkerIdentitySnapshot(Path(project_root), _parse_server_args(), _runtime_sources, _runtime_profile)
+def base_runtime_identity():
+    return _runtime_snapshot.read(config or _parse_server_args())
+
 _model_lock: Optional[Lock] = Lock()
 _infer_lock: Optional[Lock] = Lock()
 _outputs_cleanup_lock: Optional[Lock] = Lock()
+_model_verification_cache = PinnedModelVerificationCache()
 _last_outputs_cleanup = 0.0
 OUTPUTS_CLEANUP_MIN_INTERVAL = 600
 
@@ -101,25 +115,40 @@ def _validated_model_path(args: argparse.Namespace) -> Path:
     )
 
 
-def _load_qwen3tts_model_if_needed() -> None:
+def _load_qwen3tts_model_if_needed(kind: str = "voice_design", attention: str = "auto") -> None:
     """按需加载全局 Qwen3-TTS VoiceDesign 模型"""
-    global qwen3tts_model, config
+    global qwen3tts_model, config, _active_model_kind, _active_attention
 
-    if qwen3tts_model is not None:
+    if qwen3tts_model is not None and _active_model_kind == kind and _active_attention == attention:
         return
 
     lock = _model_lock
     if lock is not None:
         lock.acquire()
     try:
-        if qwen3tts_model is not None:
+        if qwen3tts_model is not None and _active_model_kind == kind and _active_attention == attention:
             return
 
         if config is None:
             args = _parse_server_args()
             config = args
 
-        model_path = _validated_model_path(config)
+        if kind not in {"voice_design", "base"}:
+            raise ValueError("unsupported character voice model kind")
+        model_path = (_validated_model_path(config) if kind == "voice_design" else
+                      require_project_model_dir(project_root, config.base_model_dir,
+                                                label="Qwen3-TTS Base model directory", required_files=_QWEN_REQUIRED_FILES))
+        if attention == "sdpa":
+            manifest_name = "voicedesign" if kind == "voice_design" else "base"
+            verification = _model_verification_cache.verify(
+                Path(project_root) / "models" / "manifests" / f"qwen3_tts_{manifest_name}.json",
+                project_root=Path(project_root),
+            )
+            logger.info("Character model integrity: kind=%s cached=%s pinned=%s",
+                        kind, verification.cache_hit, verification.pinned)
+        # The inference lock held by callers spans the switch and generation.
+        # Never keep both large Qwen models resident on the single GPU.
+        _unload_qwen3tts_model(release_verification=False)
         logger.info(f"🔧 正在加载项目内本地模型: {model_path}")
 
         import torch
@@ -140,6 +169,8 @@ def _load_qwen3tts_model_if_needed() -> None:
         except ImportError:
             attn_impl = "eager"
             logger.warning("⚠️ FlashAttention 未安装，使用默认注意力实现")
+        if attention == "sdpa":
+            attn_impl = "sdpa"
 
         model = Qwen3TTSModel.from_pretrained(
             str(model_path),
@@ -149,7 +180,9 @@ def _load_qwen3tts_model_if_needed() -> None:
             local_files_only=True,
         )
         qwen3tts_model = model
-        logger.info("✅ Qwen3-TTS VoiceDesign 模型加载完成")
+        _active_model_kind = kind
+        _active_attention = attention
+        logger.info("Qwen3-TTS model loaded: kind=%s attention=%s", kind, attn_impl)
     finally:
         if lock is not None and lock.locked():
             try:
@@ -158,11 +191,17 @@ def _load_qwen3tts_model_if_needed() -> None:
                 pass
 
 
-def _unload_qwen3tts_model() -> None:
+def _unload_qwen3tts_model(*, release_verification: bool = True) -> None:
     """卸载全局 Qwen3-TTS 模型并释放显存"""
-    global qwen3tts_model
+    global qwen3tts_model, _active_model_kind, _active_attention
+
+    if release_verification:
+        _model_verification_cache.clear()
 
     qwen3tts_model = None
+    _active_model_kind = None
+    _active_attention = None
+    gc.collect()
     try:
         import torch
         if torch.cuda.is_available():
@@ -231,18 +270,19 @@ async def lifespan(app: FastAPI):
 
     logger.info("⚙️ Qwen3-TTS VoiceDesign API 已启动，模型将按需延迟加载")
 
-    yield
-
-    logger.info("🔄 正在清理资源...")
-    _unload_qwen3tts_model()
-    temp_dir = Path("temp")
-    if temp_dir.exists():
-        for file in temp_dir.glob("*.wav"):
-            try:
-                file.unlink()
-            except Exception:
-                pass
-    logger.info("✅ 资源清理完成")
+    try:
+        yield
+    finally:
+        logger.info("🔄 正在清理资源...")
+        _unload_qwen3tts_model()
+        temp_dir = Path("temp")
+        if temp_dir.exists():
+            for file in temp_dir.glob("*.wav"):
+                try:
+                    file.unlink()
+                except Exception:
+                    pass
+        logger.info("✅ 资源清理完成")
 
 
 # ==================== FastAPI应用 ====================
@@ -302,6 +342,8 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     backend: str = "qwen3tts"
     instance_token: Optional[str] = None
+    active_model_kind: Optional[str] = None
+    character_voice_capabilities: list[str] = Field(default_factory=lambda: ["original_reference", "safe_persistent_prompt", "base_reuse", "eligible_reference_import"])
 
 
 # ==================== 工具函数 ====================
@@ -331,15 +373,20 @@ async def root():
     }
 
 
+@app.get("/api/v1/tts/runtime-identity")
+def runtime_identity_endpoint():
+    return base_runtime_identity()
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """健康检查"""
     return HealthResponse(
         status="healthy" if qwen3tts_model else "model_not_loaded",
-        model_version="Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+        model_version="Qwen3-TTS-12Hz-1.7B-Base" if _active_model_kind == "base" else "Qwen3-TTS-12Hz-1.7B-VoiceDesign",
         device=config.device if config else "cuda:0",
         model_loaded=qwen3tts_model is not None,
         instance_token=os.environ.get("DUBBING_WORKER_INSTANCE_TOKEN"),
+        active_model_kind=_active_model_kind,
     )
 
 
@@ -347,7 +394,8 @@ async def health_check():
 def load_model():
     """手动加载模型"""
     try:
-        _load_qwen3tts_model_if_needed()
+        with _infer_lock:
+            _load_qwen3tts_model_if_needed()
         return {
             "success": True,
             "message": "模型加载成功",
@@ -361,7 +409,8 @@ def load_model():
 @app.post("/api/v1/tts/unload-model")
 def unload_model():
     """卸载模型释放显存"""
-    _unload_qwen3tts_model()
+    with _infer_lock:
+        _unload_qwen3tts_model()
     return {"success": True, "message": "模型已卸载"}
 
 
@@ -373,11 +422,6 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
     根据文本描述生成音色并合成语音，无需参考音频。
     """
     try:
-        _load_qwen3tts_model_if_needed()
-        
-        if qwen3tts_model is None:
-            raise HTTPException(status_code=500, detail="模型加载失败")
-        
         # 合并 instruct 和 emotion_text
         instruct = request.instruct or ""
         if request.emotion_text and request.emotion_text.strip():
@@ -417,6 +461,7 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
         import soundfile as sf
         
         with _infer_lock:
+            _load_qwen3tts_model_if_needed()
             wavs, sr = qwen3tts_model.generate_voice_design(
                 text=request.text,
                 language=language,
@@ -469,6 +514,96 @@ async def download_audio(filename: str):
     """下载生成的音频文件"""
     file_path = _resolve_download_audio(Path("outputs"), filename)
     return FileResponse(str(file_path), media_type="audio/wav", filename=file_path.name)
+
+
+def _character_model(kind: str):
+    _load_qwen3tts_model_if_needed(kind, attention="sdpa")
+    return qwen3tts_model
+
+
+_character_runtime = CharacterVoiceRuntime(Path(project_root), _character_model)
+
+
+class CharacterDesignRequest(BaseModel):
+    project_id: str
+    identity_id: str
+    instruction: str = Field(min_length=1, max_length=4000)
+    text: str = Field(min_length=1, max_length=1000)
+    seed: int = Field(0, ge=0, le=2147483647)
+    # Acoustic conditioning derived from the candidate's performer reference. It
+    # is a numeric target profile plus its provenance, never a performer name.
+    conditioning: Optional[dict] = None
+
+
+class CharacterPrepareRequest(BaseModel):
+    project_id: str
+    identity_id: str
+
+
+class CharacterAcousticsRequest(CharacterPrepareRequest):
+    conditioning: Optional[dict] = None
+
+
+class CharacterImportReferenceRequest(CharacterPrepareRequest):
+    acquisition_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    acquisition_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class CharacterRenderRequest(CharacterPrepareRequest):
+    prompt_artifact: str
+    prompt_sha256: str
+    reference_audio: str
+    reference_audio_sha256: str
+    text: str = Field(min_length=1, max_length=10000)
+    language: str = "English"
+    performance: dict = Field(default_factory=dict)
+    expected_runtime_sha256: Optional[str] = Field(None, pattern=r"^[a-f0-9]{64}$")
+
+
+def _character_call(method, **kwargs):
+    try:
+        with _infer_lock:
+            expected = kwargs.pop("expected_runtime_sha256", None)
+            binding = base_runtime_identity() if method.__name__ == "synthesize" else None
+            if expected is not None and expected != binding["sha256"]:
+                raise HTTPException(status_code=409, detail="Worker runtime changed before synthesis; no audio generated")
+            result = method(**kwargs)
+            if binding is not None:
+                result["worker_runtime_identity"] = binding
+                result["fallback"] = None
+            return result
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Character voice operation failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/tts/character/design")
+def design_character_voice(request: CharacterDesignRequest):
+    return _character_call(_character_runtime.design, **request.model_dump())
+
+
+@app.post("/api/v1/tts/character/acoustics")
+def condition_character_reference(request: CharacterAcousticsRequest):
+    return _character_call(_character_runtime.acoustics, **request.model_dump())
+
+
+@app.post("/api/v1/tts/character/prepare")
+def prepare_character_voice(request: CharacterPrepareRequest):
+    return _character_call(_character_runtime.prepare, **request.model_dump())
+
+
+@app.post("/api/v1/tts/character/import-reference")
+def import_character_reference(request: CharacterImportReferenceRequest):
+    return _character_call(_character_runtime.import_reference, **request.model_dump())
+
+
+@app.post("/api/v1/tts/character/synthesize")
+def synthesize_character_voice(request: CharacterRenderRequest):
+    return _character_call(_character_runtime.synthesize, **request.model_dump())
 
 
 # ==================== 主入口 ====================

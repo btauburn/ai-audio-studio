@@ -13,7 +13,7 @@ true for hard process death:
 2. copy every existing target to a same-directory backup;
 3. write and ``fsync`` one intent marker naming the transaction and its targets;
 4. promote every staged file;
-5. drop the backups, then drop the marker.
+5. drop the marker, then drop the backups.
 
 Recovery is monotonic: **an intent marker means the transaction did not finish**,
 so every listed target is restored from its backup (or removed when it did not
@@ -43,6 +43,13 @@ from dubbing_service.app.audiobook.fingerprint import SynthesisRequirement
 from dubbing_service.app.core.config import safe_project_root
 from dubbing_service.app.models.project import Project, Segment, SegmentTake
 from dubbing_service.app.services.takes import normalize_slot
+from dubbing_service.app.storage.atomic import (
+    METADATA_MARKER_PREFIX,
+    METADATA_MARKER_SUFFIX,
+    ensure_metadata_writable,
+    pending_metadata_transactions,
+    replace_metadata_file,
+)
 from dubbing_service.app.storage.projects import project_meta_lock
 from dubbing_service.app.storage.segments import load_segments, project_segments_lock
 
@@ -51,8 +58,8 @@ from dubbing_service.app.storage.segments import load_segments, project_segments
 # evaluated against the identity that Take recorded.
 RequirementFactory = Callable[[Segment, SegmentTake], Optional[SynthesisRequirement]]
 
-MARKER_PREFIX = ".commit-"
-MARKER_SUFFIX = ".json"
+MARKER_PREFIX = METADATA_MARKER_PREFIX
+MARKER_SUFFIX = METADATA_MARKER_SUFFIX
 STAGE_SUFFIX = ".stage"
 BACKUP_SUFFIX = ".backup"
 
@@ -184,7 +191,21 @@ def _write_stage(target: Path, data: bytes) -> Path:
 def marker_paths(root: Path) -> List[Path]:
     if not root.is_dir():
         return []
-    return sorted(root.glob(f"{MARKER_PREFIX}*{MARKER_SUFFIX}"))
+    return pending_metadata_transactions(root)
+
+
+def _restore_backup(backup: Path, target: Path) -> None:
+    """Keep the original backup until the entire rollback has completed.
+
+    A later target can remain locked after retries, or the process can die
+    between restores. Recovery must still have every original file available.
+    """
+
+    stage = _write_stage(target, backup.read_bytes())
+    try:
+        replace_metadata_file(stage, target)
+    finally:
+        _remove_files([stage])
 
 
 def commit_files(files: Sequence[Tuple[Path, bytes]], *, root: Path) -> CommitReport:
@@ -193,11 +214,13 @@ def commit_files(files: Sequence[Tuple[Path, bytes]], *, root: Path) -> CommitRe
     if not files:
         raise PersistenceError("事务没有任何文件")
 
+    ensure_metadata_writable(Path(root))
     transaction_id = uuid.uuid4().hex
     stages: Dict[Path, Path] = {}
     backups: Dict[Path, Optional[Path]] = {}
     promoted: List[Path] = []
     marker = Path(root) / f"{MARKER_PREFIX}{transaction_id}{MARKER_SUFFIX}"
+    marker_tmp: Path | None = None
 
     try:
         for target, data in files:
@@ -231,24 +254,27 @@ def commit_files(files: Sequence[Tuple[Path, bytes]], *, root: Path) -> CommitRe
             stream.write(_json_bytes(payload))
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(marker_tmp, marker)
+        replace_metadata_file(marker_tmp, marker)
         _fsync_dir(Path(root))
 
         for target, _ in files:
-            os.replace(stages[target], target)
+            replace_metadata_file(stages[target], target)
             promoted.append(target)
     except Exception:
         unrestored: set[Optional[Path]] = set()
         for target in reversed(promoted):
             backup = backups.get(target)
             try:
-                if backup is not None and backup.is_file():
-                    os.replace(backup, target)
+                if backup is not None:
+                    if not backup.is_file():
+                        raise FileNotFoundError(f"Rollback backup missing: {backup}")
+                    _restore_backup(backup, target)
                 elif target.exists():
                     target.unlink()
             except OSError:
                 unrestored.add(backup)
                 continue
+        _remove_files([marker_tmp])
         if unrestored:
             # Keep the intent marker and the surviving backups so the next
             # recovery pass can finish the rollback instead of guessing.
@@ -289,7 +315,9 @@ def _finalize(
         if marker.is_file():
             marker.unlink()
     except OSError:
-        pass
+        # Without marker removal, recovery must still be able to restore OLD.
+        _remove_files(stages.values())
+        raise
     _fsync_dir(marker.parent)
     _remove_files(stages.values())
     _remove_files(backups)
@@ -305,14 +333,14 @@ def _cleanup(
     """Sweep after an in-process rollback back to the complete OLD state."""
 
     _remove_files(stages.values())
-    _remove_files(backups)
     if keep_marker:
         return
     try:
         if marker.is_file():
             marker.unlink()
     except OSError:
-        pass
+        return
+    _remove_files(backups)
 
 
 def recover_project_state(project_id: str) -> RecoveryReport:
@@ -340,6 +368,8 @@ def recover_root(root: Path) -> RecoveryReport:
             report.leftovers.append(str(marker))
             continue
 
+        restore_failed = False
+        restored_backups = set()
         for entry in targets:
             if not isinstance(entry, dict) or not entry.get("name"):
                 continue
@@ -349,7 +379,8 @@ def recover_root(root: Path) -> RecoveryReport:
             )
             try:
                 if backup.is_file():
-                    os.replace(backup, target)
+                    _restore_backup(backup, target)
+                    restored_backups.add(backup)
                 elif not entry.get("existed", False):
                     if target.is_file():
                         target.unlink()
@@ -358,18 +389,26 @@ def recover_root(root: Path) -> RecoveryReport:
                     # gone: claiming a rollback here would be a lie, so the
                     # problem is reported instead of guessed away.
                     report.leftovers.append(f"{target.name} (backup missing)")
+                    restore_failed = True
                     continue
             except OSError:
                 report.leftovers.append(str(target))
+                restore_failed = True
                 continue
             report.recovered.append(target.name)
             report.rolled_back.append(target.name)
 
+        if restore_failed:
+            # Preserve the journal and ALL backups, including files restored
+            # above, so another recovery can repeat the complete rollback.
+            continue
         try:
             marker.unlink()
             report.markers_removed += 1
         except OSError:
             report.leftovers.append(str(marker))
+        else:
+            _remove_files(restored_backups)
 
     for stale in root.glob(f".*{STAGE_SUFFIX}"):
         try:
@@ -377,7 +416,9 @@ def recover_root(root: Path) -> RecoveryReport:
             report.stages_removed += 1
         except OSError:
             report.leftovers.append(str(stale))
-    for stale in root.glob(f".*{BACKUP_SUFFIX}"):
+    # A remaining (even unreadable) journal may still need these backups.
+    orphan_backups = [] if marker_paths(root) else root.glob(f".*{BACKUP_SUFFIX}")
+    for stale in orphan_backups:
         try:
             stale.unlink()
         except OSError:
@@ -404,6 +445,45 @@ def commit_project_state(
     with project_meta_lock(project_id):
         with project_segments_lock(project_id):
             return commit_files(files, root=root)
+
+
+def commit_selected_take_qa_report(
+    project_id: str,
+    *,
+    segment_id: str,
+    take_id: str,
+    expected_audio_sha256: str,
+    report,
+) -> bool:
+    """Persist a re-audit only while the same selected Take still owns the slot.
+
+    QA can take long enough for a human selection or audio reference to change.
+    The audit itself runs outside the write lock; this short merge re-reads
+    canonical state and attaches its result only if the selected Take and its
+    recorded byte identity are unchanged.  It writes ``segments.json`` only.
+    """
+
+    root = safe_project_root(project_id)
+    with project_segments_lock(project_id):
+        segments = load_segments(project_id)
+        target = next((item for item in segments if item.id == segment_id), None)
+        if target is None or target.selected_take_id != take_id:
+            return False
+        take = next((item for item in target.takes if item.id == take_id), None)
+        if (
+            take is None
+            or take.missing
+            or take.audio_sha256 != expected_audio_sha256
+            or report.take_id != take_id
+            or report.output_audio_hash != expected_audio_sha256
+        ):
+            return False
+
+        takes_module.attach_qa_report(target, take_id, report)
+        commit_files(
+            [(root / "segments.json", _segments_bytes(segments))], root=root
+        )
+        return True
 
 
 def commit_take_result(

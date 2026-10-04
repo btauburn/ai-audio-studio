@@ -12,6 +12,11 @@ from pathlib import Path
 from typing import Iterable
 
 
+# Brian approved this implemented Base cloning profile as the default on 2026-10-04.
+# CustomVoice has a separate profile contract and retains its existing default.
+DEFAULT_QWEN_BASE_PROFILE = "faster-base-032"
+
+
 @dataclass(frozen=True, slots=True)
 class BackendSpec:
     backend_id: str
@@ -117,10 +122,42 @@ def build_backend_command(
     platform_python: Path,
     *,
     fp32: bool = False,
+    qwen_attention: str = "auto",
+    qwen_execution_profile: str | None = None,
+    preserve_outputs: bool = False,
 ) -> list[str]:
     spec = get_backend_spec(backend_id)
-    python = resolve_backend_python(project_root, spec, platform_python)
-    server = (project_root / spec.server_script).resolve()
+    if qwen_execution_profile is None:
+        qwen_execution_profile = DEFAULT_QWEN_BASE_PROFILE if backend_id == "qwen3tts" else "native-current"
+    environment = spec.environment
+    server_script = spec.server_script
+    attention = qwen_attention
+    if backend_id == "qwen3tts" and qwen_execution_profile == "faster-base-032":
+        environment = "faster_qwen_base032"
+        server_script = "service/faster_qwen3tts_base_server.py"
+    elif backend_id == "qwen3tts" and qwen_execution_profile not in {"native-current", "native-sdpa", "qwen-cudagraph"}:
+        raise ValueError(f"unsupported Qwen Base execution profile: {qwen_execution_profile}")
+    if backend_id == "qwen3tts_cv":
+        if qwen_execution_profile not in {"native-current", "native-sdpa", "qwen-cudagraph"}:
+            raise ValueError(f"unsupported Qwen execution profile: {qwen_execution_profile}")
+        if qwen_execution_profile == "qwen-cudagraph":
+            environment = "faster_qwen3tts"
+            server_script = "service/faster_qwen3tts_customvoice_server.py"
+            attention = "sdpa"
+        elif qwen_execution_profile == "native-sdpa":
+            attention = "sdpa"
+    runtime_spec = BackendSpec(
+        backend_id=spec.backend_id,
+        display_name=spec.display_name,
+        description=spec.description,
+        port=spec.port,
+        server_script=server_script,
+        model_directory=spec.model_directory,
+        environment=environment,
+        capabilities=spec.capabilities,
+    )
+    python = resolve_backend_python(project_root, runtime_spec, platform_python)
+    server = (project_root / server_script).resolve()
     model_dir = (project_root / spec.model_directory).resolve()
 
     missing = [str(path) for path in (server, model_dir) if not path.exists()]
@@ -142,4 +179,11 @@ def build_backend_command(
         command.extend(["--no-fp16" if fp32 else "--fp16", "--no-cuda-kernel"])
     elif backend_id.startswith("qwen3tts"):
         command.extend(["--device", "cuda:0", "--dtype", "bfloat16"])
+    if backend_id.startswith("qwen3tts") and preserve_outputs:
+        command.extend(["--outputs-keep-days", "0", "--outputs-max-files", "0"])
+    if backend_id == "qwen3tts_cv":
+        if attention not in {"auto", "eager", "sdpa", "flash_attention_2"}:
+            raise ValueError(f"unsupported Qwen attention mode: {attention}")
+        command.extend(["--attention", attention])
+        command.extend(["--execution-profile", qwen_execution_profile])
     return command

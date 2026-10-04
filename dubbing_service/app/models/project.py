@@ -18,12 +18,15 @@ from .audiobook import (
     TakeQaReport,
 )
 from .enums import EmotionMode, RoleType, SegmentReviewStatus, SegmentStatus
+from .character import CharacterCastState, CharacterVoiceIdentity
+from .voice_lab import VoiceLabState
 
 
 class Role(BaseModel):
     """配音角色（含旁白、人物等）。"""
 
     id: str = Field(..., description="角色唯一 ID（内部使用）")
+    voice_identity: Optional[CharacterVoiceIdentity] = None
     name: str = Field(..., description="角色名称，展示给用户")
     role_type: RoleType = Field(RoleType.CHARACTER, description="角色类型")
     description: Optional[str] = Field(
@@ -422,6 +425,8 @@ class Project(BaseModel):
     """配音项目。"""
 
     id: str = Field(..., description="项目唯一 ID（同时作为项目目录名）")
+    character_cast: CharacterCastState = Field(default_factory=CharacterCastState)
+    voice_lab: VoiceLabState = Field(default_factory=VoiceLabState)
     name: str = Field(..., description="项目名称")
     description: Optional[str] = Field(None, description="项目简介或备注")
 

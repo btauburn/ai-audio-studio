@@ -51,6 +51,13 @@ class Voice(BaseModel):
     description: str | None = None
     created_at: datetime
     updated_at: datetime
+    # Voice Lab appends immutable versions here. Legacy library metadata and
+    # audio uploads retain their existing API; production samples are not refs.
+    voice_lab_versions: dict[str, dict] = Field(default_factory=dict)
+    # Cross-project preference memory for the same immutable versions. Ratings
+    # and qualitative feedback attach here, keyed by version, so a later recast
+    # never rewrites the history that produced the preference.
+    voice_lab_preferred: dict[str, dict] = Field(default_factory=dict)
 
 
 def _voices_file_path() -> Path:

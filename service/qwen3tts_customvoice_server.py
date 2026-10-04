@@ -8,12 +8,15 @@ import os
 import sys
 import base64
 import argparse
+import hashlib
+import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import uuid
 from datetime import datetime
 import time
 from contextlib import asynccontextmanager
+from importlib import metadata as importlib_metadata
 from threading import Lock
 import logging
 import traceback
@@ -41,6 +44,9 @@ from dubbing_service.app.core.audio_path_policy import (  # noqa: E402
     InvalidAudioPathError,
     resolve_existing_audio_name,
 )
+from dubbing_service.app.audiobook.provider_capabilities import (  # noqa: E402
+    resolve_customvoice_speaker,
+)
 
 # ==================== 配置 ====================
 parser = argparse.ArgumentParser(description="Qwen3-TTS CustomVoice API Server")
@@ -49,6 +55,26 @@ parser.add_argument("--port", type=int, default=8004, help="服务器端口")
 parser.add_argument("--model_dir", type=str, default="models/qwen3_tts/Qwen3-TTS-CustomVoice", help="模型目录")
 parser.add_argument("--device", type=str, default="cuda:0", help="运行设备")
 parser.add_argument("--dtype", type=str, default="bfloat16", choices=["float16", "bfloat16", "float32"], help="数据类型")
+parser.add_argument(
+    "--attention",
+    type=str,
+    default="auto",
+    choices=["auto", "eager", "sdpa", "flash_attention_2"],
+    help="注意力实现；auto 保持既有策略（FlashAttention 可用时使用，否则 eager）",
+)
+parser.add_argument(
+    "--execution-profile",
+    type=str,
+    default="native-current",
+    choices=["native-current", "native-sdpa"],
+    help="可观测的 CustomVoice 执行配置",
+)
+parser.add_argument(
+    "--profile-next-request",
+    type=str,
+    default=None,
+    help="仅分析下一次生成并将一个有界 Chrome trace 写入此路径",
+)
 parser.add_argument("--outputs-keep-days", type=int, default=30, help="输出文件保留天数，0 表示不清理")
 parser.add_argument("--outputs-max-files", type=int, default=5000, help="输出目录最多保留文件数，0 表示不限制")
 
@@ -69,6 +95,11 @@ _model_lock: Optional[Lock] = Lock()
 _infer_lock: Optional[Lock] = Lock()
 _outputs_cleanup_lock: Optional[Lock] = Lock()
 _last_outputs_cleanup = 0.0
+_model_load_count = 0
+_model_unload_count = 0
+_last_model_load_seconds: Optional[float] = None
+_execution_profile: Dict[str, Any] = {}
+_profile_consumed = False
 OUTPUTS_CLEANUP_MIN_INTERVAL = 600
 
 _QWEN_REQUIRED_FILES = (
@@ -127,9 +158,140 @@ def _validated_model_path(args: argparse.Namespace) -> Path:
     )
 
 
+def _distribution_version(name: str) -> Optional[str]:
+    try:
+        return importlib_metadata.version(name)
+    except importlib_metadata.PackageNotFoundError:
+        return None
+
+
+def _resolve_attention(requested: str) -> str:
+    """Resolve one explicit attention choice without silently changing device."""
+
+    if requested != "auto":
+        if requested == "flash_attention_2":
+            try:
+                __import__("flash_attn")
+            except ImportError as exc:
+                raise RuntimeError(
+                    "--attention flash_attention_2 requires flash_attn in the isolated "
+                    "Qwen runtime; no CPU or eager fallback was used"
+                ) from exc
+        return requested
+    try:
+        __import__("flash_attn")
+    except ImportError:
+        logger.warning("⚠️ FlashAttention 未安装，auto 保持既有 eager 注意力实现")
+        return "eager"
+    return "flash_attention_2"
+
+
+def _attention_components(model_wrapper: object) -> Dict[str, Optional[str]]:
+    """Report the values Transformers put on talker/predictor/tokenizer configs."""
+
+    core = getattr(model_wrapper, "model", None)
+    talker = getattr(core, "talker", None)
+    predictor = getattr(talker, "code_predictor", None)
+    tokenizer = getattr(core, "speech_tokenizer", None)
+    tokenizer_model = getattr(tokenizer, "model", None)
+
+    def configured(value: object) -> Optional[str]:
+        config_value = getattr(value, "config", None)
+        resolved = getattr(config_value, "_attn_implementation", None)
+        return str(resolved) if resolved else None
+
+    return {
+        "root": configured(core),
+        "talker": configured(talker),
+        "predictor": configured(predictor),
+        "speech_tokenizer": configured(tokenizer_model),
+    }
+
+
+def _model_manifest_identity() -> Dict[str, Optional[str]]:
+    manifest_path = Path(project_root) / "models" / "manifests" / "qwen3_tts_customvoice.json"
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {
+            "model_id": "qwen3_tts_customvoice",
+            "model_revision": None,
+            "model_content_sha256": None,
+        }
+    files = payload.get("files") if isinstance(payload, dict) else None
+    model_sha = None
+    if isinstance(files, list):
+        for entry in files:
+            if isinstance(entry, dict) and str(entry.get("path", "")).endswith("/model.safetensors"):
+                model_sha = str(entry.get("sha256") or "") or None
+                break
+    return {
+        "model_id": str(payload.get("model_id") or "qwen3_tts_customvoice"),
+        "model_revision": str(payload.get("revision") or "") or None,
+        "model_content_sha256": model_sha,
+    }
+
+
+def _profile_identity(profile: Dict[str, Any]) -> str:
+    payload = json.dumps(
+        profile, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _build_execution_profile(
+    *, args: argparse.Namespace, resolved_attention: str, model_wrapper: object
+) -> Dict[str, Any]:
+    import torch
+
+    core = getattr(model_wrapper, "model", None)
+    configured = getattr(core, "generate_config", None)
+    control_keys = (
+        "do_sample",
+        "top_k",
+        "top_p",
+        "temperature",
+        "repetition_penalty",
+        "max_new_tokens",
+        "subtalker_dosample",
+        "subtalker_top_k",
+        "subtalker_top_p",
+        "subtalker_temperature",
+    )
+    generation_controls = (
+        {key: configured[key] for key in control_keys if key in configured}
+        if isinstance(configured, dict)
+        else {}
+    )
+    generation_controls["non_streaming_mode"] = True
+
+    profile: Dict[str, Any] = {
+        **_model_manifest_identity(),
+        "backend": "qwen3tts_cv",
+        "backend_api_version": "1.1.0",
+        "qwen_tts_version": _distribution_version("qwen-tts"),
+        "transformers_version": _distribution_version("transformers"),
+        "torch_version": torch.__version__,
+        "cuda_runtime": torch.version.cuda,
+        "device": args.device,
+        "dtype": args.dtype,
+        "attention_requested": args.attention,
+        "attention_resolved": resolved_attention,
+        "requested_execution_profile": args.execution_profile,
+        "attention_components": _attention_components(model_wrapper),
+        "batching_policy": "single-request-serialized",
+        "decoding_path": "qwen_tts.generate_custom_voice.dynamic_cache",
+        "generation_controls": generation_controls,
+        "seed_policy": "existing unseeded global RNG policy; no per-request seed",
+    }
+    profile["execution_profile_id"] = _profile_identity(profile)
+    return profile
+
+
 def _load_qwen3tts_model_if_needed() -> None:
     """按需加载全局 Qwen3-TTS CustomVoice 模型"""
-    global qwen3tts_model, config
+    global qwen3tts_model, config, _model_load_count, _last_model_load_seconds
+    global _execution_profile
 
     if qwen3tts_model is not None:
         return
@@ -147,9 +309,16 @@ def _load_qwen3tts_model_if_needed() -> None:
 
         model_path = _validated_model_path(config)
         logger.info(f"🔧 正在加载项目内本地模型: {model_path}")
+        load_started = time.perf_counter()
 
         import torch
         from qwen_tts import Qwen3TTSModel
+
+        if str(config.device).startswith("cuda") and not torch.cuda.is_available():
+            raise RuntimeError(
+                f"configured device {config.device} requires CUDA, but torch.cuda.is_available() is false; "
+                "no CPU fallback was used"
+            )
 
         # 确定数据类型
         dtype_map = {
@@ -159,13 +328,7 @@ def _load_qwen3tts_model_if_needed() -> None:
         }
         dtype = dtype_map.get(config.dtype, torch.bfloat16)
 
-        # 检查是否支持 flash_attention_2
-        attn_impl = "flash_attention_2"
-        try:
-            __import__("flash_attn")
-        except ImportError:
-            attn_impl = "eager"
-            logger.warning("⚠️ FlashAttention 未安装，使用默认注意力实现")
+        attn_impl = _resolve_attention(config.attention)
 
         model = Qwen3TTSModel.from_pretrained(
             str(model_path),
@@ -174,8 +337,36 @@ def _load_qwen3tts_model_if_needed() -> None:
             attn_implementation=attn_impl,
             local_files_only=True,
         )
+        component_attention = _attention_components(model)
+        # The top-level flag configures the autoregressive talker/predictor.
+        # The speech tokenizer is loaded separately by qwen-tts and legitimately
+        # resolves its own supported attention implementation; report it, but do
+        # not pretend it was governed by this flag.
+        mismatches = {
+            name: component_attention.get(name)
+            for name in ("root", "talker", "predictor")
+            if component_attention.get(name) is not None
+            and component_attention.get(name) != attn_impl
+        }
+        if mismatches:
+            raise RuntimeError(
+                f"requested attention {attn_impl!r} was not applied to every reported model "
+                f"component: {mismatches}"
+            )
         qwen3tts_model = model
-        logger.info("✅ Qwen3-TTS CustomVoice 模型加载完成")
+        _model_load_count += 1
+        _last_model_load_seconds = time.perf_counter() - load_started
+        _execution_profile = _build_execution_profile(
+            args=config,
+            resolved_attention=attn_impl,
+            model_wrapper=model,
+        )
+        logger.info(
+            "✅ Qwen3-TTS CustomVoice 模型加载完成: attention=%s, load=%.3fs, profile=%s",
+            attn_impl,
+            _last_model_load_seconds,
+            _execution_profile.get("execution_profile_id"),
+        )
     finally:
         if lock is not None and lock.locked():
             try:
@@ -186,9 +377,12 @@ def _load_qwen3tts_model_if_needed() -> None:
 
 def _unload_qwen3tts_model() -> None:
     """卸载全局 Qwen3-TTS 模型并释放显存"""
-    global qwen3tts_model
+    global qwen3tts_model, _model_unload_count, _execution_profile
 
+    if qwen3tts_model is not None:
+        _model_unload_count += 1
     qwen3tts_model = None
+    _execution_profile = {}
     try:
         import torch
         if torch.cuda.is_available():
@@ -293,7 +487,7 @@ class TTSRequest(BaseModel):
     text: str = Field(..., description="要合成的文本内容", min_length=1, max_length=10000)
     
     # CustomVoice 特有参数
-    speaker: str = Field("vivian", description="内置音色：vivian, uncle_fu, aiden, dylan, eric, ryan, serena, ono_anna, sohee")
+    speaker: str = Field(..., description="Explicit preset: vivian, uncle_fu, aiden, dylan, eric, ryan, serena, ono_anna, sohee")
     instruct: Optional[str] = Field(None, description="情感指令，如'用愤怒的语气说'")
     language: str = Field("Chinese", description="语言: Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian, Auto")
     
@@ -303,6 +497,8 @@ class TTSRequest(BaseModel):
     # 输出选项
     return_base64: bool = Field(False, description="是否返回base64编码的音频")
     save_file: bool = Field(True, description="是否保存音频文件到服务器")
+    request_id: Optional[str] = Field(None, max_length=200, description="调用方请求标识")
+    utterance_id: Optional[str] = Field(None, max_length=200, description="稳定 utterance 标识")
 
 
 class TTSResponse(BaseModel):
@@ -313,6 +509,12 @@ class TTSResponse(BaseModel):
     audio_base64: Optional[str] = None
     duration_seconds: Optional[float] = None
     sample_rate: int = 24000
+    request_id: Optional[str] = None
+    utterance_id: Optional[str] = None
+    effective_speaker: Optional[str] = None
+    execution_profile: Dict[str, Any] = Field(default_factory=dict)
+    stage_timings: Dict[str, Any] = Field(default_factory=dict)
+    generation: Dict[str, Any] = Field(default_factory=dict)
 
 
 class HealthResponse(BaseModel):
@@ -324,6 +526,15 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     backend: str = "qwen3tts_cv"
     instance_token: Optional[str] = None
+    configured_attention: str = "auto"
+    configured_execution_profile: str = "native-current"
+    resolved_attention: Optional[str] = None
+    model_load_count: int = 0
+    model_unload_count: int = 0
+    model_load_seconds: Optional[float] = None
+    graph_capture_count: int = 0
+    graph_captured: bool = False
+    execution_profile: Dict[str, Any] = Field(default_factory=dict)
 
 
 class SpeakersResponse(BaseModel):
@@ -347,6 +558,55 @@ def cleanup_temp_file(file_path: str):
         pass
 
 
+def _bounded_generation_controls() -> Dict[str, Any]:
+    core = getattr(qwen3tts_model, "model", None)
+    configured = getattr(core, "generate_config", None)
+    if not isinstance(configured, dict):
+        return {"non_streaming_mode": True}
+    allowed = (
+        "do_sample",
+        "top_k",
+        "top_p",
+        "temperature",
+        "repetition_penalty",
+        "max_new_tokens",
+        "subtalker_dosample",
+        "subtalker_top_k",
+        "subtalker_top_p",
+        "subtalker_temperature",
+    )
+    result = {key: configured.get(key) for key in allowed if key in configured}
+    result["non_streaming_mode"] = True
+    return result
+
+
+def _generate_custom_voice_with_optional_profile(**kwargs: Any):
+    """Profile at most one explicitly requested call; normal calls have no profiler."""
+
+    global _profile_consumed
+    target_value = getattr(config, "profile_next_request", None) if config else None
+    if not target_value or _profile_consumed:
+        return qwen3tts_model.generate_custom_voice(**kwargs), None
+
+    import torch
+
+    _profile_consumed = True
+    target = Path(target_value).resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    activities = [torch.profiler.ProfilerActivity.CPU]
+    if torch.cuda.is_available():
+        activities.append(torch.profiler.ProfilerActivity.CUDA)
+    with torch.profiler.profile(
+        activities=activities,
+        record_shapes=False,
+        profile_memory=False,
+        with_stack=False,
+    ) as profile:
+        result = qwen3tts_model.generate_custom_voice(**kwargs)
+    profile.export_chrome_trace(str(target))
+    return result, str(target)
+
+
 # ==================== API端点 ====================
 @app.get("/", response_model=Dict[str, str])
 async def root():
@@ -367,6 +627,17 @@ async def health_check():
         device=config.device if config else "cuda:0",
         model_loaded=qwen3tts_model is not None,
         instance_token=os.environ.get("DUBBING_WORKER_INSTANCE_TOKEN"),
+        configured_attention=(config.attention if config else "auto"),
+        configured_execution_profile=(
+            config.execution_profile if config else "native-current"
+        ),
+        resolved_attention=_execution_profile.get("attention_resolved"),
+        model_load_count=_model_load_count,
+        model_unload_count=_model_unload_count,
+        model_load_seconds=_last_model_load_seconds,
+        graph_capture_count=int(_execution_profile.get("graph_capture_count", 0)),
+        graph_captured=bool(_execution_profile.get("graphs_captured", False)),
+        execution_profile=dict(_execution_profile),
     )
 
 
@@ -384,7 +655,10 @@ def load_model():
         return {
             "success": True,
             "message": "模型加载成功",
-            "model_loaded": qwen3tts_model is not None
+            "model_loaded": qwen3tts_model is not None,
+            "model_load_count": _model_load_count,
+            "model_load_seconds": _last_model_load_seconds,
+            "execution_profile": dict(_execution_profile),
         }
     except Exception as e:
         logger.error(f"加载模型失败: {traceback.format_exc()}")
@@ -405,12 +679,26 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
     
     使用内置音色 + 可选情感指令合成语音。
     """
+    request_started = time.perf_counter()
+    request_id = request.request_id or uuid.uuid4().hex
     try:
+        # Resolve and reject before loading the model. Unknown values must never
+        # produce a successful Take under Vivian's identity.
+        try:
+            speaker = resolve_customvoice_speaker(request.speaker)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        load_count_before = _model_load_count
+        load_call_started = time.perf_counter()
         _load_qwen3tts_model_if_needed()
+        load_call_seconds = time.perf_counter() - load_call_started
+        load_performed = _model_load_count > load_count_before
         
         if qwen3tts_model is None:
             raise HTTPException(status_code=500, detail="模型加载失败")
-        
+
+        preparation_started = time.perf_counter()
         # 处理情感指令
         instruct = request.instruct or ""
         if request.emotion_text and request.emotion_text.strip():
@@ -435,49 +723,88 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
         }
         language = language_map.get(request.language, request.language)
         
-        # 验证音色（大小写不敏感）
-        speaker_input = request.speaker.strip()
-        speaker_lower = speaker_input.lower()
-        valid_ids = {s["id"] for s in CUSTOM_VOICE_SPEAKERS}
-        if speaker_lower in valid_ids:
-            speaker = speaker_lower
-        elif speaker_input in _SPEAKER_ID_TO_MODEL_NAME.values():
-            # 用户直接传了官方名称（如 "Vivian"），反查 id
-            speaker = next((k for k, v in _SPEAKER_ID_TO_MODEL_NAME.items() if v == speaker_input), "vivian")
-        else:
-            speaker = "vivian"
-        
         # 生成输出路径
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_filename = f"qwen3tts_cv_{timestamp}_{uuid.uuid4().hex}.wav"
         output_path = Path("outputs") / output_filename
         
         logger.info(f"🎙️ CustomVoice 合成: speaker={speaker}, instruct={instruct[:50] if instruct else 'None'}..., text={request.text[:50]}...")
-        start_time = time.time()
         
         # 执行推理
         import soundfile as sf
-        
-        with _infer_lock:
+        import torch
+
+        model_speaker = _SPEAKER_ID_TO_MODEL_NAME.get(speaker, speaker)
+        preparation_seconds = time.perf_counter() - preparation_started
+        queue_started = time.perf_counter()
+        infer_lock = _infer_lock
+        if infer_lock is not None:
+            infer_lock.acquire()
+        queue_wait_seconds = time.perf_counter() - queue_started
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+        generation_started = time.perf_counter()
+        try:
             # CustomVoice 使用 generate_custom_voice 方法
             # 将 API 小写 id 映射为官方模型期望的 speaker 名称
-            model_speaker = _SPEAKER_ID_TO_MODEL_NAME.get(speaker, speaker)
-            wavs, sr = qwen3tts_model.generate_custom_voice(
+            (wavs, sr), profiler_trace = _generate_custom_voice_with_optional_profile(
                 text=request.text,
                 language=language,
                 speaker=model_speaker,
                 instruct=instruct if instruct else None,
+                non_streaming_mode=True,
+            )
+        finally:
+            if infer_lock is not None and infer_lock.locked():
+                infer_lock.release()
+        generation_seconds = time.perf_counter() - generation_started
+        gpu_peak_allocated_mib = (
+            round(torch.cuda.max_memory_allocated() / (1024 * 1024), 2)
+            if torch.cuda.is_available()
+            else None
+        )
+        
+        if wavs is None or len(wavs) != 1:
+            raise HTTPException(
+                status_code=500,
+                detail=f"expected exactly one waveform for one request; received {0 if wavs is None else len(wavs)}",
             )
         
-        if wavs is None or len(wavs) == 0:
-            raise HTTPException(status_code=500, detail="合成失败：没有输出")
-        
         # 保存音频文件
+        file_write_started = time.perf_counter()
         sf.write(str(output_path), wavs[0], sr)
+        file_write_seconds = time.perf_counter() - file_write_started
         
         duration = len(wavs[0]) / sr
-        elapsed = time.time() - start_time
+        elapsed = time.perf_counter() - request_started
         logger.info(f"✅ 合成完成: {duration:.2f}s 音频, 耗时 {elapsed:.2f}s")
+
+        stage_timings = {
+            "schema": "qwen3tts-stage-timings-v1",
+            "clock": "time.perf_counter",
+            "inclusive": {
+                "request_through_file_seconds": round(elapsed, 6),
+                "model_generate_seconds": round(generation_seconds, 6),
+            },
+            "exclusive": {
+                "model_load_call_seconds": round(load_call_seconds, 6),
+                "preparation_seconds": round(preparation_seconds, 6),
+                "infer_queue_wait_seconds": round(queue_wait_seconds, 6),
+                "file_write_seconds": round(file_write_seconds, 6),
+            },
+            "model_load_performed": load_performed,
+            "worker_pid": os.getpid(),
+            "gpu_peak_allocated_mib": gpu_peak_allocated_mib,
+            "model_load_seconds": (
+                round(_last_model_load_seconds, 6) if load_performed and _last_model_load_seconds else 0.0
+            ),
+            "model_generate_contains": [
+                "tokenization_and_prefill",
+                "talker_and_code_predictor_generation",
+                "waveform_decode",
+            ],
+            "profiler_trace": profiler_trace,
+        }
         
         # 构建响应
         response = TTSResponse(
@@ -485,7 +812,20 @@ def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
             message="合成成功",
             audio_file=str(output_path.absolute()) if request.save_file else None,
             duration_seconds=duration,
-            sample_rate=sr
+            sample_rate=sr,
+            request_id=request_id,
+            utterance_id=request.utterance_id,
+            effective_speaker=speaker,
+            execution_profile=dict(_execution_profile),
+            stage_timings=stage_timings,
+            generation={
+                "controls": _bounded_generation_controls(),
+                "effective_speaker": speaker,
+                "model_speaker": model_speaker,
+                "input_text_characters": len(request.text),
+                "generated_codec_steps": None,
+                "termination_reason": "not_exposed_by_qwen_tts_0.1.1",
+            },
         )
         
         if request.return_base64:

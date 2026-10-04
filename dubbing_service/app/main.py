@@ -7,6 +7,7 @@ API 前缀：/api/v1/
 from __future__ import annotations
 
 import json
+import asyncio
 import logging
 import urllib.request
 from collections.abc import AsyncIterator
@@ -42,6 +43,10 @@ from dubbing_service.app.routers import ws_synthesis as ws_synthesis_router
 from dubbing_service.app.routers import jobs as jobs_router
 from dubbing_service.app.routers import masters as masters_router
 from dubbing_service.app.routers import production as production_router
+from dubbing_service.app.routers import voice_lab as voice_lab_router
+from dubbing_service.app.routers import voice_library as voice_library_router
+from dubbing_service.app.routers import voice_lab_audition as voice_lab_audition_router
+from dubbing_service.app.routers import book_creator as book_creator_router
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +66,7 @@ class WebUIStaticFiles(StaticFiles):
 
     async def get_response(self, path: str, scope: dict) -> Response:
         response = await super().get_response(path, scope)
-        if path.replace("\\", "/").strip("/") in {"", ".", "index.html"}:
+        if path.replace("\\", "/").strip("/") in {"", ".", "index.html", "voice-lab.html"}:
             response.headers["Cache-Control"] = "no-store, max-age=0"
             response.headers["Pragma"] = "no-cache"
         return response
@@ -93,9 +98,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             exc,
         )
         raise RuntimeError(str(exc)) from exc
+    # Reuse the application owner and durable jobs, with a bounded metadata-only
+    # recovery pass. No audio generation or independent daemon is started here.
+    from dubbing_service.app.audiobook.voice_lab import resume_discoveries
+    discovery_recovery = asyncio.create_task(asyncio.to_thread(resume_discoveries))
+    from dubbing_service.app.audiobook.book_maintenance import run_book_maintenance
+    book_stop = asyncio.Event()
+    book_maintenance = asyncio.create_task(run_book_maintenance(book_stop))
     yield
     # ── Shutdown ──────────────────────────────────────────────────────
     logger.info("Dubbing service shutting down, cleaning up ...")
+    book_stop.set()
+    await book_maintenance
+    await asyncio.gather(discovery_recovery, return_exceptions=True)
     if projects_lock is not None:
         try:
             projects_lock.release()
@@ -143,6 +158,10 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router.router, prefix=API_V1, tags=["jobs"])
     app.include_router(masters_router.router, prefix=API_V1, tags=["masters"])
     app.include_router(production_router.router, prefix=API_V1, tags=["production"])
+    app.include_router(voice_lab_router.router, prefix=API_V1, tags=["voice-lab"])
+    app.include_router(voice_library_router.router, prefix=API_V1, tags=["voice-library"])
+    app.include_router(voice_lab_audition_router.router, prefix=API_V1, tags=["voice-lab"])
+    app.include_router(book_creator_router.router, prefix=API_V1, tags=["book-creator"])
 
     # Web 管理界面静态文件（使用绝对路径，避免受当前工作目录影响）
     webui_dir = Path(__file__).resolve().parents[1] / "webui"

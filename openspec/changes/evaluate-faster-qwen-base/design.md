@@ -1,5 +1,17 @@
 # Design
 
+> Current decision, 2026-10-04: **USER-APPROVED DEFAULT** is the implemented
+> `faster-base-032` Base cloning/character profile. This supersedes the earlier
+> native-current/auto preference and blind-listening promotion gate. CustomVoice
+> remains a separate lane. Explicit runtime choices and immutable job/Take bindings
+> are preserved; mismatched historical resume must fail before synthesis. User
+> approval does not assert universal audio parity or that every sample was heard.
+> The October 1-2 experimental/default/pending-approval statements below describe
+> historical state. Frozen A/B audio, ASR flags, word endings, chunk boundaries,
+> voice identity and longform listening remain useful quality evidence.
+> See `docs/audiobook-current-checkpoint.md` for the current implementation receipt.
+
+
 `qwen3tts` remains the backend. An explicit per-launch `faster-base-032` profile selects an isolated environment and server wrapper. Prepared auditions and production use the same `CharacterVoiceRuntime.synthesize` Base adapter; VoiceDesign reference creation retains its current implementation. Runtime provenance belongs in generated Take metadata, not saved voice identity. The native launch remains the default.
 
 The adapter verifies exact dependency versions, source hash, CUDA/BF16 requirements and the approved absolute snapshot. Model manifest verification precedes any unload/load. Conditioning uses immutable content hashes and precomputed prompts, with no extra reference silence. Predictor sampling is pinned before graph capture and each request reseeds after warmup. A single inference lease spans preparation, model load, output generation and metadata attribution. Cancellation events are request-owned and atomic with completion. Unsupported controls, sequence-cap/budget exhaustion, OOM and interruption cannot produce silent fallback or successful partial audio.
