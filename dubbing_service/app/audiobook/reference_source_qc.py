@@ -146,3 +146,4 @@ if __name__ == "__main__":
                 raise ValueError("invalid source-QC input")
             result = classify(data["wave"], int(data["sample_rate"]))
         print(json.dumps(result, sort_keys=True))
+

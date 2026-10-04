@@ -403,3 +403,4 @@ def prepare_acquisition(project_id, acquisition_id, acquisition_sha256, expected
     return {"status": "prepared" if result["clone_ready"] else "hold", "source_acquisition_id": acquisition_id,
             "source_acquisition_sha256": acquisition_sha256, **result,
             "identity_changed": False, "selection_changed": False, "audio_generation_triggered": False}
+

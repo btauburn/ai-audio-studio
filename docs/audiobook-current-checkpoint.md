@@ -1,3 +1,8 @@
+> **October 4 follow-up repair:** exact fingerprinted reference-source bytes
+> were restored after a byte-only whitespace cleanup invalidated frozen QC
+> evidence. See [source fingerprint compatibility](reference-source-fingerprint-compatibility.md).
+> Default selection, immutable voices, receipts and source-policy guards remain unchanged.
+
 # Audiobook implementation checkpoint — 2026-10-04
 
 This is the current source architecture for Alfred's review. It supersedes the
