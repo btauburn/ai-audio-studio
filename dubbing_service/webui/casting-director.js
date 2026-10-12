@@ -292,10 +292,12 @@
         make('p', 'Recommendations bound to the book text. They are not applied to any voice or recording by this panel.', 'cd-muted small'));
       const requested = list(data.controls?.requested || data.requested_controls).map(words);
       const supported = data.controls?.supported ? Object.entries(data.controls.supported)
-        .map(([name, capability]) => words(name) + ': ' + words(capability.state || capability.native_instruction_state || (capability.available ? 'available' : 'unavailable')))
+        .map(([name, capability]) => words(name) + ': ' + (capability.controls
+          ? Object.entries(capability.controls).map(([control, detail]) => words(control) + ' ' + words(detail.state || 'unverified')).join('; ')
+          : words(capability.state || capability.native_instruction_state || 'unverified')))
         : list(data.supported_controls).map(words);
       if (requested.length || supported.length) {
-        scenesBox.append(pair('Controls requested', requested.join(', ') || 'none'), pair('Controls this runtime supports', supported.join(', ') || 'none confirmed'));
+        scenesBox.append(pair('Controls requested', requested.join(', ') || 'none'), pair('Engine control capabilities', supported.join(' · ') || 'none confirmed'));
       }
       const directions = new Map();
       list(data.directions).forEach(d => {
