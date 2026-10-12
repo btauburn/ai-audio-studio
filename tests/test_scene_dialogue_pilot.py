@@ -482,6 +482,46 @@ def test_generation_forwards_only_directed_dialogue_and_builds_manifest(prepared
         assert all(t["boundary"] is None or t["boundary"]["trimming"] is False for t in timing["timing"])
 
 
+def test_previous_selection_and_neutral_audio_are_reused_without_extra_dispatch(prepared):
+    args, state, render = prepared
+    pilot.generate(args, state, FakeWorker, render)
+    prior = args.output_dir
+    before = tree_hashes(prior)
+    args = copy.copy(args)
+    args.output_dir = prior.parent / 'new-pilot'
+    args.selection_from = prior
+    new = pilot.prepare(args, plan_builder=fake_plan_builder, model_loader=loader)
+    assert [l['utterance_id'] for l in new['lines']] == [l['utterance_id'] for l in state['lines']]
+    assert [l['voice'] for l in new['lines']] == [l['voice'] for l in state['lines']]
+    new = pilot.load_state(args.output_dir)
+    FakeWorker.instances = []
+    pilot.generate(args, new, FakeWorker, render)
+    calls = FakeWorker.instances[0].client.calls
+    assert len(calls) == sum(not l['narrator'] for l in new['lines'])
+    reused = json.loads((args.output_dir / 'reused-samples.json').read_bytes())
+    assert len(reused['samples']) == 20 + sum(l['narrator'] for l in new['lines'])
+    for line in new['lines']:
+        name = line['utterance_id'] + '.wav'
+        assert (args.output_dir/'samples'/'baseline'/name).read_bytes() == (prior/'samples'/'baseline'/name).read_bytes()
+        if line['narrator']:
+            assert (args.output_dir/'samples'/'directed'/name).read_bytes() == (prior/'samples'/'baseline'/name).read_bytes()
+    assert (args.output_dir/'review'/'index.html').read_text('utf-8').count('<audio ') == 12
+    assert tree_hashes(prior) == before
+
+
+def test_prior_sample_tamper_blocks_reuse_before_dispatch(prepared):
+    args, state, render = prepared
+    pilot.generate(args, state, FakeWorker, render)
+    prior = args.output_dir
+    args = copy.copy(args); args.output_dir = prior.parent/'new-pilot'; args.selection_from = prior
+    new = pilot.prepare(args, plan_builder=fake_plan_builder, model_loader=loader)
+    audio = next((prior/'samples'/'baseline').glob('*.wav')); audio.write_bytes(b'changed')
+    FakeWorker.instances = []
+    with pytest.raises(pilot.PilotError, match='QA refused reuse'): pilot.generate(args, new, FakeWorker, render)
+    assert FakeWorker.instances == []
+    assert not (args.output_dir/'samples').exists()
+
+
 def test_changed_cast_refused_before_worker_dispatch(prepared):
     args, state, render = prepared
     path = args.source_root / "p1" / "project.json"

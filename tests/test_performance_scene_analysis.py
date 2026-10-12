@@ -328,6 +328,35 @@ def test_pronoun_binding_is_marked_lower_confidence_and_wrong_role_is_not_bound(
     assert [cue["binding"] for cue in by_id(other, "u2")["tag_cues"]] == ["named_role"]
 
 
+def test_same_role_introductory_pronoun_tag_binds_forward_with_source_evidence():
+    result = psa.analyze_scenes(make_project(), make_segments([
+        ("mara", '"Do not jinx us."'), ("narr", "She suddenly shouted,"),
+        ("mara", '"What was that, anyway!"')]))
+    assert by_id(result, "u0")["tag_cues"] == []
+    following = by_id(result, "u2")
+    assert [c["binding"] for c in following["tag_cues"]] == ["same_role_intro"]
+    assert following["delivery_phrases"][0]["basis"] == psa.BASIS_SOURCE
+    assert following["delivery_phrases"][0]["phrase"] == "raised voice"
+    assert following["tag_cues"][0]["evidence"][0]["utterance_id"] == "u1"
+
+
+def test_introductory_pronoun_between_different_speakers_stays_ambiguous():
+    result = psa.analyze_scenes(make_project(), make_segments([
+        ("mara", '"Leave."'), ("narr", "She suddenly shouted,"), ("tom", '"No."')]))
+    assert not any(c["binding"] == "same_role_intro" for r in result["directions"] for c in r["tag_cues"])
+
+
+def test_dead_and_anyway_do_not_imply_grief_or_evasion():
+    result = psa.analyze_scenes(make_project(), make_segments([
+        ("tom", '"I am not convinced we are not dead."'), ("mara", '"What was that, anyway?"')]))
+    assert by_id(result, "u0")["emotion"]["label"] != "sadness"
+    assert by_id(result, "u1")["intention"]["value"] != "deflect"
+    tagged = psa.analyze_scenes(make_project(), make_segments([
+        ("narr", "Tom said sadly."), ("tom", '"She is gone."')]))
+    assert by_id(tagged, "u1")["emotion"]["label"] == "sadness"
+    assert by_id(tagged, "u1")["emotion"]["basis"] == psa.BASIS_SOURCE
+
+
 def test_human_direction_outranks_source_and_inference_and_is_validated():
     rows = [("narr", "Tom answered sharply."), ("tom", '"Never mind, it is nothing!"')]
     result = psa.analyze_scenes(

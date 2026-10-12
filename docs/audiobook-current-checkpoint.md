@@ -1,3 +1,9 @@
+> **October 12 stronger coaching follow-up:** see [whole-scene model coaching,
+> preserved baseline/v1 comparison and reproduction](scene-coaching-v2.md).
+> Brian reported a slight gain from v1 and requested more contrast. V2 directs
+> all 14 dialogue lines with the same clones and exact prose; narration stays
+> neutral. New listening and production approval remain pending.
+
 > **October 12 scene-aware pilot:** see [implemented scene direction, paired audio
 > evidence and reproduction instructions](scene-dialogue-pilot.md). Twenty lines
 > and forty samples were rendered using the retained clones. Native instructions

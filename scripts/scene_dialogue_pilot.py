@@ -568,6 +568,8 @@ def apply_plan(plan, plan_sha256, project_lines):
             "native_instruction": instruction, "basis": row.get("basis"), "plan_sha256": plan_sha256,
             "evidence": row.get("evidence"), "holds": row.get("holds") or [],
             "voice_revision": row.get("voice_revision"), "recommendation_only": True, "human_review": "pending"}
+        if row.get("coaching") is not None:
+            directions[line["utterance_id"]].update(coaching=row["coaching"], coaching_scene_id=row["coaching_scene_id"])
     return directions, holds
 
 
@@ -612,14 +614,30 @@ def prepare(args, plan_builder=None, model_loader=_models):
              "runtime": {"directed_profile": DIRECTED_PROFILE, "policy": DIRECTION_POLICY,
                          "request": "experimental review only; current Faster default keeps no forwarding"},
              "sources": chapters, "holds": [], "arms": list(ARMS)}
-    chosen, search = select_scenes(args.projects, rows_by_project)
+    prior = getattr(args, "selection_from", None)
+    previous = load_state(prior) if prior else None
+    chosen, search = (None, {"reused_selection": str(prior)}) if previous else select_scenes(args.projects, rows_by_project)
     state["selection_search"] = search
-    if not chosen:
+    if not chosen and previous is None:
         state.update(status="held", holds=[hold("selection_infeasible", "No complete scene set satisfies the line, "
                                                   "narrator, dialogue and codec-budget constraints", **search)],
                      lines=[], scenes=[])
         return finish(output, state, sources)
-    scenes, lines = freeze_selection(args.projects, rows_by_project, chosen, roles_by_project, registries)
+    if previous is None:
+        scenes, lines = freeze_selection(args.projects, rows_by_project, chosen, roles_by_project, registries)
+    else:
+        import copy
+        verify_prepared_sources(argparse.Namespace(source_root=args.source_root, output_dir=prior), previous)
+        if {s["project_id"] for s in previous["sources"]} != set(args.projects):
+            raise PilotError("Prior selection belongs to different source projects")
+        scenes, lines = copy.deepcopy(previous["scenes"]), copy.deepcopy(previous["lines"])
+        for line in lines:
+            live = next((r for r in rows_by_project[line["project_id"]] if r["utterance_id"] == line["utterance_id"]), None)
+            if (not live or not live["eligible"] or any(live[k] != line[k] for k in
+                    ["text_sha256", "role_id", "role_name", "narrator", "chapter_id", "index"]) or
+                    roles_by_project[line["project_id"]][line["role_id"]]["identity"] != line["voice"]):
+                raise PilotError("Prior selection source or cloned cast changed")
+        state["previous_pilot"] = {"directory": str(prior), "frozen_sha256": previous["frozen_sha256"]}
     bindings, coverage = role_bindings(lines, roles_by_project)
     state.update(scenes=scenes, lines=lines, role_bindings=bindings, clone_coverage=coverage)
     counts = {"lines": len(lines), "narrator": sum(l["narrator"] for l in lines),
@@ -653,6 +671,15 @@ def prepare(args, plan_builder=None, model_loader=_models):
                 continue
             project, segments = model_loader(source)
             plan = builder(project, segments, cache_root=cache, selected_ids=[l["utterance_id"] for l in mine])
+            coaching_file = getattr(args, "coaching_file", None)
+            if coaching_file:
+                from dubbing_service.app.audiobook.scene_coaching import apply_coaching, CoachingError
+                bundle_bytes = coaching_file.read_bytes()
+                try:
+                    plan = apply_coaching(plan, json.loads(bundle_bytes), project, segments, cache_root=cache)
+                except (CoachingError, ValueError) as exc:
+                    raise PilotError(f"Scene coaching refused: {exc}") from exc
+                publish(output / "coaching-bundle.json", bundle_bytes)
             plan_bytes = encoded(plan)
             publish(output / "plans" / f"plan-{source['id']}.json", plan_bytes)
             directions, plan_holds = apply_plan(plan, sha(plan_bytes), mine)
@@ -879,6 +906,65 @@ def pin_runtime(output, runtime_sha256, identity):
     return pin
 
 
+def verified_previous(state):
+    """Read and validate the previous pilot without changing its artifacts."""
+    prior = Path(state["previous_pilot"]["directory"])
+    previous = load_state(prior)
+    manifest_bytes = (prior / "scene-comparison.json").read_bytes()
+    manifest = json.loads(manifest_bytes)
+    if (previous["frozen_sha256"] != state["previous_pilot"]["frozen_sha256"] or
+            manifest["frozen_sha256"] != previous["frozen_sha256"] or
+            Path(manifest["base_dir"]).resolve() != prior.resolve() or
+            previous["boundary_policy_sha256"] != state["boundary_policy_sha256"]):
+        raise PilotError("Prior pilot or boundary policy changed")
+    old_lines = {l["utterance_id"]: l for l in previous["lines"]}
+    if set(old_lines) != {l["utterance_id"] for l in state["lines"]}:
+        raise PilotError("Prior pilot selection differs")
+    for line in state["lines"]:
+        old = old_lines[line["utterance_id"]]
+        if any(old[k] != line[k] for k in ["text_sha256", "voice", "source", "role_id", "scene_id", "narrator"]):
+            raise PilotError("Prior pilot source, scene or cast differs")
+    from dubbing_service.app.audiobook.scene_dialogue_evaluation import evaluate_scene_pilot, EvaluationError
+    try:
+        evaluate_scene_pilot(manifest)  # verifies both arms' audio, raw receipts, settings and forwarding
+    except EvaluationError as exc:
+        raise PilotError(f"Prior pilot QA refused reuse: {exc}") from exc
+    return prior, previous, manifest, sha(manifest_bytes)
+
+
+def reuse_prior_neutral(output, state):
+    """Reuse proven baseline clips and neutral narration; retain their original receipts."""
+    prior, _, manifest, manifest_sha = verified_previous(state)
+    pin_bytes = (prior / "runtime-pin.json").read_bytes()
+    pin = json.loads(pin_bytes)
+    if pin["runtime_sha256"] != manifest["runtime"]["runtime_sha256"]:
+        raise PilotError("Prior runtime pin differs from receipts")
+    pending, reused = [], []
+    for line in state["lines"]:
+        arms = ARMS if line["narrator"] else ("baseline",)
+        src = prior / "samples" / "baseline" / f"{line['utterance_id']}.wav"
+        audio, raw = src.read_bytes(), src.with_suffix(".receipt.json").read_bytes()
+        receipt = json.loads(raw)
+        for arm in arms:
+            verify_sample(arm, line, receipt, pin["runtime_sha256"])
+            if sha(audio) != receipt["audio_sha256"]:
+                raise PilotError("Prior audio differs from its receipt")
+            target = output / "samples" / arm / src.name
+            pending.extend([(target, audio), (target.with_suffix(".receipt.json"), raw)])
+            reused.append({"arm": arm, "utterance_id": line["utterance_id"],
+                           "source_arm": "baseline", "audio_sha256": sha(audio), "receipt_sha256": sha(raw)})
+    # Check every conflict before copying anything; exclusive publication protects retries.
+    pending.append((output / "runtime-pin.json", pin_bytes))
+    for path, data in pending:
+        if path.exists() and path.read_bytes() != data:
+            raise PilotError("Existing reuse artifact differs; choose a new output directory")
+    for path, data in pending:
+        publish(path, data)
+    publish(output / "reused-samples.json", encoded({"source_manifest_sha256": manifest_sha,
+            "source_directory": str(prior), "samples": reused,
+            "latency_policy": "Reused receipts retain original generation measurements; no new inference occurred"}))
+
+
 def run_generation(output, state, worker_class, render_fn):
     """Render both arms line by line, resuming verified samples; hold on any ambiguity."""
     os.environ["DUBBING_PROJECTS_ROOT"] = str(output / "projects")
@@ -1026,6 +1112,7 @@ def build_manifest(output, state, receipts, pinned_runtime):
 def publish_review(output, state, manifest):
     """An export for listening, with only mixed scenes exposed by a static host."""
     import html
+    previous = verified_previous(state) if state.get("previous_pilot") else None
     cards = []
     for index, scene in enumerate(state["scenes"], 1):
         players = []
@@ -1036,7 +1123,16 @@ def publish_review(output, state, manifest):
                 raise PilotError("Scene mix hash changed before review publication")
             name = f"audio/scene-{index:02}-{arm}.wav"
             publish(output / "review" / name, audio)
-            label = "Baseline" if arm == "baseline" else "Scene-aware delivery"
+            if arm == "directed" and previous:
+                prior, _, prior_manifest, _ = previous
+                old_mix = prior_manifest["arms"]["directed"]["scenes"][scene["scene_id"]]
+                old_audio = (prior / old_mix["audio_file"]).read_bytes()
+                if sha(old_audio) != old_mix["audio_sha256"]:
+                    raise PilotError("Prior scene mix changed")
+                old_name = f"audio/scene-{index:02}-previous.wav"
+                publish(output / "review" / old_name, old_audio)
+                players.append(f'<p>Previous scene pilot (v1)</p><audio controls preload="none" src="{old_name}"></audio>')
+            label = "Baseline" if arm == "baseline" else ("Stronger scene coaching (v2)" if previous else "Scene-aware delivery")
             players.append(f'<p>{label}</p><audio controls preload="none" src="{name}"></audio>')
         transcript = []
         for line in state["lines"]:
@@ -1044,6 +1140,8 @@ def publish_review(output, state, manifest):
                 continue
             d = line["direction"]
             note = html.escape(d["native_instruction"] or "Neutral / no supported direction")
+            if d.get("coaching"):
+                note += ' · Objective: ' + html.escape(d["coaching"]["objective"]) + ' · Confidence: ' + html.escape(d["coaching"]["confidence"])
             transcript.append(f'<li><strong>{html.escape(line["role_name"])}</strong> · {html.escape(line["text"])}'
                               f'<br><small>{note} · {html.escape(d["basis"])} · Review pending</small></li>')
         cards.append(f'<section><h2>Scene {index} · {html.escape(scene["theme"].replace("_", " "))}</h2>'
@@ -1057,7 +1155,8 @@ def publish_review(output, state, manifest):
             '<h1>Scene-aware listening pilot</h1><p>20 original lines from chapters 1–3. Existing cloned voices, exact prose, '
             'same experimental Base wrapper and generation settings in both arms. Narration stays neutral. '
             'Measured boundary timing accounts for silence already in the clips.</p><p>These labeled players are for direct inspection. '
-            'Blind ballots and their separate sealed key are in the evaluation directory. No quality verdict, voice approval, '
+            'Blind ballots for baseline versus the current pilot and their separate sealed key are in the evaluation directory. '
+            'The previous pilot, when shown, is a labeled historical reference. New coaching is awaiting listening review. No voice approval, '
             'Take selection or default change has been recorded.</p>' + ''.join(cards) + '</body></html>')
     publish(output / "review" / "index.html", page.encode("utf-8"))
 
@@ -1096,6 +1195,8 @@ def generate(args, state, worker_class=None, render_fn=None):
     if component_sha256("Speak gently.", 0) != direction_digest("Speak gently.", 0):
         raise PilotError("Local direction digest disagrees with the provider; refusing to generate")
     output = args.output_dir
+    if state.get("previous_pilot"):
+        reuse_prior_neutral(output, state)
     receipts, pinned = run_generation(output, state, worker_class, render_fn)
     compare_arms(state["lines"], receipts)
     audit = audit_forwarding(state["lines"], receipts)
@@ -1131,10 +1232,18 @@ def parse_args(argv=None):
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--generate", action="store_true", help="explicit GPU synthesis through the root-owned lane")
     parser.add_argument("--plan-builder", help="module[:function] of the scene dialogue plan owner (default: discovered)")
+    parser.add_argument("--selection-from", type=Path, help="reuse exact lines/scenes/cast from a verified prior pilot")
+    parser.add_argument("--coaching-file", type=Path, help="captured and source-bound whole-scene model coaching bundle")
     parser.add_argument("--min-directed-dialogue", type=int, default=MIN_DIRECTED_DIALOGUE)
     parser.add_argument("--min-directed-scenes", type=int, default=MIN_DIRECTED_SCENES)
     args = parser.parse_args(argv)
     args.source_root, args.output_dir = args.source_root.resolve(), args.output_dir.resolve()
+    if args.selection_from:
+        args.selection_from = args.selection_from.resolve(strict=True)
+        if args.selection_from == args.output_dir:
+            parser.error("Preserve the prior pilot; use a separate output directory")
+    if args.coaching_file:
+        args.coaching_file = args.coaching_file.resolve(strict=True)
     if len(set(args.projects)) != len(args.projects):
         parser.error("project ids must be distinct")
     return args

@@ -60,7 +60,7 @@ from typing import Any
 
 SCHEMA_VERSION = "performance-scene-analysis-v1"
 CACHE_SCHEMA_VERSION = "performance-scene-analysis-cache-v1"
-ANALYZER_VERSION = "pd-scene-analysis-2"
+ANALYZER_VERSION = "pd-scene-analysis-3"
 CACHE_DIRECTORY = "performance-scene-analysis"
 DEFAULT_RUNTIME_PROFILE = "faster-base-032"
 EXPERIMENTAL_RUNTIME_PROFILE = "faster-base-032-direction-x1"
@@ -210,7 +210,7 @@ _EMOTION_LEXICON: dict[str, re.Pattern[str]] = {
                       "get out", "how dare you", "how dare", "stop it", "you bastard", "sick of"),
     "fear": _phrases("afraid", "scared", "terrified", "please don't", "don't hurt", "help me",
                      "help", "they're coming", "can't breathe", "oh god", "run"),
-    "sadness": _phrases("gone", "lost", "alone", "died", "dead", "miss you", "goodbye", "grief",
+    "sadness": _phrases("gone", "lost", "alone", "miss you", "goodbye", "grief",
                         "funeral", "crying", "tears", "never see", "too late"),
     "joy": _phrases("wonderful", "delighted", "splendid", "marvellous", "marvelous", "glad",
                     "happy", "love it", "hooray", "haha", "ha ha", "thank you", "at last"),
@@ -236,7 +236,7 @@ _INTENTION_LEXICON: tuple[tuple[str, re.Pattern[str]], ...] = (
                            "you expect me to believe")),
     ("deflect", _phrases("never mind", "it's nothing", "it is nothing", "forget it", "that's not important",
                          "i don't know what you mean", "i couldn't say", "let's not talk about",
-                         "change the subject", "anyway")),
+                         "change the subject")),
     ("concede", _phrases("you're right", "you are right", "very well", "i suppose", "all right then",
                          "fine, then", "i admit", "i was wrong", "you win", "have it your way")),
     ("reassure", _phrases("it's okay", "it's all right", "it is all right", "don't worry",
@@ -687,6 +687,12 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
                     own[j]["bound_tags"].append({**cue, "binding": "named_role", "ambiguous": len(named) > 1})
             elif len(targets) == 1 and _PRONOUN_RE.search(utt.text):
                 own[targets[0]]["bound_tags"].append({**cue, "binding": "adjacent_pronoun", "ambiguous": False})
+            elif (len(targets) == 2 and _PRONOUN_RE.search(utt.text)
+                  and scene_utts[targets[0]].role_id == scene_utts[targets[1]].role_id
+                  and utt.text.rstrip().endswith((",", ":"))):
+                # An introductory tag between two turns by the same attributed
+                # speaker describes the following turn. No gender/name guess.
+                own[i + 1]["bound_tags"].append({**cue, "binding": "same_role_intro", "ambiguous": False})
 
     # -- carry author cues through their exchange --------------------------
     exchange = _exchange_ids(scene_utts, own)
