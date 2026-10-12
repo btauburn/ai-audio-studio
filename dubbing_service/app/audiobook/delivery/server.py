@@ -230,7 +230,7 @@ def create_app(config: dict) -> FastAPI:
             lab_project(project)
         web = Path(__file__).resolve().parents[3] / "webui"
         page = (web / "voice-lab.html").read_text(encoding="utf-8")
-        return HTMLResponse(page.replace('/web/voice-lab.css', '/assets/voice-lab.css').replace('/web/voice-lab.js', '/assets/voice-lab.js').replace('/web/runtime-comparison.js', '/assets/runtime-comparison.js').replace('/web/reference-transcripts.js', '/assets/reference-transcripts.js'))
+        return HTMLResponse(page.replace('/web/voice-lab.css', '/assets/voice-lab.css').replace('/web/voice-lab.js', '/assets/voice-lab.js').replace('/web/runtime-comparison.js', '/assets/runtime-comparison.js').replace('/web/reference-transcripts.js', '/assets/reference-transcripts.js').replace('/web/casting-director.js', '/assets/casting-director.js').replace('/web/casting-director.css', '/assets/casting-director.css'))
 
     @app.api_route("/api/voice-lab/{project_id}", methods=["GET", "HEAD", "POST"])
     @app.api_route("/api/voice-lab/{project_id}/{operation:path}", methods=["GET", "HEAD", "POST"])
@@ -239,7 +239,7 @@ def create_app(config: dict) -> FastAPI:
         project_id = lab_project(project_id)
         if request.method == "POST" and not request.state.recipient.get("allow_feedback"):
             raise HTTPException(403, "Feedback is disabled")
-        allowed = {"", "preferences", "position", "match", "more-like", "assign", "automation", "issues", "design", "audition", "library", "library/publish", "library/import", "casting", "casting/book", "casting/prepare", "casting/round", "casting/feedback", "casting/render", "casting/resume", "casting/production/resolve", "casting/production/skip", "casting/production/restore", "casting/production/policy"}
+        allowed = {"", "preferences", "position", "match", "more-like", "assign", "automation", "issues", "design", "audition", "library", "library/publish", "library/import", "casting", "casting/book", "casting/prepare", "casting/round", "casting/feedback", "casting/render", "casting/resume", "casting/production/resolve", "casting/production/skip", "casting/production/restore", "casting/production/policy", "directors", "directors/analyze", "directors/auditions"}
         audition_status = request.method in {"GET", "HEAD"} and re.fullmatch(r"auditions/[A-Za-z0-9_-]{1,100}", operation)
         chapter_audio = request.method in {"GET", "HEAD"} and re.fullmatch(r"casting/chapters/cast_[0-9a-f]{28}/audio", operation)
         runtime_comparison = request.method in {"GET", "HEAD"} and (
@@ -269,6 +269,8 @@ def create_app(config: dict) -> FastAPI:
         if chapter_audio and request.query_params.get("download", "").lower() in {"1", "true"}:
             url += "?download=true"
         headers = {k: v for k, v in request.headers.items() if k.lower() in {"range", "if-range", "content-type"}}
+        if operation.startswith("directors/") and request.headers.get("x-review-request") == "1":
+            headers["x-review-request"] = "1"
         client = studio_client()
         try:
             upstream = await client.send(client.build_request(
@@ -409,7 +411,7 @@ def create_app(config: dict) -> FastAPI:
 
     @app.get("/assets/{asset}")
     def asset(asset: str):
-        if asset in {"voice-lab.js", "voice-lab.css", "runtime-comparison.js", "reference-transcripts.js"}:
+        if asset in {"voice-lab.js", "voice-lab.css", "runtime-comparison.js", "reference-transcripts.js", "casting-director.js", "casting-director.css"}:
             return FileResponse(Path(__file__).resolve().parents[3] / "webui" / asset)
         if asset not in {"player.js", "player.css"}:
             raise HTTPException(404)

@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#121216">
   <title>Voice Lab · AI Audio Studio</title>
   <link rel="stylesheet" href="/web/voice-lab.css">
+  <link rel="stylesheet" href="/web/casting-director.css">
   <script defer src="/web/voice-lab.js"></script>
 </head>
 <body>
@@ -56,6 +57,16 @@
         <details><summary>Preparation &amp; notification details</summary><p id="casting-notification-status" class="muted small" role="status" aria-live="polite"></p></details>
       </details>
     </section>
+    <section id="casting-director" class="panel casting-director" aria-labelledby="casting-director-heading" hidden>
+      <div class="section-heading"><div><p class="eyebrow">CASTING DIRECTOR</p><h2 id="casting-director-heading">Voice recommendations</h2></div><button id="casting-director-open" class="secondary" type="button" aria-expanded="false" aria-controls="casting-director-body">Review recommendations</button></div>
+      <div id="casting-director-body" hidden>
+        <p class="muted small">Ranked suggestions with the evidence behind them. They never approve, rate, assign or replace a voice; you do that in the casting inbox. Nothing generates until you request auditions.</p>
+        <p id="casting-director-status" role="status" aria-live="polite" class="muted"></p>
+        <div class="button-row"><button id="casting-director-analyze" class="secondary" type="button">Analyze characters and scenes</button></div>
+        <div id="casting-director-roles" class="cd-roles"></div>
+        <div id="casting-director-scenes" class="cd-scene-box"></div>
+      </div>
+    </section>
     <details class="panel excerpt-panel"><summary>Saved chapter audio</summary><section aria-labelledby="excerpt-heading">
       <div class="section-heading"><div><p class="eyebrow">LISTENING TEST</p><h2 id="excerpt-heading">One continuous passage</h2></div><button id="play-excerpt" type="button" disabled>Listen to excerpt</button></div>
       <p id="excerpt-status" class="muted"></p><p id="excerpt-qa" class="quality"></p>
@@ -74,7 +85,7 @@
         <label class="compact" for="suitability">Fit for this character<select id="suitability"><option value="">Not rated</option><option value="1">1 · Poor fit</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 · Strong fit</option></select></label>
                 <details><summary>Source, model, and version details</summary><div id="voice-sources"></div><pre id="voice-details"></pre></details>
       </article>
-      <details><summary>Reusable voices across projects<span class="info-tip" tabindex="0" role="img" aria-label="Save an exact production voice version or bring a saved version into this project. Importing does not assign a character or copy a rating." data-tip="Save an exact production voice version or bring a saved version into this project. Importing does not assign a character or copy a rating.">i</span></summary><div class="button-row"><button id="library-publish" class="secondary" type="button">Save this version to library</button><button id="library-load" class="secondary" type="button">Browse saved voices</button></div><label for="library-versions">Saved version<select id="library-versions"><option value="">Browse saved voices first</option></select></label><button id="library-import" class="secondary" type="button">Import selected version</button><p id="library-status" class="muted" role="status"></p></details>
+      <details id="reusable-voices"><summary>Reusable voices across projects<span class="info-tip" tabindex="0" role="img" aria-label="Save an exact production voice version or bring a saved version into this project. Importing does not assign a character or copy a rating." data-tip="Save an exact production voice version or bring a saved version into this project. Importing does not assign a character or copy a rating.">i</span></summary><div class="button-row"><button id="library-publish" class="secondary" type="button">Save this version to library</button><button id="library-load" class="secondary" type="button">Browse saved voices</button></div><label for="library-versions">Saved version<select id="library-versions"><option value="">Browse saved voices first</option></select></label><button id="library-import" class="secondary" type="button">Import selected version</button><p id="library-status" class="muted" role="status"></p></details>
     </section>
     <section class="panel" aria-labelledby="match-heading"><div class="title-line"><h2 id="match-heading">Auto Match &amp; voice previews</h2><span class="info-tip" tabindex="0" role="img" aria-label="Find a direction, preview about ten seconds through the production voice path, then choose whether to use it for the character. Previewing does not assign a voice." data-tip="Find a direction, preview about ten seconds through the production voice path, then choose whether to use it for the character. Previewing does not assign a voice.">i</span></div><form id="match-form"><label for="match-role">Character (optional)</label><select id="match-role"><option value="">General voice discovery</option></select><label for="match-description">Voice or character description</label><div class="search-row"><input id="match-description" maxlength="1000" placeholder="For example: young male, thoughtful and warm"><button type="submit">Find matches</button></div></form><p id="match-status" class="muted" role="status"></p><div id="matches" class="match-list"></div></section>
     <section class="panel automation-panel"><div><div class="title-line"><h2>Automatic inspiration discovery</h2><span class="info-tip" tabindex="0" role="img" aria-label="This older inspiration-discovery path keeps audio replenishment idle while its first listening test is pending. Use the casting inbox for explicit auditions and replacements. Playing audio does not generate more audio." data-tip="This older inspiration-discovery path keeps audio replenishment idle while its first listening test is pending. Use the casting inbox for explicit auditions and replacements. Playing audio does not generate more audio.">i</span></div><p id="automation-status" class="muted"></p></div><button id="automation-toggle" class="secondary" type="button">Pause discovery</button></section>
@@ -100,5 +111,6 @@
 <details id="reference-transcripts" class="panel"><summary>Reference recordings and transcripts</summary><p>Transcripts are generated locally. Listen to the clip and correct uncertain words before reference review.</p><button type="button">Load reference clips</button><div data-references aria-live="polite"></div></details>
 <script src="/web/reference-transcripts.js" defer></script>
 <script src="/web/runtime-comparison.js" defer></script>
+<script src="/web/casting-director.js" defer></script>
 </body>
 </html>

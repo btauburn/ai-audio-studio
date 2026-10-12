@@ -1,0 +1,40 @@
+/* Casting Director panel: additive, uses the Voice Lab tokens and panel language. */
+#voice-lab .casting-director[hidden]{display:none}
+#voice-lab .casting-director .cd-muted{color:var(--muted)}
+#voice-lab .casting-director .small{font-size:.85rem}
+#voice-lab .casting-director .cd-roles{display:grid;gap:16px;margin-top:14px}
+#voice-lab .casting-director .cd-role{border:1px solid var(--rim);border-radius:var(--radius-md);background:var(--sunk);padding:16px;display:grid;gap:8px}
+#voice-lab .casting-director .cd-role-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+#voice-lab .casting-director .cd-avatar{width:56px;height:56px;flex:none;border-radius:50%;object-fit:cover;object-position:50% 12%;border:2px solid var(--rim-strong);background:var(--panel-solid)}
+#voice-lab .casting-director .cd-identity h4{margin:0;font-family:var(--font-display);font-size:1.15rem}
+#voice-lab .casting-director .cd-identity p{margin:2px 0 0}
+#voice-lab .casting-director .cd-subhead{margin:12px 0 4px;font-size:.95rem;color:var(--ink-soft)}
+#voice-lab .casting-director .cd-label{margin:0 0 2px;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#voice-lab .casting-director .cd-list ul{margin:0;padding-left:18px;color:var(--ink-soft)}
+#voice-lab .casting-director .cd-good .cd-label{color:var(--accent-soft)}
+#voice-lab .casting-director .cd-warn .cd-label{color:var(--warn-soft)}
+#voice-lab .casting-director .cd-muted ul{color:var(--muted)}
+#voice-lab .casting-director .cd-fact{margin:0;color:var(--ink-soft)}
+#voice-lab .casting-director .cd-fact strong{color:var(--ink)}
+#voice-lab .casting-director .cd-badges{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}
+#voice-lab .casting-director .cd-badge{border-radius:var(--pill);padding:2px 10px;font-size:.78rem;border:1px solid var(--rim);background:var(--surface-elevated);color:var(--ink-soft)}
+#voice-lab .casting-director .cd-badge[data-kind=protected]{border-color:rgba(var(--accent-rgb),.55);color:var(--accent-pale)}
+#voice-lab .casting-director .cd-badge[data-kind=needs],#voice-lab .casting-director .cd-badge[data-kind=info]{border-color:rgba(var(--info-rgb),.5);color:var(--info-soft)}
+#voice-lab .casting-director .cd-badge[data-kind=warn]{border-color:rgba(var(--warn-rgb),.55);color:var(--warn-soft)}
+#voice-lab .casting-director .cd-badge[data-kind=hold]{border-color:var(--danger-edge);background:var(--danger-bg);color:var(--danger)}
+#voice-lab .casting-director .cd-candidates{list-style:none;margin:0;padding:0;display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+#voice-lab .casting-director .cd-candidate{border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface-elevated);padding:12px;display:grid;gap:6px;align-content:start}
+#voice-lab .casting-director .cd-candidate-head{display:flex;align-items:baseline;gap:8px}
+#voice-lab .casting-director .cd-candidate-head h5{margin:0;font-size:1rem}
+#voice-lab .casting-director .cd-rank{color:var(--accent-soft);font-weight:600}
+#voice-lab .casting-director .cd-summary{margin:0;color:var(--ink-soft)}
+#voice-lab .casting-director .cd-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+#voice-lab .casting-director .cd-audio,#voice-lab .casting-director .casting-director-audio{width:100%;margin-top:6px}
+#voice-lab .casting-director .cd-hold{margin:6px 0;color:var(--danger)}
+#voice-lab .casting-director #casting-director-status[data-tone=error]{color:var(--danger)}
+#voice-lab .casting-director .cd-scene-box{margin-top:18px}
+#voice-lab .casting-director .cd-scenes{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:10px}
+#voice-lab .casting-director .cd-scene{border-left:3px solid var(--rim-strong);padding:4px 0 4px 12px;display:grid;gap:2px}
+#voice-lab .casting-director button[disabled]{cursor:not-allowed}
+@media (max-width:640px){#voice-lab .casting-director .cd-candidates{grid-template-columns:1fr}#voice-lab .casting-director .cd-avatar{width:44px;height:44px}}
+@media (prefers-reduced-motion:reduce){#voice-lab .casting-director *{transition:none!important;animation:none!important}}

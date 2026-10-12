@@ -47,6 +47,7 @@ from dubbing_service.app.routers import voice_lab as voice_lab_router
 from dubbing_service.app.routers import voice_library as voice_library_router
 from dubbing_service.app.routers import voice_lab_audition as voice_lab_audition_router
 from dubbing_service.app.routers import book_creator as book_creator_router
+from dubbing_service.app.routers import directors as directors_router
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +163,7 @@ def create_app() -> FastAPI:
     app.include_router(voice_library_router.router, prefix=API_V1, tags=["voice-library"])
     app.include_router(voice_lab_audition_router.router, prefix=API_V1, tags=["voice-lab"])
     app.include_router(book_creator_router.router, prefix=API_V1, tags=["book-creator"])
+    app.include_router(directors_router.router, prefix=API_V1, tags=["voice-lab"])
 
     # Web 管理界面静态文件（使用绝对路径，避免受当前工作目录影响）
     webui_dir = Path(__file__).resolve().parents[1] / "webui"

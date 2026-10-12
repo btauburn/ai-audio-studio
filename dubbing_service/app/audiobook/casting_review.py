@@ -684,7 +684,7 @@ def _new_round(project, role_id, *, direction=None, replacement=False, reuse_key
         candidate = {"candidate_id": cid, "label": chr(65 + index), "key": None, "status": "blocked" if proposal.get("blocked") else "pending",
             "rating": None, "audio_sha256": None, "duration_seconds": None,
             "technical_qa": "pending", "sections": [],
-            "reuse_key": current_key if index == 0 and generated else proposal.get("reuse_key"),
+            "reuse_key": proposal.get("reuse_key") or (current_key if index == 0 and generated else None),
             "request_id": "castaud_" + lab.digest([round_id, cid])[:28],
             "provenance": proposal["kind"],
             "anchor": copy.deepcopy(proposal.get("anchor")),
@@ -807,6 +807,10 @@ def _proposal_plan(project, role_id, profile, dossier, base, retained, *, reuse_
     fixed here, shown in the review surface, and re-used unchanged when the
     design is dispatched.
     """
+    from .casting_director import proposals_for_round
+    directed = proposals_for_round(project, role_id)
+    if directed is not None:
+        return directed
     from . import original_inspired_design
     from .named_reference_feedback import proposals
     from .named_reference_feedback import requested_performer as resolve_performer
