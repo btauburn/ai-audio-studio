@@ -74,6 +74,17 @@ function surface({search='?project=book',pathname='/voice-lab-ui',routes={},miss
 }
 const GET_OK={'GET ':json(200,REPORT)};
 
+test('scene-aware instructions are visible as pending recommendations without synthesis',async()=>{
+  const report=structuredClone(REPORT);
+  report.scenes.directions[0].utterance_id='line-1';
+  report.scene_dialogue_plan={directions:[{utterance_id:'line-1',role_name:'Elena',native_instruction:'Speak quietly and cautiously.',basis:'inferred'}]};
+  const s=surface({routes:{'GET ':json(200,report)}});await s.open.emit('click');
+  assert.ok(s.all().includes('Speak quietly and cautiously.'));
+  assert.ok(s.all().includes('Review pending'));
+  assert.deepEqual(s.calls.map(c=>c.method),['GET']);
+  assert.equal(s.players.length,0);
+});
+
 test('mount reveals the panel but never fetches or generates',()=>{
   const s=surface({routes:GET_OK});
   assert.equal(s.host.hidden,false);assert.equal(s.calls.length,0);assert.equal(s.players.length,0);

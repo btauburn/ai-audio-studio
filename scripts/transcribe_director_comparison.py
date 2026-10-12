@@ -54,6 +54,25 @@ def write_once(path, data):
         if path.read_bytes() != content: raise ValueError('Existing ASR evidence differs; choose a new output directory')
 
 
+def normalize_manifest(manifest):
+    """Accept the paired scene contract as well as the original four-arm export."""
+    if manifest.get('schema_version') != 'scene-dialogue-comparison-v1':
+        return manifest
+    from dubbing_service.app.audiobook.scene_dialogue_evaluation import _SafeSources
+    sources = _SafeSources(Path(manifest['base_dir']))
+    lines = {line['utterance_id']: line for line in manifest['lines']}
+    arms = {}
+    for arm, spec in manifest['arms'].items():
+        samples = []
+        for uid, sample in spec['samples'].items():
+            if sample['text'] != lines[uid]['text']:
+                raise ValueError('ASR sample text differs from the frozen source')
+            samples.append({**sample, 'utterance_id': uid,
+                            'audio_path': str(sources.resolve(sample['audio_file'], f'{arm}.{uid}.audio_file'))})
+        arms[arm] = {**spec, 'samples': samples}
+    return {**manifest, 'arms': arms}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('manifest', type=Path)
@@ -65,7 +84,7 @@ def main():
     hashes = {name: file_sha(model_dir / name) for name in required}
     model_sha = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
     manifest_bytes = args.manifest.read_bytes()
-    manifest = json.loads(manifest_bytes)
+    manifest = normalize_manifest(json.loads(manifest_bytes))
     output = args.output_dir.resolve()
     if any(Path(s['audio_path']).resolve().is_relative_to(output)
            for arm in manifest['arms'].values() for s in arm['samples']):

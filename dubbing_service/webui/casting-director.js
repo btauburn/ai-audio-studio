@@ -287,7 +287,7 @@
       return `Auditions ${words(receipt.status)}: ${receipt.candidate_count} candidate(s), round ${text(receipt.round_id)}. Rate, accept or reject them in the casting inbox.${holds}`;
     }
 
-    function renderScenes(scenes) {
+    function renderScenes(scenes, plan) {
       scenesBox.replaceChildren();
       const data = scenes && typeof scenes === 'object' ? scenes : null;
       if (!data) return;
@@ -303,6 +303,7 @@
         scenesBox.append(pair('Controls requested', requested.join(', ') || 'none'), pair('Engine control capabilities', supported.join(' · ') || 'none confirmed'));
       }
       const directions = new Map();
+      const planned = new Map(list(plan?.directions).map(d => [text(d.utterance_id), d]));
       list(data.directions).forEach(d => {
         const id = text(d?.scene_id);
         if (!directions.has(id)) directions.set(id, []);
@@ -324,6 +325,12 @@
         bits.forEach(([label, value]) => item.append(pair(label, words(value))));
         const emphasis = list(direction.emphasis || scene.emphasis).map(e => text(typeof e === 'object' && e ? (e.text || e.span) : e)).filter(Boolean);
         if (emphasis.length) item.append(pair('Emphasis', emphasis.join(', ')));
+        const proposals = sceneDirections.map(d => planned.get(text(d.utterance_id))).filter(d => d && d.native_instruction);
+        proposals.forEach(d => {
+          item.append(pair(text(d.role_name) || 'Dialogue', text(d.native_instruction)));
+          item.append(make('p', `${words(d.basis)} · Review pending`, 'cd-muted small'));
+        });
+        if (proposals.length) item.append(make('p', 'These directions are available for an isolated listening pilot. Your current voice and Takes stay in place.', 'cd-muted small'));
         rows.append(item);
       });
       scenesBox.append(rows);
@@ -347,7 +354,7 @@
       const roles = list(data.roles);
       if (!roles.length) { say('Analysis found no speaking characters to recommend voices for.'); return; }
       roles.forEach(role => rolesBox.append(renderRole(role)));
-      renderScenes(data.scenes);
+      renderScenes(data.scenes, data.scene_dialogue_plan);
       say(`${roles.length} character(s) reviewed. Human review: ${data.human_review || 'pending'}. Recommendations never approve or replace a voice.`);
     }
 

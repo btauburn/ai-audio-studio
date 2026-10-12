@@ -67,6 +67,15 @@ def test_prose_edit_invalidates_analysis(project, monkeypatch):
     assert director.view(project.id)["status"] == "needs_analysis"
 
 
+def test_source_registry_edit_invalidates_director_report(project):
+    from dubbing_service.app.models.audiobook import SourceRevision
+    p = load_project(project.id)
+    p.source_revisions = [SourceRevision(id='book-source', uri='fixture://book', kind='inline', sha256='a' * 64)]
+    first = director._binding(p, load_segments(p.id))
+    p.source_revisions[0].sha256 = 'b' * 64
+    assert director._binding(p, load_segments(p.id)) != first
+
+
 def test_cache_tampering_refused(project, monkeypatch):
     monkeypatch.setattr(director, "_compute", lambda p, s, b: report(p))
     result = director.analyze(project.id)
@@ -219,6 +228,8 @@ def test_role_rejection_is_not_erased_by_global_keeper_rating(project, monkeypat
         return []
     monkeypatch.setattr(matching, 'rank_candidates', rank)
     monkeypatch.setattr(scene, 'analyze_scenes', lambda *a, **kw: {})
+    from dubbing_service.app.audiobook import scene_dialogue_plan
+    monkeypatch.setattr(scene_dialogue_plan, 'build_scene_dialogue_plan', lambda *a, **kw: {})
     director._compute(p, load_segments(p.id), 'a' * 64)
     assert seen == ['new']
 

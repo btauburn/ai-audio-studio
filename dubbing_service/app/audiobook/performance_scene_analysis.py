@@ -25,6 +25,22 @@ analyzer's lexicon or punctuation heuristics).  Inferred recommendations are
 never relabelled as explicit, and nothing here is human-approved: every row
 carries ``human_review == "pending"`` and ``approved == False``.
 
+Source proof
+------------
+A segment's ``source_anchor.source_revision_id`` is a registry *id*, not a hash.
+The SHA-256 a scene plan is bound to is resolved through ``project.source_revisions``
+and validated there; a missing, duplicated or malformed registry fails closed
+(no plan, a typed hold), never falls back to treating the id as a hash.
+
+Scene carry
+-----------
+An author-written cue (``she whispered``) describes more than the one line it
+sits beside.  It is carried, as a lower-confidence ``inferred`` cue that still
+points at the author's own words, to that speaker's following turns in the same
+exchange until the author or the line itself says otherwise; a hushed register
+also reaches the other participant's next turns.  No cue is invented from
+knowledge of the book.
+
 Optional experimental code (``performance_director``, ``provider_capabilities``)
 is imported lazily.  When it is absent the analysis still runs and the
 ``integrations`` block says exactly what was unavailable.
@@ -44,13 +60,17 @@ from typing import Any
 
 SCHEMA_VERSION = "performance-scene-analysis-v1"
 CACHE_SCHEMA_VERSION = "performance-scene-analysis-cache-v1"
-ANALYZER_VERSION = "pd-scene-analysis-1"
+ANALYZER_VERSION = "pd-scene-analysis-2"
 CACHE_DIRECTORY = "performance-scene-analysis"
 DEFAULT_RUNTIME_PROFILE = "faster-base-032"
 EXPERIMENTAL_RUNTIME_PROFILE = "faster-base-032-direction-x1"
 MAX_SCENE_UTTERANCES = 40
 MAX_EVIDENCE = 12
 MAX_PRIORITIES = 3
+MAX_CARRY_TURNS = 3
+MAX_PARTNER_CARRY_TURNS = 2
+MAX_EXCHANGE_GAP_WORDS = 40
+MAX_EXCHANGE_GAP_LINES = 2
 
 BASIS_HUMAN = "explicit_human"
 BASIS_SOURCE = "explicit_source"
@@ -321,6 +341,9 @@ _SCENE_BREAK_RE = re.compile(r"^\s*(?:(?:[*#~=_\-]\s*){3,}|⁂|\*)\s*$")
 _LEADING_HESITATION_RE = re.compile(r"^[\s\"“'‘(\[]*(?:…|\.{3}|—|–|--)")
 _STAMMER_RE = re.compile(r"(?<![\w])([A-Za-z])-\1\w*", re.IGNORECASE)
 _TERMINAL_RE = re.compile(r"(\.{2,}|…|——|—|–|--|[?？]+[!！]*|[!！]+[?？]*|[.。])$")
+#: Speech-tag families that describe a register the speaker keeps, as opposed to a one-off event
+#: (a laugh or a sigh) that only carries when the author attached an adverb to it.
+_SUSTAINED_FAMILIES = frozenset({"hushed", "muttered", "raised", "sharp", "halting", "tearful", "pleading"})
 _CLOSERS = "\"'”’)]»*_」 \t\r\n"
 _PRONOUN_RE = re.compile(r"\b(?:he|she|they)\b", re.IGNORECASE)
 _SPEECH_VERB_RE = re.compile(
@@ -350,6 +373,7 @@ class _Utt:
     source_revision: str | None
     speaker_id: str | None
     attribution_source: str
+    anchor: dict[str, Any] | None = None
 
 
 def _evidence(utt_id: str, kind: str, text: str, start: int, end: int) -> dict[str, Any]:
@@ -546,6 +570,82 @@ def _final_word_span(text: str) -> tuple[int, int] | None:
     return (start, end) if start < end else None
 
 
+def _exchange_ids(scene_utts: list[_Utt], own: list[dict[str, Any]]) -> list[int | None]:
+    """Group dialogue into exchanges: one conversation, broken by a scene break or a long narrative gap."""
+
+    ids: list[int | None] = [None] * len(scene_utts)
+    current = -1
+    gap_lines = 0
+    gap_words = 0
+    have_dialogue = False
+    for i, utt in enumerate(scene_utts):
+        if utt.kind == "scene_break":
+            have_dialogue, gap_lines, gap_words = False, 0, 0
+        elif utt.kind in ("dialogue", "unattributed"):
+            if not have_dialogue or gap_lines > MAX_EXCHANGE_GAP_LINES or gap_words > MAX_EXCHANGE_GAP_WORDS:
+                current += 1
+            have_dialogue, gap_lines, gap_words = True, 0, 0
+            ids[i] = current
+        elif have_dialogue:
+            gap_lines += 1
+            gap_words += own[i]["words"] or len(utt.text.split())
+    return ids
+
+
+def _carry_cues(scene_utts: list[_Utt], own: list[dict[str, Any]],
+                exchange: list[int | None]) -> dict[int, list[dict[str, Any]]]:
+    """Carry an author-written cue through the rest of its exchange.
+
+    A cue stays attached to its speaker's following turns (``speaker_continuation``)
+    until the author or the line itself says otherwise, and a hushed register also
+    reaches the other participant's next turns (``exchange_register``).  Carried
+    cues are ``inferred`` and low confidence, and every one points at the author's
+    own words through its evidence.
+    """
+
+    carried: dict[int, list[dict[str, Any]]] = {}
+    for i, utt in enumerate(scene_utts):
+        if utt.kind != "dialogue" or exchange[i] is None:
+            continue
+        for cue in own[i]["bound_tags"]:
+            if cue["binding"] == "adjacent_pronoun" or cue["ambiguous"] or not (cue["phrase"] or cue["emotion"]):
+                continue  # a pronoun guess or a tag that could belong to either line is too weak to carry
+            if not (cue["adverb"] or cue["family"] in _SUSTAINED_FAMILIES):
+                continue  # a laugh or a sigh is an event, not a register
+            own_turns = partner_turns = 0
+            for j in range(i + 1, len(scene_utts)):
+                other = scene_utts[j]
+                if other.kind == "scene_break" or (other.kind in ("dialogue", "unattributed")
+                                                   and exchange[j] != exchange[i]):
+                    break
+                if other.kind != "dialogue":
+                    continue
+                later = own[j]
+                loud = bool(later["caps_line"] or (later["terminal"] and later["terminal"]["kind"] == "exclaim"))
+                already_cued = any(t["phrase"] or t["emotion"] for t in later["bound_tags"])
+                item = {"phrase": cue["phrase"], "emotion": cue["emotion"], "intensity": cue["intensity"],
+                        "family": cue["family"], "from_utterance_id": utt.id, "binding": cue["binding"],
+                        "basis": BASIS_INFERRED, "confidence": "low", "evidence": list(cue["evidence"])}
+                if other.role_id == utt.role_id:
+                    own_turns += 1
+                    own_label = later["emotion"].get("label")
+                    if (own_turns > MAX_CARRY_TURNS or already_cued
+                            or (own_label and cue["emotion"] and own_label != cue["emotion"])
+                            or (loud and cue["family"] in ("hushed", "muttered"))):
+                        break  # superseded by the author, by the line's own evidence, or by a clash
+                    carried.setdefault(j, []).append({**item, "scope": "speaker_continuation",
+                                                      "turn_distance": own_turns})
+                else:
+                    partner_turns += 1
+                    if (cue["family"] == "hushed" and partner_turns <= MAX_PARTNER_CARRY_TURNS
+                            and not already_cued and not loud and later["emotion"].get("label") is None
+                            and later["intention"]["value"] == "unknown"):
+                        carried.setdefault(j, []).append({**item, "scope": "exchange_register",
+                                                          "emotion": None, "intensity": "low",
+                                                          "turn_distance": partner_turns})
+    return carried
+
+
 def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
     """The cacheable, voice-independent interpretation of one scene."""
 
@@ -574,7 +674,7 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
     for i, utt in enumerate(scene_utts):
         for cue in own[i]["tags"]:
             if utt.kind == "dialogue":
-                own[i]["bound_tags"].append({**cue, "binding": "inline"})
+                own[i]["bound_tags"].append({**cue, "binding": "inline", "ambiguous": False})
                 continue
             if utt.kind != "narration":
                 continue
@@ -583,9 +683,18 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
             named = [j for j in targets if _mentions(utt.text, scene_utts[j].role_name)]
             if named:
                 for j in named:
-                    own[j]["bound_tags"].append({**cue, "binding": "named_role"})
+                    # a tag between two lines by the same named speaker could belong to either
+                    own[j]["bound_tags"].append({**cue, "binding": "named_role", "ambiguous": len(named) > 1})
             elif len(targets) == 1 and _PRONOUN_RE.search(utt.text):
-                own[targets[0]]["bound_tags"].append({**cue, "binding": "adjacent_pronoun"})
+                own[targets[0]]["bound_tags"].append({**cue, "binding": "adjacent_pronoun", "ambiguous": False})
+
+    # -- carry author cues through their exchange --------------------------
+    exchange = _exchange_ids(scene_utts, own)
+    carry = _carry_cues(scene_utts, own, exchange)
+    exchange_members: dict[int, list[int]] = {}
+    for i, number in enumerate(exchange):
+        if number is not None:
+            exchange_members.setdefault(number, []).append(i)
 
     # -- scene tone ---------------------------------------------------------
     comic: list[dict[str, Any]] = []
@@ -638,7 +747,8 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
                             "emotion": o["emotion"], "intention": o["intention"], "emphasis": [],
                             "tempo": {"value": "neutral", "basis": BASIS_NONE, "evidence": []},
                             "boundary": {"before": None, "after": None}, "response": None,
-                            "ending": None, "tag_cues": [], "delivery_phrases": []})
+                            "ending": None, "tag_cues": [], "carried_cues": [], "exchange": None,
+                            "delivery_phrases": []})
             continue
         dialogue = utt.kind in ("dialogue", "unattributed")
         prev = scene_utts[i - 1] if i > 0 and scene_utts[i - 1].kind != "scene_break" else None
@@ -646,6 +756,7 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
         prev_o = own[i - 1] if prev is not None else None
         terminal = o["terminal"]
         tags = o["bound_tags"]
+        carried = carry.get(i, []) if utt.kind == "dialogue" else []
 
         # emotion: an author-written tag outranks the analyzer's lexicon
         emotion = dict(o["emotion"])
@@ -656,7 +767,8 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
                 if cue["emotion"] and emotion["basis"] != BASIS_SOURCE:
                     emotion = {"label": cue["emotion"], "intensity": cue["intensity"] or "moderate",
                                "basis": BASIS_SOURCE,
-                               "confidence": "low" if cue["binding"] == "adjacent_pronoun" else "moderate",
+                               "confidence": ("low" if cue["binding"] == "adjacent_pronoun" or cue["ambiguous"]
+                                              else "moderate"),
                                "binding": cue["binding"], "evidence": list(cue["evidence"]), "loud": emotion["loud"]}
                 if cue["phrase"]:
                     tag_phrases.append({"phrase": cue["phrase"], "source": "speech_tag", "basis": BASIS_SOURCE,
@@ -665,8 +777,22 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
                         emotion = {**emotion, "intensity": cue["intensity"]}
                 if cue["intention"] and intention["basis"] != BASIS_SOURCE:
                     intention = {"value": cue["intention"], "basis": BASIS_SOURCE,
-                                 "confidence": "low" if cue["binding"] == "adjacent_pronoun" else "moderate",
+                                 "confidence": ("low" if cue["binding"] == "adjacent_pronoun" or cue["ambiguous"]
+                                                else "moderate"),
                                  "binding": cue["binding"], "evidence": list(cue["evidence"])}
+
+        # a carried cue fills an otherwise silent emotion; it never replaces the line's own evidence
+        carried_emotion = False
+        if carried and not tags:
+            for item in carried:
+                if (item["scope"] == "speaker_continuation" and item["emotion"]
+                        and emotion["label"] is None and emotion["basis"] == BASIS_NONE):
+                    emotion = {"label": item["emotion"], "intensity": item["intensity"] or "moderate",
+                               "basis": BASIS_INFERRED, "confidence": "low",
+                               "carried_from": item["from_utterance_id"],
+                               "evidence": list(item["evidence"]), "loud": emotion["loud"]}
+                    carried_emotion = True
+                    break
 
         # response relation to the previous spoken line
         response = None
@@ -807,7 +933,11 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
 
             for item in tag_phrases:
                 add(item["phrase"], "speech_tag", BASIS_SOURCE, item["evidence"], binding=item["binding"])
-            if emotion["label"] and not tag_phrases:
+            if not tag_phrases:
+                for item in carried:
+                    add(item["phrase"], "carried_cue", BASIS_INFERRED, item["evidence"],
+                        carried_from=item["from_utterance_id"], scope=item["scope"])
+            if emotion["label"] and not tag_phrases and not carried_emotion:
                 phrase = _EMOTION_PHRASE.get((emotion["label"], emotion["intensity"] or "moderate"))
                 add(phrase or "", f"emotion:{emotion['label']}", emotion["basis"], emotion["evidence"])
             if intention["value"] != "unknown" and intention["value"] in _INTENTION_PHRASE:
@@ -830,8 +960,14 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
             "tempo": tempo, "boundary": {"before": before, "after": after}, "response": response,
             "ending": ending,
             "tag_cues": [{key: cue[key] for key in ("verb", "adverb", "phrase", "emotion", "intensity",
-                                                    "intention", "binding", "source_utterance_id", "evidence")}
+                                                    "intention", "binding", "ambiguous", "source_utterance_id", "evidence")}
                          for cue in tags],
+            "carried_cues": [{key: item[key] for key in ("phrase", "emotion", "intensity", "scope", "binding",
+                                                         "from_utterance_id", "turn_distance", "basis",
+                                                         "confidence", "evidence")} for item in carried],
+            "exchange": (None if exchange[i] is None else {
+                "id": f"x{exchange[i]}", "position": exchange_members[exchange[i]].index(i) + 1,
+                "size": len(exchange_members[exchange[i]])}),
             "delivery_phrases": phrases,
         })
 
@@ -863,6 +999,10 @@ def _interpret_scene(scene_utts: list[_Utt]) -> dict[str, Any]:
         "emotion_arc": arc,
         "ending": (final["ending"] if final else None),
         "rapid_exchange_utterance_ids": [scene_utts[i].id for i in sorted(brisk)],
+        "exchanges": [{"id": f"x{number}", "utterance_ids": [scene_utts[i].id for i in members],
+                       "speakers": list(dict.fromkeys(scene_utts[i].role_id for i in members
+                                                      if scene_utts[i].role_id))}
+                      for number, members in sorted(exchange_members.items())],
         "dialogue_utterances": sum(1 for utt in scene_utts if utt.kind == "dialogue"),
         "narration_utterances": sum(1 for utt in scene_utts if utt.kind == "narration"),
         "basis": BASIS_INFERRED,
@@ -910,7 +1050,11 @@ def _normalize(project: Any, segments: Sequence[Any]) -> tuple[list[_Utt], list[
             role_type=role_type, kind=kind, text=text, text_sha=_text_sha(text), latin=_is_latin(text),
             source_revision=_get(anchor, "source_revision_id"),
             speaker_id=_get(attribution, "speaker_id"),
-            attribution_source=str(_get(attribution, "source") or "unknown")))
+            attribution_source=str(_get(attribution, "source") or "unknown"),
+            anchor=(None if anchor is None else {
+                "source_revision_id": _get(anchor, "source_revision_id"),
+                "start_offset": _get(anchor, "start_offset"), "end_offset": _get(anchor, "end_offset"),
+                "occurrence_index": _get(anchor, "occurrence_index")})))
         if kind == "unattributed":
             holds.append({"code": "attribution_unresolved", "utterance_id": seg_id,
                           "reason": "the segment has no known role; analysis is text-only and no instruction is proposed"
@@ -947,13 +1091,91 @@ def _alias_projection(project: Any) -> dict[str, Any]:
             "canonical_aliases": {str(k): str(v) for k, v in sorted(canonical.items())}}
 
 
-def _source_proofs(scene: list[_Utt], alias_digest: str) -> dict[str, Any]:
-    anchors = sorted({utt.source_revision for utt in scene if utt.source_revision} |
-                     ({None} if any(not utt.source_revision for utt in scene) else set()),
-                     key=lambda item: item or "")
-    source = anchors[0] if len(anchors) == 1 and anchors[0] and _SHA_RE.match(str(anchors[0])) else None
+@dataclass
+class _Registry:
+    """The project's source-revision registry, reduced to ``id -> sha256`` or a refusal."""
+
+    shas: dict[str, str] = field(default_factory=dict)
+    problem: str | None = None  # stable code; the registry is unusable when set
+    detail: str = ""
+    count: int = 0
+
+
+_ID_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,200}$")
+
+
+def _source_registry(project: Any) -> _Registry:
+    """Resolve revision ids to SHA-256 through ``project.source_revisions``, failing closed.
+
+    Any defect makes the whole registry unusable: a registry that is absent, has a
+    repeated id, or carries a malformed id or digest cannot prove which source a
+    scene was read from.
+    """
+
+    revisions = _get(project, "source_revisions")
+    if revisions is None or isinstance(revisions, (str, bytes, Mapping)) or not isinstance(revisions, Sequence):
+        return _Registry(problem="source_registry_missing",
+                         detail="the project has no source_revisions registry to resolve revision ids")
+    if len(revisions) == 0:
+        return _Registry(problem="source_registry_missing",
+                         detail="the project's source_revisions registry is empty")
+    shas: dict[str, str] = {}
+    for position, revision in enumerate(revisions):
+        revision_id, digest = _get(revision, "id"), _get(revision, "sha256")
+        if not isinstance(revision_id, str) or not _ID_RE.fullmatch(revision_id):
+            return _Registry(problem="source_registry_malformed", count=len(revisions),
+                             detail=f"source_revisions[{position}] has no usable id")
+        if not isinstance(digest, str) or not _SHA_RE.fullmatch(digest):
+            return _Registry(problem="source_registry_malformed", count=len(revisions),
+                             detail=f"source revision {revision_id} has no lowercase 64-hex sha256")
+        if revision_id in shas:
+            return _Registry(problem="source_registry_duplicate", count=len(revisions),
+                             detail=f"source revision id {revision_id} appears more than once")
+        shas[revision_id] = digest
+    return _Registry(shas=shas, count=len(revisions))
+
+
+def resolve_source_revision_sha256(project: Any, revision_id: str) -> str:
+    """The registered SHA-256 for a ``source_anchor.source_revision_id``, or a typed refusal.
+
+    This is the one place an anchor id becomes a digest.  An id is never accepted
+    because it merely looks like a hash.
+    """
+
+    registry = _source_registry(project)
+    if registry.problem:
+        raise SceneAnalysisError(registry.problem, registry.detail)
+    if not isinstance(revision_id, str) or revision_id not in registry.shas:
+        raise SceneAnalysisError("source_revision_unknown",
+                                 f"source revision {revision_id!r} is not in the project registry")
+    return registry.shas[revision_id]
+
+
+def _source_proofs(scene: list[_Utt], alias_digest: str, registry: _Registry) -> dict[str, Any]:
+    """Proofs a scene is bound to.  The SHA comes from the registry, never from the anchor id itself."""
+
+    ids = sorted({utt.source_revision for utt in scene if utt.source_revision})
+    unanchored = [utt.id for utt in scene if not utt.source_revision and utt.kind != "scene_break"]
+    source: str | None = None
+    problem: str | None = None
+    detail = ""
+    if registry.problem:
+        problem, detail = registry.problem, registry.detail
+    elif unanchored or not ids:
+        problem = "source_anchor_missing"
+        detail = f"utterance {(unanchored or [scene[0].id])[0]} has no source revision anchor"
+    else:
+        unknown = [item for item in ids if item not in registry.shas]
+        resolved = sorted({registry.shas[item] for item in ids if item in registry.shas})
+        if unknown:
+            problem, detail = "source_revision_unknown", f"source revision {unknown[0]} is not in the project registry"
+        elif len(resolved) != 1:
+            problem, detail = "source_revision_mixed", "the scene spans more than one source revision"
+        else:
+            source = resolved[0]
     attribution = [{"id": utt.id, "speaker": utt.speaker_id, "source": utt.attribution_source} for utt in scene]
-    return {"source_revision_sha256": source,
+    return {"source_revision_ids": ids, "source_revision_sha256": source,
+            "source_problem": problem, "source_problem_detail": detail,
             "utterances": [[utt.id, utt.text_sha, utt.role_id] for utt in scene],
             "attribution_digest": _sha(attribution), "alias_digest": alias_digest}
 
@@ -1203,7 +1425,8 @@ def _scene_intention(seams: _Seams, scene: list[_Utt], scene_id: str, proofs: di
     if director is None:
         return None, None, seams.reasons.get("performance_director", "performance_director unavailable")
     if proofs["source_revision_sha256"] is None:
-        return None, None, "plan_stale: the scene has no single canonical source revision"
+        return None, None, (f"plan_stale: {proofs['source_problem'] or 'source_anchor_missing'}: "
+                            f"{proofs['source_problem_detail'] or 'the scene has no single canonical source revision'}")
     try:
         utterances = [director.SceneUtterance(id=utt.id, text_sha256=utt.text_sha, role_id=utt.role_id)
                       for utt in scene]
@@ -1253,6 +1476,7 @@ def analyze_scenes(project: Any, segments: Sequence[Any], *, cache_root: Path | 
     utts, holds, roles = _normalize(project, segments)
     scenes = _split_scenes(utts, int(max_scene_utterances))
     alias_digest = _sha(_alias_projection(project))
+    registry = _source_registry(project)
     overrides = _validate_overrides(director, explicit_directions, {utt.id for utt in utts}, holds)
     chapters = {str(_get(c, "id")): _get(c, "index") for c in (_get(project, "chapters") or [])}
 
@@ -1266,7 +1490,7 @@ def analyze_scenes(project: Any, segments: Sequence[Any], *, cache_root: Path | 
 
     for ordinal, scene in enumerate(scenes):
         scene_id = _scene_id(scene)
-        proofs = _source_proofs(scene, alias_digest)
+        proofs = _source_proofs(scene, alias_digest, registry)
         key = _analysis_key(scene, proofs)
         interpretation, status = _cache_read(directory, key, scene)
         if interpretation is None:
@@ -1279,6 +1503,9 @@ def analyze_scenes(project: Any, segments: Sequence[Any], *, cache_root: Path | 
         cache_scenes.append({"scene_id": scene_id, "analysis_key": key, "status": status})
 
         scene_holds: list[dict[str, Any]] = []
+        if proofs["source_problem"]:
+            scene_holds.append({"code": proofs["source_problem"], "scene_id": scene_id,
+                                "reason": proofs["source_problem_detail"]})
         plan, plan_record, plan_reason = _scene_intention(seams, scene, scene_id, proofs, interpretation["turns"])
         records = {row["utterance_id"]: row for row in interpretation["utterances"]}
 
@@ -1315,10 +1542,13 @@ def analyze_scenes(project: Any, segments: Sequence[Any], *, cache_root: Path | 
                         # Retry without the habit so one unsafe or long habit cannot suppress the scene phrases.
                         phrases, habit_used = phrases[:-1], False
                         text, reason = _compose(director, phrases)
+                scene_phrases = [item for item in effective["delivery_phrases"]][:MAX_PRIORITIES]
                 candidates[utt.id] = {"text": text, "chars": len(text) if text else 0,
                                       "phrases": phrases[:MAX_PRIORITIES],
                                       "habit_included": bool(habit_used and text), "reason": reason,
-                                      "basis": effective["delivery_basis"]}
+                                      "basis": effective["delivery_basis"],
+                                      # scene intention and character habit stay separate for downstream composers
+                                      "scene_phrases": scene_phrases, "habit_phrase": habit}
             if plan is None or director is None:
                 reason = plan_reason or "performance_director unavailable"
                 for utt in role_utts:
@@ -1409,10 +1639,13 @@ def analyze_scenes(project: Any, segments: Sequence[Any], *, cache_root: Path | 
                 "emotion": record["emotion"], "intention": record["intention"], "emphasis": record["emphasis"],
                 "tempo": record["tempo"], "boundary": record["boundary"], "response": record["response"],
                 "ending": record["ending"], "tag_cues": record["tag_cues"],
+                "carried_cues": record["carried_cues"], "exchange": record["exchange"],
+                "source_anchor": utt.anchor,
                 "delivery_phrases": record["delivery_phrases"],
                 "human_override": override, "effective": effective,
                 "native_instruction_candidate": (None if candidate is None else {
-                    key: candidate[key] for key in ("text", "chars", "phrases", "habit_included", "reason", "basis")}),
+                    key: candidate[key] for key in ("text", "chars", "phrases", "habit_included", "reason", "basis",
+                                                "scene_phrases", "habit_phrase")}),
                 "what_if": what_if.get(utt.id, {}),
                 "resolution": resolution.get(utt.id, {"available": False,
                                                        "reason": "no resolvable role for this line"}),
@@ -1468,6 +1701,8 @@ def analyze_scenes(project: Any, segments: Sequence[Any], *, cache_root: Path | 
         "schema_version": SCHEMA_VERSION, "analyzer_version": ANALYZER_VERSION,
         "project_id": _get(project, "id"),
         "runtime": {"requested_profile": profile_name, "profiles_evaluated": profiles},
+        "source": {"registry_status": registry.problem or "ok", "registry_detail": registry.detail,
+                   "revisions": [{"id": key, "sha256": value} for key, value in sorted(registry.shas.items())]},
         "scenes": scene_rows, "directions": direction_rows, "roles": role_rows,
         "cache": {"enabled": directory is not None, "identity": cache_identity, "scenes": cache_scenes,
                   "hits": sum(1 for e in cache_scenes if e["status"] == "hit"),

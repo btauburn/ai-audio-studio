@@ -1,3 +1,9 @@
+> **October 12 scene-aware pilot:** see [implemented scene direction, paired audio
+> evidence and reproduction instructions](scene-dialogue-pilot.md). Twenty lines
+> and forty samples were rendered using the retained clones. Native instructions
+> reached seven dialogue requests in an isolated review wrapper; narration stayed
+> neutral. Human listening and production enablement remain pending.
+
 > **October 12 directors follow-up:** see the current
 > [Casting/Performance Director implementation](directors-implementation.md) and
 > [cloned-only policy and chapter review architecture](directors-cloned-chapters.md).

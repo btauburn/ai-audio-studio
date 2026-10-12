@@ -20,7 +20,7 @@ import pytest
 from dubbing_service.app.audiobook import performance_director as director
 from dubbing_service.app.audiobook import performance_scene_analysis as psa
 from dubbing_service.app.audiobook import provider_capabilities
-from dubbing_service.app.models.audiobook import Attribution, SourceAnchor
+from dubbing_service.app.models.audiobook import Attribution, SourceAnchor, SourceRevision
 from dubbing_service.app.models.character import (
     CharacterDossier,
     CharacterFact,
@@ -30,6 +30,7 @@ from dubbing_service.app.models.project import Chapter, Project, Role, Segment
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE = "a" * 64
+SOURCE_ID = "src_fixture0001"  # a registry id, deliberately not a hash
 
 
 def identity(role_id: str, prompt: str = "p1") -> CharacterVoiceIdentity:
@@ -49,14 +50,19 @@ def make_roles(with_identity: bool = True) -> list[Role]:
 
 
 def make_segments(rows: list[tuple[str, str]], *, chapter: str = "c1", start: int = 0,
-                  source: str | None = SOURCE) -> list[Segment]:
+                  source: str | None = SOURCE_ID) -> list[Segment]:
     return [Segment(id=f"u{start + i}", chapter_id=chapter, role_id=role, index=start + i, text=text,
                     source_anchor=SourceAnchor(source_revision_id=source) if source else None,
                     attribution=Attribution(speaker_id=role, source="user", reviewed=True))
             for i, (role, text) in enumerate(rows)]
 
 
+def make_registry(digest: str = SOURCE, revision_id: str = SOURCE_ID) -> list[SourceRevision]:
+    return [SourceRevision(id=revision_id, uri="fixture://scene-analysis", kind="inline", sha256=digest)]
+
+
 def make_project(roles: list[Role] | None = None, **extra) -> Project:
+    extra.setdefault("source_revisions", make_registry())
     return Project(id="proj-1", name="Fixture", roles=roles or make_roles(),
                    chapters=[Chapter(id="c1", title="One", index=1), Chapter(id="c2", title="Two", index=2)],
                    **extra)
@@ -444,7 +450,7 @@ def test_scene_id_is_stable_across_prose_edits():
 # --------------------------------------------- existing Performance Director seam
 
 
-def test_scene_intention_record_matches_the_existing_seam_and_live_proofs(monkeypatch):
+def test_scene_intention_record_matches_the_existing_seam_and_registry_proofs():
     segments = make_segments(DRAMA)
     project = make_project()
     result = psa.analyze_scenes(project, segments)
@@ -456,13 +462,16 @@ def test_scene_intention_record_matches_the_existing_seam_and_live_proofs(monkey
     assert {turn.utterance_id for turn in plan.turns} <= {u.id for u in plan.utterances}
     assert all(turn.confidence == "deterministic" for turn in plan.turns)  # never "manual", never "model"
 
-    # The proofs are the same ones the existing store checks: the plan must still be applicable.
-    monkeypatch.setattr("dubbing_service.app.storage.segments.load_segments", lambda _project_id: segments)
-    assert director._scene_applicable(project, plan) is True
+    # The plan is bound to the registry-resolved digest and to the exact prose: the same live state
+    # reproduces the same plan identity, an edited line does not.
+    # (performance_director.scene_proofs still compares the anchor id itself with a SHA; see node A notes.)
+    again = psa.analyze_scenes(project, segments)["scenes"][0]["scene_intention"]
+    assert again["cache_key"] == scene["scene_intention"]["cache_key"]
     changed = copy.deepcopy(segments)
     changed[1].text = '"Where were you, really?"'
-    monkeypatch.setattr("dubbing_service.app.storage.segments.load_segments", lambda _project_id: changed)
-    assert director._scene_applicable(project, plan) is False
+    edited = psa.analyze_scenes(project, changed)["scenes"][0]["scene_intention"]
+    assert edited["cache_key"] != scene["scene_intention"]["cache_key"]
+    assert [u["text_sha256"] for u in edited["utterances"]] != [u["text_sha256"] for u in scene["scene_intention"]["utterances"]]
 
 
 def test_missing_source_revision_still_analyzes_but_reports_no_plan():
@@ -618,3 +627,267 @@ def test_human_correction_is_the_only_path_to_a_resolved_instruction(forwarding_
     assert resolution["resolved"]["native_instruction"] == "dry; unhurried."
     assert [d["state"] for d in resolution["dispositions"] if d["control"] == "native_instruction"] == ["forward_native"]
     assert by_id(result, "u1")["approved"] is False  # a correction is a request, not an approval
+
+
+# ------------------------------------------------ source revision registry (node A)
+
+
+def scene_of(result: dict) -> dict:
+    return result["scenes"][0]
+
+
+def test_anchor_id_is_resolved_through_the_registry_and_is_never_taken_for_a_hash():
+    result = psa.analyze_scenes(make_project(), make_segments(DRAMA))
+    scene = scene_of(result)
+    assert scene["scene_intention_reason"] is None
+    assert scene["source"]["source_revision_ids"] == [SOURCE_ID]
+    assert scene["source"]["source_revision_sha256"] == SOURCE != SOURCE_ID
+    assert scene["scene_intention"]["source_revision_sha256"] == SOURCE
+    assert result["source"] == {"registry_status": "ok", "registry_detail": "",
+                                "revisions": [{"id": SOURCE_ID, "sha256": SOURCE}]}
+
+
+def test_two_ids_for_identical_source_bytes_still_resolve_to_one_proof():
+    registry = make_registry() + make_registry(revision_id="src_alias0002")
+    segments = make_segments(DRAMA)
+    segments[2].source_anchor = SourceAnchor(source_revision_id="src_alias0002")
+    result = psa.analyze_scenes(make_project(source_revisions=registry), segments)
+    assert scene_of(result)["scene_intention"]["source_revision_sha256"] == SOURCE
+
+
+def test_a_hash_shaped_anchor_id_is_not_a_bypass_without_a_registry():
+    segments = make_segments(DRAMA, source=SOURCE)  # the pre-repair shape: the anchor "is" the digest
+    result = psa.analyze_scenes(make_project(source_revisions=[]), segments)
+    scene = scene_of(result)
+    assert scene["scene_intention"] is None
+    assert scene["scene_intention_reason"].startswith("plan_stale: source_registry_missing")
+    assert scene["source"]["source_revision_sha256"] is None
+    assert result["source"]["registry_status"] == "source_registry_missing"
+    assert {hold["code"] for hold in scene["holds"]} == {"source_registry_missing"}
+
+
+def test_hash_shaped_anchor_id_must_still_be_in_the_registry():
+    segments = make_segments(DRAMA, source=SOURCE)
+    result = psa.analyze_scenes(make_project(), segments)  # registry holds SOURCE_ID only
+    assert scene_of(result)["scene_intention"] is None
+    assert scene_of(result)["scene_intention_reason"].startswith("plan_stale: source_revision_unknown")
+
+
+def test_unknown_anchor_id_fails_closed_but_the_prose_is_still_analysed():
+    result = psa.analyze_scenes(make_project(), make_segments(DRAMA, source="src_other"))
+    scene = scene_of(result)
+    assert scene["scene_intention"] is None
+    assert scene["scene_intention_reason"].startswith("plan_stale: source_revision_unknown")
+    assert "src_other" in scene["scene_intention_reason"]
+    assert by_id(result, "u2")["boundary"]["before"]["value"] == "quick"
+    assert by_id(result, "u1")["resolution"]["available"] is False
+
+
+@pytest.mark.parametrize("registry, code", [
+    (lambda: make_registry() + make_registry(digest="b" * 64), "source_registry_duplicate"),
+    (lambda: make_registry() + make_registry(), "source_registry_duplicate"),
+    (lambda: make_registry(digest="A" * 64), "source_registry_malformed"),
+    (lambda: make_registry(digest="a" * 63), "source_registry_malformed"),
+    (lambda: make_registry(digest="g" * 64), "source_registry_malformed"),
+    (lambda: make_registry(revision_id=""), "source_registry_malformed"),
+    (lambda: [], "source_registry_missing"),
+])
+def test_registry_defects_fail_closed(registry, code):
+    result = psa.analyze_scenes(make_project(source_revisions=registry()), make_segments(DRAMA))
+    scene = scene_of(result)
+    assert scene["scene_intention"] is None and scene["source"]["source_revision_sha256"] is None
+    assert scene["scene_intention_reason"].startswith(f"plan_stale: {code}")
+    assert result["source"]["registry_status"] == code and result["source"]["revisions"] == []
+
+
+def test_a_registry_defect_elsewhere_in_the_registry_still_fails_closed():
+    registry = make_registry() + make_registry(digest="not-a-digest", revision_id="src_unused")
+    result = psa.analyze_scenes(make_project(source_revisions=registry), make_segments(DRAMA))
+    assert scene_of(result)["scene_intention"] is None
+    assert result["source"]["registry_status"] == "source_registry_malformed"
+
+
+def test_missing_mixed_or_partial_anchors_are_typed_not_guessed():
+    mixed_registry = make_registry() + make_registry(digest="b" * 64, revision_id="src_second0002")
+    segments = make_segments(DRAMA)
+    segments[3].source_anchor = SourceAnchor(source_revision_id="src_second0002")
+    mixed = psa.analyze_scenes(make_project(source_revisions=mixed_registry), segments)
+    assert scene_of(mixed)["scene_intention_reason"].startswith("plan_stale: source_revision_mixed")
+
+    partial = make_segments(DRAMA)
+    partial[2].source_anchor = None
+    result = psa.analyze_scenes(make_project(), partial)
+    assert scene_of(result)["scene_intention_reason"].startswith("plan_stale: source_anchor_missing")
+    assert "u2" in scene_of(result)["scene_intention_reason"]
+
+
+def test_editing_the_registered_digest_invalidates_the_cache_and_leaves_the_old_entry(tmp_path):
+    segments = make_segments(DRAMA)
+    first = psa.analyze_scenes(make_project(), segments, cache_root=tmp_path)
+    old_key = scene_of(first)["analysis_key"]
+    old_bytes = (tmp_path / psa.CACHE_DIRECTORY / f"{old_key}.json").read_bytes()
+
+    edited = psa.analyze_scenes(make_project(source_revisions=make_registry(digest="b" * 64)), segments,
+                                cache_root=tmp_path)
+    assert scene_of(edited)["analysis_key"] != old_key
+    assert edited["cache"]["scenes"][0]["status"] == "miss_written"
+    assert scene_of(edited)["scene_intention"]["source_revision_sha256"] == "b" * 64
+    assert scene_of(edited)["scene_id"] == scene_of(first)["scene_id"]
+    assert (tmp_path / psa.CACHE_DIRECTORY / f"{old_key}.json").read_bytes() == old_bytes
+
+    again = psa.analyze_scenes(make_project(), segments, cache_root=tmp_path)
+    assert again["cache"]["scenes"][0]["status"] == "hit"
+
+
+def test_registry_id_is_provenance_while_the_plan_stays_bound_to_the_same_digest(tmp_path):
+    first = psa.analyze_scenes(make_project(), make_segments(DRAMA), cache_root=tmp_path)
+    renamed = psa.analyze_scenes(make_project(source_revisions=make_registry(revision_id="src_renamed0009")),
+                                 make_segments(DRAMA, source="src_renamed0009"), cache_root=tmp_path)
+    assert scene_of(renamed)["scene_intention"]["source_revision_sha256"] == SOURCE
+    assert scene_of(renamed)["analysis_key"] != scene_of(first)["analysis_key"]
+
+
+def test_no_source_or_voice_change_means_a_cache_hit_and_identical_interpretation(tmp_path):
+    segments = make_segments(DRAMA)
+    first = psa.analyze_scenes(make_project(), segments, cache_root=tmp_path)
+    second = psa.analyze_scenes(make_project(), segments, cache_root=tmp_path)
+    assert second["cache"]["scenes"][0]["status"] == "hit"
+    assert second["directions"] == first["directions"]
+    assert [(row["summary"], row["turns"]) for row in second["scenes"]] ==         [(row["summary"], row["turns"]) for row in first["scenes"]]
+
+
+def test_literal_utf8_prose_is_hashed_cached_and_cited_without_escaping(tmp_path):
+    rows = [("narr", "Tom didn’t answer… he stared at the 門 for a long moment."),
+            ("mara", "“Où étais-tu ? 你去哪儿了？”"),
+            ("tom", "“I couldn’t say.”")]
+    segments = make_segments(rows)
+    result = psa.analyze_scenes(make_project(), segments, cache_root=tmp_path)
+    for segment in segments:
+        row = by_id(result, segment.id)
+        assert row["text_sha256"] == hashlib.sha256(segment.text.encode("utf-8")).hexdigest()
+    for item in evidence_items(result["directions"]):
+        prose = next(s.text for s in segments if s.id == item["utterance_id"])
+        assert prose[item["start"]:item["end"]] == item["text"]
+    stored = (tmp_path / psa.CACHE_DIRECTORY / f"{scene_of(result)['analysis_key']}.json").read_bytes()
+    assert "didn’t answer…".encode("utf-8") in stored and "你去哪儿了".encode("utf-8") in stored
+    assert b"\\u2019" not in stored and b"\\u4f60" not in stored
+    assert [u["text"] for u in scene_of(result)["utterances"]] == [s.text for s in segments]
+
+
+# ------------------------------------------------------- scene carry (node A)
+
+
+EXCHANGE = [
+    ("mara", '"Come closer."'),
+    ("narr", "Mara whispered softly."),
+    ("tom", '"Why?"'),
+    ("mara", '"Because they are listening."'),
+    ("tom", '"Who is?"'),
+    ("mara", '"Everyone."'),
+]
+
+
+def test_a_source_cue_persists_across_the_whole_exchange_with_its_evidence():
+    result = psa.analyze_scenes(make_project(), make_segments(EXCHANGE))
+    cue = by_id(result, "u0")["tag_cues"][0]
+    assert cue["phrase"] == "soft" and cue["binding"] == "named_role"
+    assert by_id(result, "u0")["carried_cues"] == []
+
+    carried = {uid: by_id(result, uid)["carried_cues"] for uid in ("u2", "u3", "u4", "u5")}
+    assert [(c["scope"], c["turn_distance"]) for c in carried["u3"]] == [("speaker_continuation", 1)]
+    assert [(c["scope"], c["turn_distance"]) for c in carried["u5"]] == [("speaker_continuation", 2)]
+    assert [(c["scope"], c["turn_distance"]) for c in carried["u2"]] == [("exchange_register", 1)]
+    assert [(c["scope"], c["turn_distance"]) for c in carried["u4"]] == [("exchange_register", 2)]
+    for items in carried.values():
+        for item in items:
+            assert item["basis"] == psa.BASIS_INFERRED and item["confidence"] == "low"
+            assert item["from_utterance_id"] == "u0"
+            assert [(e["utterance_id"], e["text"]) for e in item["evidence"]] == [("u1", "whispered"),
+                                                                                   ("u1", "softly")]
+    assert {by_id(result, i)["exchange"]["id"] for i in ("u0", "u2", "u3", "u4", "u5")} == {"x0"}
+    phrase = by_id(result, "u3")["delivery_phrases"][0]
+    assert phrase["phrase"] == "soft" and phrase["source"] == "carried_cue" and phrase["basis"] == psa.BASIS_INFERRED
+    assert by_id(result, "u1")["carried_cues"] == [] and by_id(result, "u1")["exchange"] is None
+
+
+def test_carry_never_relabels_inference_as_explicit_source():
+    result = psa.analyze_scenes(make_project(), make_segments(EXCHANGE))
+    for row in result["directions"]:
+        for item in row["carried_cues"]:
+            assert item["basis"] != psa.BASIS_SOURCE
+        for phrase in row["delivery_phrases"]:
+            if phrase["source"] == "carried_cue":
+                assert phrase["basis"] == psa.BASIS_INFERRED
+
+
+def test_carried_emotion_is_low_confidence_inferred_and_points_at_the_author_cue():
+    rows = [("mara", '"I can\'t."'), ("narr", "Mara stammered."), ("tom", '"Try."'),
+            ("mara", '"I really can\'t."')]
+    result = psa.analyze_scenes(make_project(), make_segments(rows))
+    own = by_id(result, "u0")["emotion"]
+    assert own["label"] == "fear" and own["basis"] == psa.BASIS_SOURCE
+    later = by_id(result, "u3")["emotion"]
+    assert later["label"] == "fear" and later["basis"] == psa.BASIS_INFERRED and later["confidence"] == "low"
+    assert later["carried_from"] == "u0" and later["evidence"][0]["text"] == "stammered"
+    # The partner is not handed the speaker's emotion.
+    assert by_id(result, "u2")["emotion"]["label"] is None
+
+
+def test_a_new_author_cue_ends_the_carry_and_a_loud_line_clashes_with_a_hush():
+    rows = EXCHANGE[:4] + [("narr", "Mara shouted."), ("mara", '"Everyone!"'), ("tom", '"Quiet."'),
+                           ("mara", '"Never."')]
+    result = psa.analyze_scenes(make_project(), make_segments(rows))
+    shouted = by_id(result, "u5")
+    assert shouted["carried_cues"] == []
+    assert shouted["delivery_phrases"][0]["source"] == "speech_tag"
+    assert shouted["delivery_phrases"][0]["phrase"] == "raised voice"
+
+    clash = psa.analyze_scenes(make_project(), make_segments(EXCHANGE[:4] + [("tom", '"Hm."'),
+                                                                             ("mara", '"EVERYONE!"')]))
+    assert by_id(clash, "u5")["carried_cues"] == []
+
+
+def test_carry_is_bounded_by_turns_pronoun_guesses_and_exchange_breaks():
+    turns = [("mara", '"Closer."'), ("narr", "Mara whispered softly.")]
+    for _ in range(5):
+        turns += [("tom", '"Go on."'), ("mara", '"Not yet."')]
+    result = psa.analyze_scenes(make_project(), make_segments(turns))
+    carried = [any(c["scope"] == "speaker_continuation" for c in by_id(result, f"u{i}")["carried_cues"])
+               for i in range(2, len(turns)) if turns[i][0] == "mara"]
+    assert carried == [True, True, True, False, False]  # psa.MAX_CARRY_TURNS == 3
+
+    pronoun = psa.analyze_scenes(make_project(), make_segments([("mara", '"Closer."'),
+                                                                ("narr", "She whispered softly."),
+                                                                ("narr", "The lamp guttered."),
+                                                                ("tom", '"Why?"'), ("mara", '"Listen."')]))
+    assert by_id(pronoun, "u0")["tag_cues"][0]["binding"] == "adjacent_pronoun"
+    assert by_id(pronoun, "u4")["carried_cues"] == [] and by_id(pronoun, "u3")["carried_cues"] == []
+
+    gap = [("narr", "The hall emptied."), ("narr", "Lamps burned low."), ("narr", "Rain fell outside.")]
+    broken = psa.analyze_scenes(make_project(), make_segments(EXCHANGE[:4] + gap + [("mara", '"Now."')]))
+    assert by_id(broken, "u0")["exchange"]["id"] != by_id(broken, "u7")["exchange"]["id"]
+    assert by_id(broken, "u7")["carried_cues"] == []
+
+
+def test_scene_break_ends_an_exchange_and_the_carry():
+    rows = EXCHANGE[:4] + [("narr", "* * *"), ("mara", '"Morning."')]
+    result = psa.analyze_scenes(make_project(), make_segments(rows))
+    assert len(result["scenes"]) == 2
+    assert by_id(result, "u5")["carried_cues"] == []
+
+
+def test_unknown_stays_unknown_when_nothing_is_cued():
+    rows = [("mara", '"Pass the salt."'), ("tom", '"Here."'), ("mara", '"Thanks."')]
+    result = psa.analyze_scenes(make_project(), make_segments(rows))
+    for row in result["directions"]:
+        assert row["carried_cues"] == []
+    assert by_id(result, "u0")["intention"] == {"value": "unknown", "basis": "none", "confidence": None,
+                                                "evidence": []}
+
+
+def test_character_habit_stays_separate_from_scene_phrases():
+    result = psa.analyze_scenes(make_project(), make_segments(EXCHANGE))
+    candidate = by_id(result, "u3")["native_instruction_candidate"]
+    assert candidate["scene_phrases"][0] == "soft" and "habit_phrase" in candidate
+    narrator = by_id(result, "u1")["native_instruction_candidate"]
+    assert narrator["text"] is None and narrator["habit_phrase"] is None

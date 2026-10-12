@@ -18,7 +18,7 @@ from dubbing_service.app.storage.segments import load_segments
 from . import voice_lab as lab
 
 SCHEMA = "casting-performance-directors-v1"
-ALGORITHM_VERSION = "casting-director-integration-v7"
+ALGORITHM_VERSION = "casting-director-integration-v8"
 META = "casting_director"
 
 
@@ -52,6 +52,7 @@ def _binding(project, segments):
                     "preferences": _json(project.voice_lab.preferences),
                     "casting": project.voice_lab.casting,
                     "requested_runtime": project.metadata.get("requested_runtime"),
+                    "source_revisions": _json(project.source_revisions),
                     "voice_policy": policy_mode(project)})
 
 
@@ -136,6 +137,7 @@ def _compute(project, segments, binding, *, scene_cache_root=None):
     from .casting_director_discovery import discover_candidates
     from .casting_director_matching import analyze_characters, rank_candidates
     from .performance_scene_analysis import analyze_scenes
+    from .scene_dialogue_plan import build_scene_dialogue_plan
     from .project_qwen_runtime import project_profile
     from .character_research import research_project
     from .cloned_voice_policy import policy_mode, candidate_holds, role_holds
@@ -192,9 +194,12 @@ def _compute(project, segments, binding, *, scene_cache_root=None):
     # POST analysis creates only immutable recommendations. Native forwarding still
     # belongs to the existing reviewed Performance Director runtime owner.
     scene = analyze_scenes(project, segments, cache_root=(scene_cache_root or _cache_path(project.id, binding).parent))
+    dialogue_plan = build_scene_dialogue_plan(
+        project, segments, cache_root=(scene_cache_root or _cache_path(project.id, binding).parent))
     payload = {"schema": SCHEMA, "project_id": project.id, "runtime": project_profile(project.id),
                "voice_policy": mode,
                "binding_sha256": binding, "roles": roles, "scenes": scene,
+               "scene_dialogue_plan": dialogue_plan,
                "holds": [*discovery.get("holds", []), *policy_holds,
                          *[{"candidate_id": c["candidate_id"], "code": "incompatible_base_engine",
                             "reason": "Saved voice remains approved for its engine; this comparison requires Qwen Base."}
