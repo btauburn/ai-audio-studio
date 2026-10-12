@@ -155,6 +155,15 @@ def _bound_intent(project, role_id, candidate_id, *, script_version=None, reuse_
     if role is None:
         raise AuditionError("Choose a real character before previewing")
     candidate = _candidate_for_intent(project, role_id, candidate_id, reuse_key)
+    from .cloned_voice_policy import policy_mode, require_record, ClonePolicyError
+    clone_mode = policy_mode(project)
+    if clone_mode == "cloned_only":
+        if not reuse_key:
+            raise AuditionError("Cloned-only auditions require an exact saved recorded reference; synthetic design is disabled")
+        try:
+            require_record(_reuse_record(project, reuse_key), mode=clone_mode)
+        except ClonePolicyError as exc:
+            raise AuditionError(str(exc)) from exc
     profile = project.character_cast.profiles.get(role_id)
     dossier = project.character_cast.dossiers.get(role_id)
     # Ranking scores/preferences do not alter a voice and therefore must not
@@ -185,6 +194,8 @@ def _bound_intent(project, role_id, candidate_id, *, script_version=None, reuse_
              "preview_text": preview_text, "target_seconds": script_data["target_seconds"],
              "duration_window_seconds": script_data["duration_window_seconds"],
              "script_version": script_version, "sections": sections, "reuse_key": reuse_key}
+    if clone_mode == "cloned_only":
+        bound["director_voice_policy"] = {"mode": clone_mode}
     # Freeze new Base requests before hashing; stored intents are never rehashed.
     # A reused built-in CustomVoice keeps its independent execution contract.
     backend = "qwen3tts"
@@ -410,6 +421,8 @@ def _prepare_project(parent_id, intent_hash):
                 from dubbing_service.app.models.character import CastingProfile
                 child.character_cast.profiles[role.id] = CastingProfile.model_validate(intent["binding"]["profile"])
             child.voice_lab.shortlists[role.id] = {"matches": [copy.deepcopy(intent["candidate_snapshot"])]}
+            if binding.get("director_voice_policy"):
+                child.metadata["director_voice_policy"] = copy.deepcopy(binding["director_voice_policy"])
             child.metadata["voice_lab_audition"] = {"parent_project_id": parent_id, "intent": intent_hash,
                 "role_id": role.id, "preview_text": preview_text, "script_version": binding.get("script_version"),
                 "sections": copy.deepcopy(sections), "source_kind": "original_neutral_preview"}

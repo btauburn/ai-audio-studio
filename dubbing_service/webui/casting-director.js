@@ -241,6 +241,9 @@
       const stars = typeof current.rating === 'number' ? `${current.rating} of 5 stars` : 'not rated';
       card.append(pair('Current voice', text(current.name) || text(current.key) || 'None chosen'));
       card.append(pair('Current rating', stars + (current.approved ? ' · approved by a person' : '')));
+      if (role.policy_conflict) {
+        card.append(make('p', 'The saved voice is excluded by this book’s cloned-only policy. Its approval remains saved; rendering is blocked until casting is explicitly reviewed.', 'cd-hold'));
+      }
 
       const evidence = list(analysis.evidence).map(row => {
         const label = words(row.dimension), value = text(row.value);
@@ -331,6 +334,9 @@
       stopPlayer();
       report = data;
       rolesBox.replaceChildren(); scenesBox.replaceChildren();
+      if (data.voice_policy === 'cloned_only') {
+        rolesBox.append(make('p', 'Cloned voices only: recorded-reference clones are eligible. Synthetic designs and presets are held; existing approvals remain saved.', 'cd-muted'));
+      }
       for (const hold of list(data.holds)) {
         rolesBox.append(make('p', 'Held: ' + words(typeof hold === 'object' ? (hold.reason || hold.code || JSON.stringify(hold)) : hold), 'cd-hold'));
       }

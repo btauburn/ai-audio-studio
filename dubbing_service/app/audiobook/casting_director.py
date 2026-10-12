@@ -18,7 +18,7 @@ from dubbing_service.app.storage.segments import load_segments
 from . import voice_lab as lab
 
 SCHEMA = "casting-performance-directors-v1"
-ALGORITHM_VERSION = "casting-director-integration-v5"
+ALGORITHM_VERSION = "casting-director-integration-v7"
 META = "casting_director"
 
 
@@ -36,6 +36,7 @@ def _json(value):
 
 
 def _binding(project, segments):
+    from .cloned_voice_policy import policy_mode
     from dubbing_service.app.storage import voices as library
     from .fingerprint import voice_revision_for_role
     with library.voices_lock():
@@ -50,7 +51,8 @@ def _binding(project, segments):
                     "character_cast": _json(project.character_cast), "shelf": shelf,
                     "preferences": _json(project.voice_lab.preferences),
                     "casting": project.voice_lab.casting,
-                    "requested_runtime": project.metadata.get("requested_runtime")})
+                    "requested_runtime": project.metadata.get("requested_runtime"),
+                    "voice_policy": policy_mode(project)})
 
 
 def _current(project, role, records):
@@ -130,12 +132,13 @@ def _base_compatible(candidate):
     return True  # Original design/source directions still require preparation.
 
 
-def _compute(project, segments, binding):
+def _compute(project, segments, binding, *, scene_cache_root=None):
     from .casting_director_discovery import discover_candidates
     from .casting_director_matching import analyze_characters, rank_candidates
     from .performance_scene_analysis import analyze_scenes
     from .project_qwen_runtime import project_profile
     from .character_research import research_project
+    from .cloned_voice_policy import policy_mode, candidate_holds, role_holds
     # Accumulate current book evidence on a private projection. Approval history,
     # identities and the persisted dossier remain owned by their original owners.
     project = project.model_copy(deep=True)
@@ -144,10 +147,19 @@ def _compute(project, segments, binding):
     project.character_cast.profiles = build_profiles(project, segments)
     analyses = analyze_characters(project, segments)
     discovery = discover_candidates(project, segments)
+    mode = policy_mode(project)
+    policy_holds = []
+    for candidate in discovery["candidates"]:
+        rejected_by_policy = candidate_holds(candidate, mode=mode)
+        candidate["holds"] = [*candidate.get("holds", []), *rejected_by_policy]
+        candidate["eligible"] = bool(candidate.get("eligible")) and not rejected_by_policy
+        policy_holds.extend({**hold, "candidate_id": candidate["candidate_id"]}
+                            for hold in rejected_by_policy)
     records = lab.voice_records(project)
     cast = []
     for role in project.roles:
         current = _current(project, role, records)
+        current["policy_holds"] = role_holds(role, mode=mode) if current["identity_id"] else []
         if current["identity_id"]:
             match = next((c for c in discovery["candidates"]
                           if c.get("key") == current["key"]), {})
@@ -156,6 +168,7 @@ def _compute(project, segments, binding):
     for analysis in analyses:
         role = next(r for r in project.roles if r.id == analysis["role_id"])
         current = _current(project, role, records)
+        current["policy_holds"] = role_holds(role, mode=mode) if current["identity_id"] else []
         rejected = (project.voice_lab.casting["roles"].get(role.id) or {}).get("rejections", [])
         rejected_keys = {row.get("key") for row in rejected}
         rejected_identities = {(records.get(key) or {}).get("identity", {}).get("id")
@@ -169,17 +182,20 @@ def _compute(project, segments, binding):
                                  cast=[c for c in cast if c.get("role_id") != role.id], limit=5)
         _audio_links(project, ranked, records)
         replacement = type(current["rating"]) is int and current["rating"] <= 3
+        policy_conflict = bool(current["policy_holds"])
         roles.append({"analysis": analysis, "role_id": role.id, "role_name": role.name,
                       "current_voice": current, "protected": current["protected"],
-                      "needs_casting": not current["protected"],
+                      "needs_casting": not current["protected"] or policy_conflict,
+                      "policy_conflict": policy_conflict,
                       "replacement_candidate": replacement, "candidates": ranked,
-                      "coverage": "recommendations" if ranked else "needs_casting"})
+                      "coverage": "blocked_by_voice_policy" if policy_conflict else "recommendations" if ranked else "needs_casting"})
     # POST analysis creates only immutable recommendations. Native forwarding still
     # belongs to the existing reviewed Performance Director runtime owner.
-    scene = analyze_scenes(project, segments, cache_root=_cache_path(project.id, binding).parent)
+    scene = analyze_scenes(project, segments, cache_root=(scene_cache_root or _cache_path(project.id, binding).parent))
     payload = {"schema": SCHEMA, "project_id": project.id, "runtime": project_profile(project.id),
+               "voice_policy": mode,
                "binding_sha256": binding, "roles": roles, "scenes": scene,
-               "holds": [*discovery.get("holds", []),
+               "holds": [*discovery.get("holds", []), *policy_holds,
                          *[{"candidate_id": c["candidate_id"], "code": "incompatible_base_engine",
                             "reason": "Saved voice remains approved for its engine; this comparison requires Qwen Base."}
                            for c in discovery["candidates"] if not _base_compatible(c)]],
@@ -197,7 +213,9 @@ def view(project_id):
         path = _cache_path(project_id, binding)
         if path.is_file():
             return _read(path, binding)
+        from .cloned_voice_policy import policy_mode
         return {"schema": SCHEMA, "project_id": project_id, "status": "needs_analysis",
+                "voice_policy": policy_mode(project),
                 "binding_sha256": binding, "roles": [], "scenes": None, "holds": [],
                 "human_review": "pending", "quality_improvement": "not_established"}
 
@@ -285,8 +303,12 @@ def _prepare_auditions(project_id, *, request_id, role_id, report_sha256):
             raise DirectorError("Role needs source attribution before casting: " + str(attention)[:400])
     proposals = []
     holds = []
+    from .cloned_voice_policy import policy_mode, candidate_holds
+    mode = policy_mode(project)
     for candidate in selected["candidates"][:5]:
-        if not candidate.get("eligible", False) or candidate.get("holds"):
+        policy_rejections = candidate_holds(candidate, mode=mode)
+        if not candidate.get("eligible", False) or candidate.get("holds") or policy_rejections:
+            holds.extend({**h, "candidate_id": candidate["candidate_id"]} for h in policy_rejections)
             continue
         reuse_key = candidate.get("key")
         library_id = candidate.get("library_voice_id")

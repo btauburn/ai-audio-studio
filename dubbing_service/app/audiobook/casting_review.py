@@ -811,6 +811,9 @@ def _proposal_plan(project, role_id, profile, dossier, base, retained, *, reuse_
     directed = proposals_for_round(project, role_id)
     if directed is not None:
         return directed
+    from .cloned_voice_policy import policy_mode
+    if policy_mode(project) == "cloned_only":
+        raise CastingError("This book requires cloned voices. Use Review recommendations and Request fresh auditions; synthetic design fallback is disabled.")
     from . import original_inspired_design
     from .named_reference_feedback import proposals
     from .named_reference_feedback import requested_performer as resolve_performer

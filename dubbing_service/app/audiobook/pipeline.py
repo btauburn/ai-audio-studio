@@ -433,6 +433,21 @@ def render_utterances(
 
     project = load_project(project_id)
     metadata = project.metadata or {}
+    # An explicit cloned-only book cannot trigger synthetic character design or
+    # reuse a preset. This guard runs before any provider/runtime/GPU work.
+    from .cloned_voice_policy import policy_mode, role_holds
+    clone_mode = policy_mode(project)
+    if clone_mode == "cloned_only":
+        if getattr(renderer, "backend", None) != "qwen3tts":
+            raise PipelineError("Cloned-only synthesis requires the Qwen Base renderer")
+        targets = set(utterance_ids)
+        requested = {s.role_id for s in load_segments(project_id) if s.id in targets}
+        for role_id in requested:
+            role = next((r for r in project.roles if r.id == role_id), None)
+            holds = role_holds(role, mode=clone_mode)
+            if role is None or role.tts_backend != "qwen3tts" or holds:
+                raise PipelineError("Cloned-only synthesis requires a recorded Qwen Base clone for every requested role: "
+                                    + str(role_id) + "; " + str(holds))
     strict_casting = bool(project.voice_lab.casting.get("enabled")) or (
         (metadata.get("autocast_import") or {}).get("mode") == "autocast"
     )

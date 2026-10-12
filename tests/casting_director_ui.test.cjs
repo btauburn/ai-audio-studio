@@ -243,3 +243,14 @@ test('page wiring is additive, hidden until mounted, and rendering never uses in
   assert.doesNotMatch(source,/innerHTML|outerHTML|insertAdjacentHTML|eval\(|new Function/);
   assert.ok(fs.statSync(path.join(webui,'casting-director.css')).size>0);
 });
+
+test('cloned-only book policy is visible without generating or changing approvals',async()=>{
+  const report={...REPORT,voice_policy:'cloned_only'};
+  const s=surface({routes:{'GET ':json(200,report)}});
+  await s.open.emit('click');
+  const copy=s.roles.walk().map(n=>n._text).join(' ');
+  assert.match(copy,/Cloned voices only/);
+  assert.match(copy,/existing approvals remain saved/);
+  assert.equal(s.calls.length,1);
+  assert.equal(s.calls[0].method,'GET');
+});

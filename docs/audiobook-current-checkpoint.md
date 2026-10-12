@@ -1,3 +1,9 @@
+> **October 12 directors follow-up:** see the current
+> [Casting/Performance Director implementation](directors-implementation.md) and
+> [cloned-only policy and chapter review architecture](directors-cloned-chapters.md).
+> The approved Faster Base default is retained. Full-chapter native emotion
+> forwarding and improved listening quality remain unvalidated.
+
 > **October 4 follow-up repair:** exact fingerprinted reference-source bytes
 > were restored after a byte-only whitespace cleanup invalidated frozen QC
 > evidence. See [source fingerprint compatibility](reference-source-fingerprint-compatibility.md).
