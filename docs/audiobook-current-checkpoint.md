@@ -1,7 +1,8 @@
 > **October 12 chapters 4–10:** [resumable full-chapter V2 rendering](coached-chapters.md)
 > preserves the existing cloned cast, reuses verified neutral narration and
 > applies captured whole-scene coaching to dialogue. Source preparation passed
-> for all seven chapters. Audio generation and listening review are pending.
+> for all seven chapters; seven complete WAV/MP3 review exports and technical
+> checks are now verified. Human listening quality and production approval remain pending.
 > The exporter now shares the canonical recorded scene-separator classifier.
 
 > **October 12 stronger coaching follow-up:** see [whole-scene model coaching,

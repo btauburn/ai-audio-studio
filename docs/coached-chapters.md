@@ -122,7 +122,7 @@ that conditions the voice. Spoken text is never rewritten.
 ## Running it
 
 ```powershell
-$run = 'C:/Users/brian/omni-audiobook/runtime_evidence/2026-10-12-coached-chapters-4-10'
+$run = 'C:/Users/brian/omni-audiobook/runtime_evidence/2026-10-12-coached-chapters-4-10-recovery-1'
 .\.venv\Scripts\python.exe scripts/render_coached_chapters.py `
   --epub C:\Users\brian\Downloads\ArKendrithyst.epub `
   --source-root C:\Users\brian\omni-audiobook\runtime_evidence\2026-09-28-autocast-elf-acceptance\projects `
@@ -156,11 +156,121 @@ retry and conflict, ambiguous pending dispatch, source/cast/neutral/clone drift,
 notification-counter tolerance, resume with a single worker, exclusions and scene
 separators, and fixture labeling of every receipt.
 
+
+## Executed chapter batch — October 12, 2026
+
+The renderer was committed and pushed **before chapter synthesis** in
+[`a6133e1`](https://github.com/btauburn/ai-audio-studio/commit/a6133e1dd6a6f922ae0d1209a69f9ea4715cceb8). All seven
+numbered EPUB chapters were then rendered to private WAV/MP3 exports and verified
+against their complete source maps. Every chapter remains `review_only`, with
+`human_review: pending`, `quality_improvement: not_established` and
+`production_ready: false`.
+
+| Chapter | MP3 duration | Coached dialogue | Reused neutral narration | Added boundary padding (s) | Measured MP3 LUFS |
+|---|---:|---:|---:|---:|---:|
+| 4 | 38:31 | 118 | 123 | 65.740 | -26.0 |
+| 5 | 25:18 | 90 | 85 | 49.100 | -26.2 |
+| 6 | 27:42 | 132 | 108 | 72.530 | -25.3 |
+| 7 | 19:47 | 73 | 58 | 36.540 | -24.9 |
+| 8 | 14:42 | 92 | 64 | 39.390 | -25.8 |
+| 9 | 17:04 | 93 | 70 | 43.360 | -25.6 |
+| 10 | 18:03 | 59 | 57 | 32.230 | -26.2 |
+
+Total listening audio: **2.685 hours**. The batch uses
+1,222 speech segments, with **657 instruction-conditioned dialogue samples** and
+**565 unchanged neutral narrator Takes**, retaining all five existing cloned
+identities. The exact EPUB, canonical source/Take contracts, clone references,
+prompt files, global voice registry and all 18 pre-existing local-file baselines
+were rechecked. No approval, Take selection, reference replacement, prose rewrite
+or global runtime switch was created.
+
+Measured boundary assembly added 338.889s across
+1215 speech boundaries. 152
+already contained enough measured silence and needed zero added padding. Source
+separators retain their recorded 1.25s target. No synthesized speech was trimmed.
+Master durations equal the sum of source clip durations and recorded padding;
+decoded MP3 duration agrees within 0.1s. LUFS is a measurement of each delivered
+file, not a claim of final mastering or a listening preference.
+
+The sum of the **final accepted dialogue samples' original request latencies** is
+2049.959s for
+3329.842s of generated dialogue. Peak sampled
+total-device VRAM was 8696MiB, including
+desktop/background allocations. These receipts span the original and recovery
+workers; the sum is not batch wall time, excludes discarded outputs/diagnostic
+probes, and is not a speed comparison. GPU requests were serial. The chat-owned
+idle review tree was parked and restored with the identical original runtime
+identity; the other review/production services were preserved.
+
+**Actual delegation and interpretation:** one Claude CLI `claude-sonnet-5-5`
+engineering worker implemented the batch module, CLI, 58 fixture checks and initial
+documentation. The root owned source reconciliation, the existing separator fix
+adoption, integration, additional checks, commit/push, GPU lane, recovery and
+private delivery. Seven further successful Sonnet 5.5 calls interpreted whole
+chapter-scene packets, with no tools or per-sentence calls. Raw provider responses
+and hashes remain private. Bounded editorial normalizations retained raw outputs,
+repaired source-evidence offsets and removed identity wording; evidence added by
+the root is marked as editorial. Haiku 6 was not needed. The eight captured Claude
+CLI receipts report $7.6430054 at list cost; this is not actual account billing or
+the cost of the complete root session.
+
+**Recovery evidence:** the original edition stopped at an overdriven single-word
+laugh that failed the blocking peak check. A separate recovery edition retained
+both original outputs and changed only two unapproved temporary directions: the
+laugh and a warning ending flagged by ASR. It verified and reused 358 raw samples,
+then generated 299 missing/revised samples; derived receipts were rebuilt against
+the current plan. The revised laugh passed QA. The warning's former eight-word
+tail deletion is absent from the revised ASR result, which still has two word
+substitutions. No prose or voice identity changed, and ASR does not prove acting
+quality.
+
+One subsequent HTTP400 reference-isolation replay refusal returned no audio
+before synthesis. The immutable acquisition and its exact full CPU replay passed
+fresh validation; plain, threaded, Base-loaded and post-synthesis diagnostic
+probes reproduced no recipe difference. The precise cause is unconfirmed. The
+original refusal/reservation was retained with a root-owned one-retry resolution;
+the fresh worker completed without a provenance or QA waiver. This is not an
+automatic retry of an unknown dispatch outcome.
+
+Offline CPU Whisper Base.en checked all 657 dialogue samples, with no downloads:
+516 edits over 10192 source words
+(5.06% ASR disagreement), 58 possible
+omissions and 97 tail-token mismatches. These include
+fantasy names, spelling and short interjections; they are supporting diagnostics,
+not confirmed errors. Existing neutral narration was hash-reused, not re-synthesized.
+The complete chapter receipts and all sample-level blocking technical QA passed.
+Human judgment of intelligibility, acting, voice consistency and transitions is
+still required.
+
+Verification: **58 batch checks and 284 selected regression checks passed**.
+Structured Codex review reported no accepted findings at its configured P0
+threshold; changed-content TruffleHog was clean. All seven private Brian-only
+players/downloads were checked with matching MP3 hashes and Range206; missing or
+wrong identity receives403. Earlier private Serve routes were preserved. Private
+EPUB prose, reference recordings, prompts, model packets and audio remain outside
+Git. The existing 20-line baseline/v1/v2 listening comparison remains available;
+the full chapters are new review exports, not blind comparative ratings or
+production approval.
+
+The completed recovery edition is:
+`C:/Users/brian/omni-audiobook/runtime_evidence/2026-10-12-coached-chapters-4-10-recovery-1`.
+Use the command above with this output directory and its `coaching/` directory.
+An identical completed `--generate` retry verifies existing artifacts and launches
+zero inference workers. Listening files are
+`chapters/<project-id>/chapter-004.mp3` through `chapter-010.mp3`, each alongside its
+WAV master and source-to-audio receipt. Run evidence is under the existing private
+Task Observer run `2026-10-12-coached-chapters-4-10`.
+
+Next evaluation remains **proposed**: calibrate instruction response for each
+approved clone using human preferences before promoting scene coaching into
+production. Native instruction forwarding is verified; a substantial acting
+improvement has not been established.
+
 ## Known limits
 
-* A real run exercises code paths the fixture cannot: real plan holds, real
-  scene sizes (analysis caps a scene at 40 utterances), the real worker and ffmpeg.
-  Nothing here is evidence that real audio exists or is better.
+* The measured run above exercises the real worker, ffmpeg, source and clone
+  contracts. Scene analysis still caps individual scenes at 40 utterances, and
+  successful technical checks do not establish better acting.
 * Preparation refuses rather than guesses when the EPUB hash is not a registered
   source revision of the chosen project (including the repaired chapter 7
   rendition) or a Take does not prove `faster-base-032`.
