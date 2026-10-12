@@ -148,7 +148,7 @@ production promotion is made.
   local-environment/private-capture skips; the installed environment passed the
   corresponding runtime/fingerprint composition checks.
 - JavaScript feature plus existing portrait, casting, transcript, comparison and
-  startup checks: 160 passed.
+  startup checks: 161 passed, including the final runtime-disposition regression.
 - Existing and directed Faster adapter/server unittest checks: 45 passed in the
   isolated Faster environment.
 - Broad CPU run: **3003 passed, 2 failed, 2 skipped, 162 subtests** in 1090.64 s.
