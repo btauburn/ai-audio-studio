@@ -104,8 +104,21 @@ test('rights are never invented: absent rights_status is shown as not recorded',
 test('scene recommendations are shown as source-bound, unapplied direction',async()=>{
   const s=surface({routes:GET_OK});await s.open.emit('click');
   const all=s.all();
-  for(const expected of ['Scene 1','wary','deflect','quick','never','after "never"','Controls this runtime supports','not applied to any voice or recording'])
+  for(const expected of ['Scene 1','wary','deflect','quick','never','after "never"','Engine control capabilities','not applied to any voice or recording'])
     assert.ok(all.includes(expected),'missing: '+expected);
+});
+
+test('a present capability record does not claim that default instructions are forwarded',async()=>{
+  const report={...REPORT,scenes:{...REPORT.scenes,controls:{requested:['native_instruction'],supported:{
+    'faster-base-032':{available:true,controls:{native_instruction:{state:'available_not_forwarded'},emotion_label:{state:'unsupported'}}},
+    'faster-base-032-direction-x1':{available:true,controls:{native_instruction:{state:'forwarded_experimental'}}}
+  }}}};
+  const s=surface({routes:{'GET ':json(200,report)}});await s.open.emit('click');
+  const all=s.all();
+  assert.ok(all.includes('faster-base-032: native instruction available not forwarded'));
+  assert.ok(all.includes('emotion label unsupported'));
+  assert.ok(all.includes('native instruction forwarded experimental'));
+  assert.equal(s.calls.length,1);
 });
 
 test('samples play only on click, one player at a time, and unverified or foreign audio is not playable',async()=>{
