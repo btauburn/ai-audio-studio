@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import re
 import wave
 from pathlib import Path
 from typing import Any
@@ -66,7 +65,7 @@ def _source_snapshot(project_id: str, chapter_id: str) -> tuple[Any, list, dict]
     original = meta.get("source_utterances") or []
     if [r.get("utterance_id") for r in original] != ids:
         raise ChapterExportError("Fork-time exact source utterance evidence is missing")
-    from .voice_lab_chapter import _hash, _source_proof
+    from .voice_lab_chapter import _hash, _source_proof, _scene_break
     if len(project.chapters) != 1 or _hash(_source_proof(project, original)) != meta.get("expected_source_hash"):
         raise ChapterExportError("Fork-time chapter identity or source/spoken-text revision history changed")
     for segment, expected in zip(segments, original):
@@ -84,17 +83,17 @@ def _source_snapshot(project_id: str, chapter_id: str) -> tuple[Any, list, dict]
     by_id = {s.id: s for s in segments}
     for record in breaks:
         segment = by_id[record["utterance_id"]]
-        if (not re.fullmatch(r"\s*\*{3,}\s*", segment.text)
+        if (not _scene_break(segment.text)
                 or record.get("source_text_sha256") != text_sha256(segment.text)
                 or record.get("index") != segment.index or record.get("duration_seconds") != 1.25):
-            raise ChapterExportError("Only explicit recorded star separators receive their 1.25-second scene pause")
+            raise ChapterExportError("Only explicit recorded source separators receive their 1.25-second scene pause")
     from .voice_lab_chapter import _validated_exclusions
     exclusions = _validated_exclusions(project, segments)
     excluded_ids = {row["utterance_id"] for row in exclusions}
     speech_ids = [sid for sid in ids if sid not in set(break_ids) | excluded_ids]
     if not speech_ids or speech_ids != meta.get("speech_utterance_ids"):
         raise ChapterExportError("Speech coverage does not match the explicit source scene-break manifest")
-    if any(re.fullmatch(r"\s*\*{3,}\s*", by_id[sid].text) for sid in speech_ids):
+    if any(_scene_break(by_id[sid].text) for sid in speech_ids):
         raise ChapterExportError("A source scene separator was incorrectly marked for synthesis")
     return project, segments, {"chapter_id": chapter_id, "chapter_title": chapter.title,
                                "metadata": meta, "source_utterance_ids": ids,

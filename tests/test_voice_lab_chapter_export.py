@@ -22,7 +22,8 @@ from dubbing_service.app.core.tts_operations import try_register_running_batch, 
 
 
 @pytest.fixture
-def chapter(monkeypatch, tmp_path):
+def chapter(monkeypatch, tmp_path, request):
+    scene_marker = getattr(request, "param", "***")
     root = use_projects_root(monkeypatch, tmp_path)
     project = build_project(name="isolated signal-only chapter fixture", chapter_titles=["Chapter 258: Fixture"])
     project.voice_lab.scope = "isolated_listening_test"
@@ -40,7 +41,7 @@ def chapter(monkeypatch, tmp_path):
     segments = []
     for i, name in enumerate(["narrator", None, "alden", "stuart", "library"]):
         segment = Segment(id=f"seg{i}", chapter_id="chap0", index=i, role_id=name or "narrator",
-                          text="***" if name is None else name + " fixture.",
+                          text=scene_marker if name is None else name + " fixture.",
                           source_anchor=SourceAnchor(source_revision_id=source.id, chapter_id="chap0", occurrence_index=i),
                           attribution=Attribution(speaker_id=name or "narrator", source="user"))
         if name:
@@ -64,7 +65,7 @@ def chapter(monkeypatch, tmp_path):
         "source_utterances": [{"utterance_id": s.id, "index": s.index, "chapter_id": s.chapter_id,
                  "source_text_sha256": text_sha256(s.text), "source_anchor": s.source_anchor.model_dump(mode="json"),
                  "spoken_text_revision_id": s.spoken_text_revision_id} for s in segments],
-        "scene_breaks": [{"utterance_id": "seg1", "index": 1, "source_text_sha256": text_sha256("***"), "duration_seconds": 1.25}],
+        "scene_breaks": [{"utterance_id": "seg1", "index": 1, "source_text_sha256": text_sha256(scene_marker), "duration_seconds": 1.25}],
     }
     from dubbing_service.app.audiobook.voice_lab_chapter import _hash, _source_proof
     project.metadata["chapter_rerun"]["expected_source_hash"] = _hash(_source_proof(project, project.metadata["chapter_rerun"]["source_utterances"]))
@@ -106,6 +107,21 @@ def test_complete_chapter_uses_all_actual_roles_no_five_minute_or_four_character
     assert result["loudness_measurement"]["audio_sha256"] == result["audio_sha256"]
     assert result["comparisons"][0]["passage_id"] == result["passage_id"]
     assert result["generation_totals"]["tts_generated_by_export"] == 0
+
+
+@pytest.mark.parametrize("chapter", ["- - -", "* * *", "___", "_ _ _"], indirect=True)
+def test_recorded_renderer_scene_separators_export_as_exact_pauses(chapter):
+    result = run(chapter)
+    assert result["duration_seconds"] == 3.25
+    assert result["map"][1]["kind"] == "scene_break"
+    assert result["map"][1]["end_seconds"] - result["map"][1]["start_seconds"] == 1.25
+
+
+@pytest.mark.parametrize("chapter", ["- -", "--- prose", "_word_", "* *"], indirect=True)
+def test_recorded_nonseparator_text_cannot_be_hidden_as_pause(chapter):
+    with pytest.raises(export.ChapterExportError, match="recorded source separators"):
+        run(chapter)
+    assert chapter[2]["mp3"] == 0
 
 
 def test_resuming_export_preserves_selected_take_files_and_reuses_master(chapter):
