@@ -97,7 +97,21 @@ def requirement_for(
     engine of its own is not reported as stale purely because some other engine
     is the process-wide default.  Declaring ``segment.tts_backend`` is what makes
     an engine switch detectable.
+
+    This is the single funnel through which the Performance Director's delivery
+    direction reaches a fingerprint (M4).  ``Project.metadata`` is otherwise
+    documented as never participating in a requirement, and reading the active
+    direction pointer here is the one deliberate exception to that note; see
+    ``performance_director`` and ``docs/performance_director.md``.  With no
+    index — which is every project today — the call below reads no performance
+    storage at all and the requirement is byte-identical to before M4.
     """
+
+    from .performance_director import PerformanceDirectorError, requirement_direction
+
+    if "performance_direction" in overrides:
+        raise PerformanceDirectorError("direction_conflict", "performance_direction is owned by the active direction loader")
+    overrides["performance_direction"] = requirement_direction(project, segment)
 
     if role is None and segment.role_id:
         canonical_role = segment.role_id

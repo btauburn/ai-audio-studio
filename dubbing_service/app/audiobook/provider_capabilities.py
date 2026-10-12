@@ -231,3 +231,190 @@ def synthesis_components(backend: str, identity: dict | None = None) -> dict[str
         "model_revision": checkpoint.get("model_content_sha256") or checkpoint.get("manifest_revision") or "unknown",
         "runtime_version": hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest(),
         "decoder_version": runtime.get("qwen_tts_version") or "unknown"}
+
+
+PERFORMANCE_CAPABILITY_SCHEMA = "performance-capability-v1"
+EXPERIMENTAL_DIRECTION_PROFILE = "faster-base-032-direction-x1"
+
+_KNOWN_RUNTIME_PROFILES = ("faster-base-032", EXPERIMENTAL_DIRECTION_PROFILE, "native-base", "native-current")
+_FASTER_ENVIRONMENT = "environments/faster_qwen_base032"
+_UNKNOWN_PROFILE_REASON = "unknown runtime profile"
+_PREPARE_GENERATION_RE = re.compile(r"def _prepare_generation\((.*?)\)\s*(?:->[^:]*)?:", re.DOTALL)
+
+
+def _text_or_none(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _faster_site_packages(root: Path) -> Path | None:
+    """The Faster site-packages folder that actually holds the library today."""
+
+    venv = root / _FASTER_ENVIRONMENT / ".venv"
+    candidates = [venv / "Lib" / "site-packages", *sorted((venv / "lib").glob("python*/site-packages"))]
+    for candidate in candidates:
+        if (candidate / "faster_qwen3_tts" / "model.py").is_file():
+            return candidate
+    return None
+
+
+def _faster_version(site_packages: Path) -> str | None:
+    for metadata_path in sorted(site_packages.glob("faster_qwen3_tts-*.dist-info/METADATA")):
+        text = _text_or_none(metadata_path)
+        if text is None:
+            continue
+        for line in text.splitlines():
+            if line[:1].isspace() or ":" not in line:
+                continue
+            name, _, value = line.partition(":")
+            if name.strip().casefold() == "version":
+                return value.strip() or None
+    return None
+
+
+def _library_accepts_instruct(model_text: str | None) -> bool:
+    if not model_text:
+        return False
+    match = _PREPARE_GENERATION_RE.search(model_text)
+    return bool(match) and "instruct" in match.group(1)
+
+
+def _performance_control(state: str, stage: str, review_copy_eligible: bool, reason: str) -> dict[str, Any]:
+    return {"state": state, "stage": stage, "review_copy_eligible": review_copy_eligible, "reason": reason}
+
+
+def performance_capabilities(runtime_profile: str, identity: dict | None = None, *,
+                             repo_root: Path | None = None) -> dict[str, Any]:
+    """Which delivery controls this runtime really applies. Reads files; loads nothing."""
+
+    root = repo_root or REPO_ROOT
+    site_packages = _faster_site_packages(root)
+    library_accepts_instruct = _library_accepts_instruct(
+        _text_or_none(site_packages / "faster_qwen3_tts" / "model.py") if site_packages else None)
+    try:
+        adapter_bytes: bytes | None = (root / "service" / "faster_qwen3tts_base_adapter.py").read_bytes()
+    except OSError:
+        adapter_bytes = None
+    adapter_forwards_instruct = adapter_bytes is not None and b"instruct" in adapter_bytes
+    direction_adapter_sha256 = _sha256(root / "service" / "faster_qwen3tts_base_direction_adapter.py")
+
+    identity_mechanism = (identity or {}).get("mechanism")
+    if identity_mechanism == "qwen_reference":
+        conditioning_mode = (identity or {}).get("clone_mode") or (identity or {}).get("mode") or "icl"
+    else:
+        conditioning_mode = "not_applicable"
+
+    evidence = {
+        "faster_version": _faster_version(site_packages) if site_packages else None,
+        "faster_model_sha256": _sha256(site_packages / "faster_qwen3_tts" / "model.py") if site_packages else None,
+        "faster_generate_sha256": _sha256(site_packages / "faster_qwen3_tts" / "generate.py") if site_packages else None,
+        "library_accepts_instruct": library_accepts_instruct,
+        "adapter_sha256": _sha256(root / "service" / "faster_qwen3tts_base_adapter.py"),
+        "adapter_forwards_instruct": adapter_forwards_instruct,
+        "direction_adapter_sha256": direction_adapter_sha256,
+        "base_manifest_sha256": _sha256(root / "models" / "manifests" / "qwen3_tts_base.json"),
+    }
+
+    if runtime_profile not in _KNOWN_RUNTIME_PROFILES:
+        controls = {
+            name: _performance_control("unsupported", stage, False, _UNKNOWN_PROFILE_REASON)
+            for name, stage in (("native_instruction", "native"), ("emotion_label", "native"),
+                                ("intensity", "native"), ("emphasis", "native"),
+                                ("role_delivery", "native"), ("pace", "postprocess"),
+                                ("volume", "postprocess"), ("numeric_rate", "native"),
+                                ("seed", "native"))
+        }
+    else:
+        if runtime_profile in ("native-base", "native-current"):
+            instruction = _performance_control(
+                "unsupported", "native", False,
+                "the native profiles forward no natural-language performance instruction")
+        elif runtime_profile == "faster-base-032":
+            if library_accepts_instruct and not adapter_forwards_instruct:
+                instruction = _performance_control(
+                    "available_not_forwarded", "native", True,
+                    "the installed library accepts instruct but service/faster_qwen3tts_base_adapter.py does not forward it")
+            elif not library_accepts_instruct:
+                instruction = _performance_control(
+                    "unsupported", "native", False,
+                    "the installed library's _prepare_generation does not accept an instruct argument")
+            else:
+                instruction = _performance_control(
+                    "unsupported", "native", False,
+                    "service/faster_qwen3tts_base_adapter.py already forwards instruct; the experimental direction profile owns that path")
+        else:
+            failed = []
+            if not library_accepts_instruct:
+                failed.append("the installed library's _prepare_generation does not accept an instruct argument")
+            if direction_adapter_sha256 is None:
+                failed.append("service/faster_qwen3tts_base_direction_adapter.py is missing")
+            if identity_mechanism != "qwen_reference":
+                failed.append("the identity mechanism is not qwen_reference")
+            if conditioning_mode != "icl":
+                failed.append(f"the conditioning mode is {conditioning_mode}, not icl")
+            if failed:
+                instruction = _performance_control("unsupported", "native", False, "; ".join(failed))
+            else:
+                instruction = _performance_control(
+                    "forwarded_experimental", "native", True,
+                    "the experimental direction adapter forwards instruct for an icl reference identity")
+
+        postprocess_state = "available" if identity_mechanism == "qwen_reference" else "unsupported"
+        postprocess_reason = ("the project changes this after synthesis" if postprocess_state == "available"
+                              else "postprocess control requires a qwen_reference identity")
+        controls = {
+            "native_instruction": instruction,
+            "emotion_label": _performance_control("unsupported", "native", False,
+                                                  "no emotion label is forwarded to this runtime"),
+            "intensity": _performance_control("unsupported", "native", False,
+                                              "no intensity parameter is forwarded to this runtime"),
+            "emphasis": _performance_control("unsupported", "native", False,
+                                             "no emphasis parameter is forwarded to this runtime"),
+            "role_delivery": _performance_control("unsupported", "native", False,
+                                                  "no role delivery parameter is forwarded to this runtime"),
+            "pace": _performance_control(postprocess_state, "postprocess", False, postprocess_reason),
+            "volume": _performance_control(postprocess_state, "postprocess", False, postprocess_reason),
+            "numeric_rate": _performance_control("unsupported", "native", False,
+                                                 "there is no numeric rate parameter; the runtime takes no tokens per second or percent change"),
+            "seed": _performance_control("unsupported", "native", False,
+                                         "the worker derives the seed from identity and text"),
+        }
+
+    record = {
+        "schema_version": PERFORMANCE_CAPABILITY_SCHEMA,
+        "runtime_profile": runtime_profile,
+        "backend": "qwen3tts",
+        "identity_mechanism": identity_mechanism,
+        "conditioning_mode": conditioning_mode,
+        "evidence": evidence,
+        "controls": controls,
+    }
+    record["sha256"] = hashlib.sha256(
+        json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    return record
+
+
+def experimental_direction_capabilities(runtime_profile, identity=None, *, repo_root=None):
+    """M5 capability extension; the accepted M1/default probe remains unchanged.
+
+    Explicit experimental seed support is tied to the hashed new adapter. No
+    default profile gains this control, and no model or provider is imported.
+    """
+    record = performance_capabilities(runtime_profile, identity, repo_root=repo_root)
+    root = Path(repo_root) if repo_root is not None else REPO_ROOT
+    try:
+        source = (root / 'service/faster_qwen3tts_base_direction_adapter.py').read_text(encoding='utf-8')
+    except OSError:
+        source = ''
+    if (runtime_profile == 'faster-base-032-direction-x1'
+            and record['controls']['native_instruction']['state'] == 'forwarded_experimental'
+            and 'def _apply_seed(' in source and 'torch.manual_seed(effective)' in source):
+        record['controls']['seed'] = _performance_control('forwarded_experimental', 'native', True,
+                                                          'experimental adapter applies an explicit bounded seed salt after identity/text seeding')
+        record['evidence']['seed_policy'] = 'identity-text-plus-explicit-salt-mod-2^32'
+        payload = {key: value for key, value in record.items() if key != 'sha256'}
+        record['sha256'] = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')).hexdigest()
+    return record

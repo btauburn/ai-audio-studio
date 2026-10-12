@@ -32,13 +32,20 @@ def strict_casting_enabled(project: Any) -> bool:
     )
 
 
-def current_frozen_binding(project: Any, segments: list) -> dict | None:
+def current_frozen_binding(project: Any, segments: list, *, allow_experimental: bool = False) -> dict | None:
     """Validate selected Takes against one current frozen manifest, if required.
 
     Legacy projects return ``None`` and preserve their existing export behavior.
     Strict projects must prove current source/cast approvals, exact per-utterance
     requirement fingerprints, playable Take provenance, and unchanged bytes.
     """
+    if not allow_experimental:
+        from .runtime_binding import require_production_take, RuntimeBindingError
+        try:
+            for segment in segments:
+                require_production_take(takes.selected_take(segment))
+        except RuntimeBindingError as exc:
+            raise CastingAssemblyError(str(exc)) from exc
     if not strict_casting_enabled(project):
         return None
     from . import casting_review

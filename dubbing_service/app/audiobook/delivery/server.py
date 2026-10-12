@@ -470,3 +470,62 @@ def create_app(config: dict) -> FastAPI:
         return {"feedback": store.list_feedback(state_dir, batch_id)}
 
     return app
+
+
+# ---------------------------------------------------------------------------
+# Additive opt-in route installation for the live review pilot.
+#
+# The module above is preserved byte-for-byte as an exact prefix of this file.
+# The wrapper below is the only addition: it returns the original app unchanged
+# unless the operator explicitly enabled the pilot owner store.
+# ---------------------------------------------------------------------------
+
+_create_app_without_live_owner = create_app
+
+
+def create_app(config: dict) -> FastAPI:
+    """Build the private listener, adding the owner grant route only on explicit opt-in.
+
+    The added route sits behind this module's existing boundary middleware, so it
+    is reachable only from the Tailscale-authenticated loopback connection.  With
+    no opt-in configuration the original app is returned untouched and the pilot
+    owner seam stays fail-closed.
+    """
+
+    app = _create_app_without_live_owner(config)
+    from dubbing_service.app.audiobook import performance_live_owner as live_owner
+    if live_owner.configure_live_owner(config) is None:
+        return app
+    _install_live_owner_routes(app, config)
+    return app
+
+
+def _install_live_owner_routes(app: FastAPI, config: dict) -> None:
+    """Install the one bounded grant route.  It can only issue, never approve."""
+
+    from dubbing_service.app.audiobook import performance_live_owner as live_owner
+
+    @app.post(live_owner.GRANT_ROUTE)
+    async def issue_live_owner_grant(request: Request):
+        if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+            raise HTTPException(415, "A JSON grant request is required")
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > live_owner.MAX_GRANT_BYTES:
+                raise HTTPException(413, "The grant request is too large")
+        try:
+            payload = json.loads(bytes(body).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(422, "Invalid grant request") from None
+        if not isinstance(payload, dict) or set(payload) != {"scope"}:
+            raise HTTPException(422, "A grant request carries exactly one scope")
+        try:
+            receipt = live_owner.issue_allocation_grant(config, request=request,
+                                                        scope=payload["scope"])
+        except live_owner.LiveOwnerError as exc:
+            raise HTTPException(403, str(exc)) from None
+        return {"grant_id": receipt["grant_id"], "issued_at": receipt["issued_at"],
+                "scope_sha256": receipt["scope_sha256"], "purpose": receipt["purpose"],
+                "reference": live_owner.receipt_reference(receipt),
+                "listening_approval": False, "production_enablement": False}

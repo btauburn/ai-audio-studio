@@ -67,7 +67,8 @@ def ensure_backend_ready(backend: str, *, job_id: str | None = None, project_id:
                           for job in load_jobs(path.parent.name))
             owned = settings._tts_process is not None and settings._tts_process.poll() is None
             if not owned or has_active_tts_operation() or pending:
-                label = "Faster Qwen" if profile == "faster-base-032" else "native Qwen"
+                label = ("Experimental directed Faster Qwen" if profile == "faster-base-032-direction-x1"
+                         else "Faster Qwen" if profile == "faster-base-032" else "native Qwen")
                 raise ValueError(f"Waiting for {label} worker. The active worker is busy or externally owned; no fallback was used. Resume this saved request after the operator activates the selected runtime.")
             settings.api_start_tts_service(settings.TTSServiceStartPayload(
                 backend=backend, persist_default=False, preserve_outputs=True,

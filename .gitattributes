@@ -19,3 +19,7 @@ examples/voice_11.wav filter=lfs diff=lfs merge=lfs -text
 # Frozen acquisition QC receipts hash these exact source bytes.
 dubbing_service/app/audiobook/reference_source_qc.py text eol=lf whitespace=-blank-at-eof
 dubbing_service/app/audiobook/reference_preparation.py text eol=lf whitespace=-blank-at-eof
+
+# Experimental runtime identity hashes these new worker source bytes.
+service/faster_qwen3tts_base_direction_adapter.py text eol=lf
+service/faster_qwen3tts_base_direction_server.py text eol=lf

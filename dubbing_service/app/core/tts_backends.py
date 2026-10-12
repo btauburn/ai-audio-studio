@@ -132,9 +132,10 @@ def build_backend_command(
     environment = spec.environment
     server_script = spec.server_script
     attention = qwen_attention
-    if backend_id == "qwen3tts" and qwen_execution_profile == "faster-base-032":
+    if backend_id == "qwen3tts" and qwen_execution_profile in {"faster-base-032", "faster-base-032-direction-x1"}:
         environment = "faster_qwen_base032"
-        server_script = "service/faster_qwen3tts_base_server.py"
+        server_script = ("service/faster_qwen3tts_base_direction_server.py" if qwen_execution_profile == "faster-base-032-direction-x1"
+                         else "service/faster_qwen3tts_base_server.py")
     elif backend_id == "qwen3tts" and qwen_execution_profile not in {"native-current", "native-sdpa", "qwen-cudagraph"}:
         raise ValueError(f"unsupported Qwen Base execution profile: {qwen_execution_profile}")
     if backend_id == "qwen3tts_cv":

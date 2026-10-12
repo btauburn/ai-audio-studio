@@ -723,6 +723,12 @@ def _run(project_id, request_id, binding, renderer=None):
 
 
 def _selected_audio(project, segments):
+    from .runtime_binding import require_production_take, RuntimeBindingError
+    try:
+        for segment in segments:
+            require_production_take(takes.selected_take(segment))
+    except RuntimeBindingError as exc:
+        raise BookCreatorError(str(exc)) from exc
     root = safe_project_root(project.id)
     casting_binding = current_frozen_binding(project, segments)
     coverage = release.check_coverage(segments, project_root=root, verify_bytes=True, require_qa=True)

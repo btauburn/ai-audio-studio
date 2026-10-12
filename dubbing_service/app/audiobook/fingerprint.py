@@ -58,6 +58,7 @@ AUDIO_AFFECTING_COMPONENTS = frozenset(
         "temperature",
         "top_p",
         "continuation_context_hash",
+        "performance_direction",
     }
 )
 
@@ -152,6 +153,12 @@ class SynthesisRequirement(BaseModel):
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     continuation_context_hash: Optional[str] = None
+    #: M4.  The Performance Director delivery component: the SHA-256 of the
+    #: canonical ``{control_policy, native_instruction, seed_salt}``.  It is
+    #: present only when a native instruction or a seed salt really reaches the
+    #: runtime, so a project that forwards nothing keeps its existing
+    #: fingerprints byte for byte.  See ``docs/performance_director.md``.
+    performance_direction: Optional[str] = None
 
     def components(self) -> Dict[str, str]:
         """Normalized, stable component map (the hashed payload)."""
@@ -188,6 +195,11 @@ class SynthesisRequirement(BaseModel):
         # their v1 fingerprints; include gain only when the renderer bakes it.
         if self.volume is not None:
             components["volume"] = _num(self.volume)
+        # Same precedent as volume: a delivery direction is serialized only when
+        # one is really forwarded, so adding this component cannot stale a Take
+        # that no instruction reached.
+        if self.performance_direction is not None:
+            components["performance_direction"] = self.performance_direction
         return components
 
     def fingerprint(self) -> str:
@@ -267,6 +279,7 @@ def build_requirement(
     temperature: Optional[float] = None,
     top_p: Optional[float] = None,
     continuation_context_hash: Optional[str] = None,
+    performance_direction: Optional[str] = None,
 ) -> SynthesisRequirement:
     engine_components = engine_components or {}
     return SynthesisRequirement(
@@ -297,6 +310,7 @@ def build_requirement(
         temperature=temperature,
         top_p=top_p,
         continuation_context_hash=continuation_context_hash,
+        performance_direction=performance_direction,
     )
 
 
@@ -316,6 +330,7 @@ def requirement_for_segment(
     pitch: Optional[float] = None,
     emphasis: Optional[str] = None,
     language: Optional[str] = None,
+    performance_direction: Optional[str] = None,
 ) -> SynthesisRequirement:
     """Gather the live requirement for one utterance from canonical state.
 
@@ -358,6 +373,7 @@ def requirement_for_segment(
         pitch=pitch,
         emphasis=emphasis,
         continuation_context_hash=continuation_context_hash,
+        performance_direction=performance_direction,
     )
 
 

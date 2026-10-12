@@ -456,5 +456,10 @@ class Project(BaseModel):
     )
     metadata: Dict[str, Any] = Field(
         default_factory=dict,
-        description="非音频元数据（书名、作者、来源路径、分析工具版本等）；不参与合成指纹",
+        description=(
+            "非音频元数据（书名、作者、来源路径、分析工具版本等）；不参与合成指纹。"
+            "唯一例外：Performance Director 的活动方向指针 "
+            "metadata['performance_director']，它由 pipeline.requirement_for 读取，"
+            "用来决定是否传入 performance_direction 组件（仅在真的转发指令或盐值时出现）。"
+        ),
     )

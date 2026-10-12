@@ -105,7 +105,7 @@ def _source_snapshot(project_id: str, chapter_id: str) -> tuple[Any, list, dict]
 def _take_snapshot(project: Any, segments: list, source: dict) -> tuple[list, list, dict]:
     root = safe_project_root(project.id)
     speech = [s for s in segments if s.id in source["speech_utterance_ids"]]
-    casting_binding = current_frozen_binding(project, speech)
+    casting_binding = current_frozen_binding(project, speech, allow_experimental=True)
     coverage = release.check_coverage(speech, project_root=root, verify_bytes=True, require_qa=True)
     if not coverage.ready:
         raise ChapterExportError("Selected chapter Takes fail blocking release QA: " + json.dumps(coverage.as_dict()))
@@ -161,7 +161,11 @@ def _take_snapshot(project: Any, segments: list, source: dict) -> tuple[list, li
     state = {"source": source, "selections": selections,
              "cast": [r.model_dump(mode="json") for r in project.roles if r.id in {s.role_id for s in speech}],
              "casting_binding": casting_binding}
-    return paths, selections, {"state_sha256": _digest(state), "proof": proof}
+    from .runtime_binding import take_runtime_profiles, PRODUCTION_RUNTIME_PROFILES
+    experimental = any(take_runtime_profiles(takes.selected_take(segment)) - PRODUCTION_RUNTIME_PROFILES for segment in speech)
+    if experimental:
+        state['experimental_runtime'] = {segment.id: sorted(take_runtime_profiles(takes.selected_take(segment))) for segment in speech}
+    return paths, selections, {"state_sha256": _digest(state), "proof": proof, "experimental_runtime": experimental}
 
 
 def _pause(reference: Path, target: Path, seconds: float) -> None:
@@ -255,6 +259,7 @@ def export_chapter(project_id: str, chapter_id: str) -> dict:
             if loudness is None or not math.isfinite(loudness):
                 raise ChapterExportError("Listening file loudness could not be measured")
             result = {"schema": "voice-lab-chapter-review-v1", "status": "ready_for_listening",
+                      "experimental_runtime": snapshot["experimental_runtime"],
                       "chapter_id": chapter_id, "chapter_title": source["chapter_title"],
                       "manifest_id": passage_id, "passage_id": passage_id,
                       "state_sha256": snapshot["state_sha256"], "selections": selections,

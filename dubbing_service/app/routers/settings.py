@@ -998,7 +998,7 @@ class TTSServiceStartPayload(BaseModel):
     fp32: bool = Field(False, description="是否使用 FP32（仅 IndexTTS2）")
     only_if_absent: bool = Field(False, description="Refuse replacing an existing managed worker")
     preserve_outputs: bool = Field(False, description="Disable Qwen VoiceDesign/Base output retention cleanup for this launch")
-    qwen_execution_profile: Literal["native-current", "native-sdpa", "qwen-cudagraph", "faster-base-032"] | None = None
+    qwen_execution_profile: Literal["native-current", "native-sdpa", "qwen-cudagraph", "faster-base-032", "faster-base-032-direction-x1"] | None = None
     persist_default: bool = Field(
         True,
         description="是否同时将本次启动的后端保存为平台默认后端；自动任务切换 worker 时应设为 false",

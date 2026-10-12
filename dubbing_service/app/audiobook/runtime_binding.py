@@ -11,6 +11,38 @@ class RuntimeBindingError(RuntimeError):
     pass
 
 
+DIRECTION_RUNTIME_PROFILE = 'faster-base-032-direction-x1'
+PRODUCTION_RUNTIME_PROFILES = frozenset({'native-base', 'faster-base-032'})
+
+
+def take_runtime_profiles(take):
+    """Read all recorded runtime declarations, including renderer provider calls.
+
+    Legacy Takes with no declaration retain their existing validation path.
+    Any explicit non-production declaration prevents production export.
+    """
+    profiles = set()
+    def visit(value):
+        if isinstance(value, dict):
+            if 'runtime_profile' in value:
+                profile = value['runtime_profile']
+                profiles.add(profile if isinstance(profile, str) else '<invalid>')
+            if isinstance(value.get('direction'), dict):
+                profiles.add(DIRECTION_RUNTIME_PROFILE)
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+    visit(getattr(take, 'generation_metadata', None) or {})
+    return profiles
+
+
+def require_production_take(take):
+    if take is not None and take_runtime_profiles(take) - PRODUCTION_RUNTIME_PROFILES:
+        raise RuntimeBindingError('Experimental runtime Takes are review-only and cannot enter a production export')
+
+
 def canonical_backend(value):
     return 'qwen3tts' if value in {'qwen3tts', 'qwen3tts_voicedesign'} else value
 
@@ -23,7 +55,7 @@ def validate_worker(value):
     if (not isinstance(value, dict) or not isinstance(value.get('contract'), dict)
             or value.get('sha256') != digest(value['contract'])
             or value['contract'].get('schema') != 'qwen-base-worker-identity-v1'
-            or value['contract'].get('runtime_profile') not in {'native-base', 'faster-base-032'}
+            or value['contract'].get('runtime_profile') not in PRODUCTION_RUNTIME_PROFILES | {DIRECTION_RUNTIME_PROFILE}
             or value['contract'].get('fallback') != 'disabled'):
         raise RuntimeBindingError('Worker runtime identity is missing or invalid; no synthesis or cache reuse is allowed')
     return value

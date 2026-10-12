@@ -451,6 +451,12 @@ def export_chapter(project_id, request_id, chapter_id, number=None):
               and not SCENE_BREAK_RE.fullmatch(s.text)]
     if not speech:
         raise BookError("This chapter has no spoken utterances to assemble")
+    from .runtime_binding import require_production_take, RuntimeBindingError
+    try:
+        for segment in speech:
+            require_production_take(takes.selected_take(segment))
+    except RuntimeBindingError as exc:
+        raise BookError(str(exc)) from exc
     root = safe_project_root(project_id)
     coverage = release.check_coverage(speech, project_root=root, verify_bytes=True, require_qa=True)
     if not coverage.ready:
