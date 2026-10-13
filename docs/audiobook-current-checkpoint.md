@@ -6,8 +6,10 @@
 > casting can use an explicitly authorized private review bound to the original
 > same-book, same-role clone and its current source-use context. Source permission,
 > role-fit approval and listening quality remain separate. No model/default switch,
-> voice promotion or human approval is created. Chapter 11 rendering is pending;
-> improved acting quality is not established.
+> voice promotion or human approval is created. [Chapter 11 results and launch
+> instructions](character-memory-chapter-11-results.md) now verify the complete
+> private review audio,791 automated checks, instruction forwarding, measured
+> boundaries and a zero-worker retry. Improved acting quality is not established.
 
 > **October 12 chapters 4–10:** [resumable full-chapter V2 rendering](coached-chapters.md)
 > preserves the existing cloned cast, reuses verified neutral narration and
