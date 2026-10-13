@@ -32,6 +32,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+from . import character_performance_memory as memory_seam
 from . import epub_chapter_selection, performance_boundaries as boundaries, qa, scene_coaching
 from . import scene_dialogue_plan as plans, takes
 from . import voice_lab_chapter_export as exporter
@@ -44,6 +45,8 @@ STATE_SCHEMA = "coached-chapter-batch-state-v1"
 APPLIED_SCHEMA = "coached-chapter-applied-v1"
 CHAPTER_SCHEMA = "coached-chapter-review-v1"
 RESULT_SCHEMA = "coached-chapter-batch-result-v1"
+MEMORY_BINDING_SCHEMA = "coached-chapter-memory-binding-v1"
+MEMORY_FILE = "memory/performance-memory.json"
 NEUTRAL_PROFILE = "faster-base-032"
 SEPARATOR_TARGET_MS = 1250
 FIXTURE_LABEL = "Synthetic CPU test fixture; excluded from production readiness"
@@ -134,9 +137,11 @@ def _config(args):
         raise BatchError("Output must be a separate directory outside the canonical project store")
     coaching = getattr(args, "coaching_dir", None)
     epub = getattr(args, "epub", None)
+    memory = getattr(args, "performance_memory", None)
     return SimpleNamespace(epub=Path(epub).resolve() if epub else None, source_root=source_root, projects=projects,
                            chapters=chapters, output_dir=output,
-                           coaching_dir=Path(coaching).resolve() if coaching else None)
+                           coaching_dir=Path(coaching).resolve() if coaching else None,
+                           performance_memory=Path(memory).resolve() if memory else None)
 
 
 def _frozen_sha(state):
@@ -166,7 +171,79 @@ def load_state(output_dir):
         for pid, row in state[kind].items():
             if pilot().sha((output / row["file"]).read_bytes()) != row["sha256"]:
                 raise BatchError(f"Published {kind[:-1]} for {pid} changed since preparation")
+    _verify_memory_binding(output, state)
     return state
+
+
+# ---------------------------------------------------------------------------------------- memory
+
+
+def _read_memory(path, book_sha256):
+    """Parse and fully validate an optional performance-memory bundle."""
+    path = Path(path)
+    if not path.is_file():
+        raise BatchError(f"Performance memory file not found: {path}")
+    raw = path.read_bytes()
+    try:
+        bundle = json.loads(raw)
+    except ValueError as exc:
+        raise BatchError(f"Performance memory is not valid JSON: {exc}") from exc
+    summary = memory_seam.validate_bundle(bundle)
+    if summary["book_sha256"] != book_sha256:
+        raise BatchError("Performance memory was captured for a different book than this EPUB")
+    return {"summary": summary, "raw": raw, "bundle": bundle}
+
+
+def _memory_binding(memory):
+    summary = memory["summary"]
+    return {"schema_version": MEMORY_BINDING_SCHEMA, "memory_sha256": summary["memory_sha256"],
+            "file": MEMORY_FILE, "file_sha256": pilot().sha(memory["raw"]), "book_sha256": summary["book_sha256"],
+            "request_sha256": summary["request_sha256"], "response_sha256": summary["response_sha256"],
+            "model_requested": summary["provenance"]["model_requested"],
+            "profile_roles": sorted(summary["profiles"]), "narrator_roles": list(summary["narrator_role_ids"]),
+            "interpretation": memory_seam.STATUS, "approved": False,
+            "fixture": memory["bundle"]["provenance"].get("fixture") is True}
+
+
+def _verify_memory_binding(output, state):
+    """A bound state must still hold its immutable private memory and carry it in every frozen request."""
+    binding = state.get("performance_memory")
+    carried = {}
+    for pid, row in state["requests"].items():
+        try:
+            carried[pid] = memory_seam.enriched_memory_sha256(json.loads((output / row["file"]).read_bytes()))
+        except ValueError as exc:
+            raise BatchError(f"{pid}: {exc}") from exc
+    if binding is None:
+        if any(carried.values()) or any("performance_memory_sha256" in r for r in state["requests"].values()):
+            raise BatchError("A frozen request carries a performance memory but the state has no memory binding")
+        return
+    if binding.get("schema_version") != MEMORY_BINDING_SCHEMA:
+        raise BatchError("Unknown performance memory binding")
+    path = output / binding["file"]
+    if not path.is_file() or pilot().sha(path.read_bytes()) != binding["file_sha256"]:
+        raise BatchError("The private performance memory bound to this batch is missing or changed")
+    if _read_memory(path, binding["book_sha256"])["summary"]["memory_sha256"] != binding["memory_sha256"]:
+        raise BatchError("The private performance memory no longer matches its binding")
+    if set(carried.values()) - {binding["memory_sha256"]} or any(
+            row.get("performance_memory_sha256") != binding["memory_sha256"] for row in state["requests"].values()):
+        raise BatchError("A frozen request is not bound to the batch's performance memory")
+
+
+def _require_same_memory(state, cfg):
+    """Resume rule: a bound batch holds unless the identical memory is supplied; an unbound one never gains one."""
+    binding = state.get("performance_memory")
+    supplied = cfg.performance_memory
+    if binding is None:
+        if supplied is not None:
+            raise BatchError("This output directory was prepared without performance memory; "
+                             "use a new output directory to add one")
+        return
+    if supplied is None:
+        raise BatchError("This batch is bound to performance memory " + binding["memory_sha256"][:16]
+                         + "; supply the same --performance-memory to resume (it will not be silently reused)")
+    if _read_memory(supplied, state["epub"]["sha256"])["summary"]["memory_sha256"] != binding["memory_sha256"]:
+        raise BatchError("The supplied performance memory differs from the memory bound at preparation; holding")
 
 
 def _require_same_batch(state, cfg):
@@ -210,7 +287,7 @@ def _verify_prose(epub_text, segments):
     return len(expected)
 
 
-def _prepare_chapter(cfg, book, chapter, project_id, plan_builder):
+def _prepare_chapter(cfg, book, chapter, project_id, plan_builder, memory=None):
     p, output = pilot(), cfg.output_dir
     source_folder = cfg.source_root / project_id
     before = p.read_source(cfg.source_root, project_id)
@@ -236,6 +313,13 @@ def _prepare_chapter(cfg, book, chapter, project_id, plan_builder):
         if roles[role_id].tts_backend != "qwen3tts":
             raise BatchError(f"{project_id}:{role_id} is not assigned to the Qwen Base route")
         p.verify_identity_files(source_folder, entry["identity"])
+    if memory is not None:  # before anything for this chapter is published
+        if memory["bundle"]["provenance"].get("fixture") is True and not (
+                project.metadata.get("coached_batch_fixture") is True
+                or project.metadata.get("scene_pilot_fixture") is True):
+            raise BatchError(f"{project_id}: a fixture performance memory may not condition non-fixture chapters")
+        memory_seam.require_role_coverage(memory["summary"], [
+            (rid, table[rid]["name"], table[rid]["narrator"]) for rid in sorted({s.role_id for s in speech})])
     paths, selections, evidence = exporter._take_snapshot(project, segments, source)
     for segment in speech:
         if take_runtime_profiles(takes.selected_take(segment)) != {NEUTRAL_PROFILE}:
@@ -298,6 +382,8 @@ def _prepare_chapter(cfg, book, chapter, project_id, plan_builder):
     if plan.get("source", {}).get("proven") is not True:
         holds.append({"code": "source_unproven", "detail": "base plan has no proven source revision"})
     request = None if holds else _build_request(project_id, plan, segments, table, lines)
+    if request is not None and memory is not None:
+        request = memory_seam.enrich_coaching_request(request, memory["bundle"], book_sha256=book["source_sha256"])
     request_info = None
     if request is not None:
         request_file = output / "requests" / f"request-{project_id}.json"
@@ -305,6 +391,8 @@ def _prepare_chapter(cfg, book, chapter, project_id, plan_builder):
         request_info = {"file": _relative(request_file, output), "sha256": p.sha(request_file.read_bytes()),
                         "request_sha256": plans._sha(request), "scenes": len(request["scenes"]),
                         "dialogue_ids": [line["utterance_id"] for line in dialogue]}
+        if memory is not None:
+            request_info["performance_memory_sha256"] = memory["summary"]["memory_sha256"]
 
     voices = {line["voice"]["id"] for line in dialogue}
     copied = p.prepare_isolated_project(source_folder, output / "projects" / project_id, voices)
@@ -380,14 +468,20 @@ def prepare_batch(args, *, plan_builder=None):
         if (out / "state.json").is_file():
             state = load_state(out)
             _require_same_batch(state, cfg)
+            _require_same_memory(state, cfg)
             return state
         data = cfg.epub.read_bytes()
         book = epub_chapter_selection.select_epub_chapters(data, cfg.epub.name, chapter_numbers=cfg.chapters)
+        memory = None
+        if cfg.performance_memory is not None:  # fully validated before any output exists
+            memory = _read_memory(cfg.performance_memory, book["source_sha256"])
         out.mkdir(parents=True, exist_ok=True)
+        if memory is not None:  # exact immutable private capture; an identical retry is a no-op
+            p.publish(out / MEMORY_FILE, memory["raw"])
         built = []
         with _projects_root(cfg.source_root):
             for chapter, project_id in zip(book["chapters"], cfg.projects):
-                built.append(_prepare_chapter(cfg, book, chapter, project_id, plan_builder or _build_plan))
+                built.append(_prepare_chapter(cfg, book, chapter, project_id, plan_builder or _build_plan, memory))
         holds = [h for item in built for h in item["holds"]]
         state = {
             "schema_version": STATE_SCHEMA, "batch": "coached-chapters-v2",
@@ -405,6 +499,8 @@ def prepare_batch(args, *, plan_builder=None):
             "base_plans": {item["source"]["project_id"]: item["base"] for item in built},
             "isolated": {item["source"]["project_id"]: item["isolated"] for item in built},
             "boundary_policy_sha256": p.boundary_policy_sha(), "prepare_holds": holds}
+        if memory is not None:
+            state["performance_memory"] = _memory_binding(memory)
         state["frozen_sha256"] = _frozen_sha(state)
         state.update(status="held" if holds else "awaiting_coaching", holds=holds, coaching={})
         _write_state(out, state)
@@ -497,6 +593,8 @@ def _apply_project(cfg, state, project_id, bundle_path):
                "directions_sha256": p.value_sha({uid: d["native_instruction"] for uid, d in directions.items()}),
                "dialogue_directed": sum(1 for l in _lines_for(state, project_id) if not l["narrator"]),
                "recommendation_only": True, "human_review": "pending", "approved": False}
+    if state.get("performance_memory"):
+        receipt["performance_memory_sha256"] = state["performance_memory"]["memory_sha256"]
     if state["fixture"]:
         receipt["fixture"] = {"is_fixture": True, "label": FIXTURE_LABEL}
     p.publish(published, raw)
@@ -513,6 +611,7 @@ def apply_bundles(args, state):
         supplied, state = state, load_state(out)
         if _frozen_sha(supplied) != state["frozen_sha256"]:
             raise BatchError("Supplied state differs from the frozen prepared batch")
+        _require_same_memory(state, cfg)
         if state["prepare_holds"]:
             raise BatchError("Preparation held and cannot be coached: "
                              + json.dumps(state["prepare_holds"], ensure_ascii=False)[:600])
@@ -832,6 +931,10 @@ def _assemble_chapter(cfg, state, chapter, rlines, receipts, pinned):
         "integrated_loudness_lufs": loudness,
         "loudness_measurement": {"audio_sha256": mp3_sha, "integrated_lufs": loudness, "method": "ffmpeg_ebur128"},
         "technical_qa": "passed", "qa_report": report.model_dump(mode="json"), "source_to_audio": mapping}
+    if state.get("performance_memory"):
+        bound = state["performance_memory"]
+        result["performance_memory"] = {"memory_sha256": bound["memory_sha256"], "interpretation": bound["interpretation"],
+                                        "approved": False, "model_requested": bound["model_requested"]}
     if chapter["fixture"]:
         result["fixture"] = {"is_fixture": True, "label": FIXTURE_LABEL}
     p.publish(receipt_path, p.encoded(result))
@@ -846,6 +949,7 @@ def generate_batch(args, state, worker_class=None, render_fn=None):
         disk = load_state(out)
         if state.get("frozen_sha256") != disk["frozen_sha256"] or _frozen_sha(state) != disk["frozen_sha256"]:
             raise BatchError("Supplied state differs from the frozen prepared batch")
+        _require_same_memory(disk, cfg)
         if disk["prepare_holds"]:
             raise BatchError("Preparation held; the batch will not generate")
         directions = _applied_directions(out, disk)
@@ -894,6 +998,9 @@ def parse_args(argv=None):
                         help="chapter numbers in ascending order (spaces or commas), one per project")
     parser.add_argument("--output-dir", type=Path, required=True, help="private output outside the source store")
     parser.add_argument("--coaching-dir", type=Path, help="directory holding coaching-{project_id}.json bundles")
+    parser.add_argument("--performance-memory", type=Path, dest="performance_memory",
+                        help="optional captured character-performance-memory bundle (unapproved model notes); "
+                             "binds this batch to that exact memory")
     parser.add_argument("--generate", action="store_true", help="explicit serial GPU synthesis (root-owned lane)")
     args = parser.parse_args(argv)
     args.chapters = [n for group in args.chapters for n in group]
@@ -902,6 +1009,8 @@ def parse_args(argv=None):
         _config(args)
         if not args.epub.is_file():
             raise BatchError(f"EPUB not found: {args.epub}")
+        if args.performance_memory is not None and not args.performance_memory.is_file():
+            raise BatchError(f"Performance memory not found: {args.performance_memory}")
     except BatchError as exc:
         parser.error(str(exc))
     return args
@@ -917,6 +1026,8 @@ def main(argv=None):
                    "speech_lines": len(state["lines"]), "dialogue_lines": sum(not l["narrator"] for l in state["lines"]),
                    "coaching": state.get("coaching"), "holds": state["holds"], "output": str(args.output_dir),
                    "human_review": "pending", "production_ready": False}
+        if state.get("performance_memory"):
+            summary["performance_memory_sha256"] = state["performance_memory"]["memory_sha256"]
         if args.generate:
             if state["status"] not in ("ready", "generated"):
                 print(json.dumps(summary, ensure_ascii=True), flush=True)

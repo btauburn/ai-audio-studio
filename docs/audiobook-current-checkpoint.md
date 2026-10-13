@@ -1,3 +1,14 @@
+> **October 12 character memory and fresh chapter review:**
+> [book-scoped character delivery memory](character-performance-memory.md)
+> adds source-grounded, voice-independent habits to whole-scene coaching requests.
+> [Fresh chapter review](fresh-coached-chapters.md) generates neutral narration and
+> directed dialogue without requiring or manufacturing selected Takes. Retained
+> casting can use an explicitly authorized private review bound to the original
+> same-book, same-role clone and its current source-use context. Source permission,
+> role-fit approval and listening quality remain separate. No model/default switch,
+> voice promotion or human approval is created. Chapter 11 rendering is pending;
+> improved acting quality is not established.
+
 > **October 12 chapters 4–10:** [resumable full-chapter V2 rendering](coached-chapters.md)
 > preserves the existing cloned cast, reuses verified neutral narration and
 > applies captured whole-scene coaching to dialogue. Source preparation passed

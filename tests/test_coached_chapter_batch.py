@@ -970,3 +970,334 @@ def test_retry_refuses_changed_sample_or_chapter_bytes(ready):
         batch.generate_batch(args, batch.load_state(out), FakeWorker, render_function())
     master.write_bytes(good)
     assert batch.generate_batch(args, batch.load_state(out), FakeWorker, render_function())["status"] == "generated"
+
+
+# --------------------------------------------------------------------------- optional performance memory
+# Labeled synthetic fixtures only: the "memory" is a hand-written stand-in for a model response (never real
+# model output) and nothing below is evidence about audio quality, calibration or approval.
+
+from dubbing_service.app.audiobook import character_performance_memory as cpm       # noqa: E402
+from tests.test_character_performance_memory import FIXTURE_PROVENANCE as MEMORY_PROVENANCE      # noqa: E402
+from tests.test_character_performance_memory import chapter_request as memory_chapter_request      # noqa: E402
+from tests.test_character_performance_memory import make_response as memory_response      # noqa: E402
+
+GOLDEN_FROZEN_KEYS = ("epub", "sources", "chapters", "lines", "requests", "base_plans", "isolated",
+                      "boundary_policy_sha256", "prepare_holds")
+
+
+def plain_requests(state, out):
+    return [json.loads((Path(out) / info["file"]).read_bytes()) for info in state["requests"].values()]
+
+
+def write_memory(world, state, out, name="memory.json", *, mutate=None, book=None, provenance=None, requests=None):
+    request = cpm.build_memory_request(requests or plain_requests(state, out),
+                                       book_sha256=book or state["epub"]["sha256"])
+    bundle = cpm.capture_bundle(request, memory_response(request, mutate=mutate), provenance or MEMORY_PROVENANCE)
+    path = world.tmp / name
+    path.write_bytes(pilot.encoded(bundle))
+    return path, bundle
+
+
+def memory_args(world, path, tag="mem", **overrides):
+    return args_for(world, output_dir=world.tmp / f"out-{tag}", coaching_dir=world.tmp / f"coaching-{tag}",
+                    performance_memory=path, **overrides)
+
+
+def write_memory_bundles(args, state, *, only=None):
+    args.coaching_dir.mkdir(exist_ok=True)
+    for pid, info in state["requests"].items():
+        if only is None or pid in only:
+            request = json.loads((args.output_dir / info["file"]).read_bytes())
+            (args.coaching_dir / f"coaching-{pid}.json").write_bytes(pilot.encoded(make_bundle(request)))
+
+
+@pytest.fixture
+def bound(prepared):
+    """A plain batch, a memory captured from its requests, and a second batch prepared bound to that memory."""
+    world, plain_args, plain_state = prepared
+    path, bundle = write_memory(world, plain_state, plain_args.output_dir)
+    args = memory_args(world, path)
+    state = batch.prepare_batch(args)
+    return SimpleNamespace(world=world, plain_args=plain_args, plain=plain_state, path=path, bundle=bundle,
+                           args=args, state=state)
+
+
+def replace_memory(args, path):
+    return SimpleNamespace(**{**vars(args), "performance_memory": path})
+
+
+def test_existing_v2_behaviour_is_byte_identical_without_the_option(world):
+    assert batch.FROZEN_KEYS == GOLDEN_FROZEN_KEYS                      # no new frozen key invalidates old states
+    absent = batch.prepare_batch(args_for(world, output_dir=world.tmp / "no-attr"))
+    explicit = batch.prepare_batch(args_for(world, output_dir=world.tmp / "none", performance_memory=None))
+    assert "performance_memory" not in absent and "performance_memory" not in explicit
+    assert absent["frozen_sha256"] == explicit["frozen_sha256"] and absent["requests"] == explicit["requests"]
+    for pid, info in absent["requests"].items():
+        assert "performance_memory_sha256" not in info
+        request = json.loads((world.tmp / "no-attr" / info["file"]).read_bytes())
+        assert set(request) == {"instruction", "constraints", "response_contract", "scenes"}
+        assert all(cpm.SCENE_KEY not in scene for scene in request["scenes"])
+        assert request["constraints"] == batch.REQUEST_CONSTRAINTS and cpm.enriched_memory_sha256(request) is None
+    assert not (world.tmp / "no-attr" / "memory").exists()
+
+
+def test_a_memory_less_batch_is_not_changed_by_the_new_code_on_resume_apply_and_generate(ready):
+    world, args, state = ready
+    assert batch.prepare_batch(args)["status"] == "ready"
+    assert batch.apply_bundles(args, batch.load_state(args.output_dir))["status"] == "ready"
+    result = batch.generate_batch(args, batch.load_state(args.output_dir), FakeWorker, render_function())
+    assert result["status"] == "generated"
+    receipts = sorted((args.output_dir / "chapters").rglob("chapter-*.json"))
+    assert receipts and all("performance_memory" not in json.loads(p.read_bytes()) for p in receipts)
+    assert all("performance_memory_sha256" not in json.loads(p.read_bytes())
+               for p in (args.output_dir / "applied").glob("*.json"))
+    assert not (args.output_dir / "memory").exists()
+
+
+def test_prepare_with_memory_keeps_the_v2_request_and_adds_only_bound_notes(bound):
+    out, plain_out = bound.args.output_dir, bound.plain_args.output_dir
+    binding = bound.state["performance_memory"]
+    assert binding["memory_sha256"] == bound.bundle["memory_sha256"] and binding["approved"] is False
+    assert binding["interpretation"] == "unapproved_model_interpretation" and binding["fixture"] is True
+    assert binding["profile_roles"] == ["erick", "jane"] and binding["narrator_roles"] == ["narrator"]
+    assert (out / binding["file"]).read_bytes() == bound.path.read_bytes()        # exact private capture
+    assert bound.state["status"] == "awaiting_coaching" and bound.state["production_ready"] is False
+    assert bound.state["approvals_created"] is False and bound.state["takes_selected"] is False
+    assert batch.load_state(out) == bound.state
+    assert bound.state["lines"] == bound.plain["lines"] and bound.state["base_plans"] == bound.plain["base_plans"]
+    for pid, info in bound.state["requests"].items():
+        assert info["performance_memory_sha256"] == bound.bundle["memory_sha256"]
+        enriched = json.loads((out / info["file"]).read_bytes())
+        plain = json.loads((plain_out / bound.plain["requests"][pid]["file"]).read_bytes())
+        assert cpm.enriched_memory_sha256(enriched) == bound.bundle["memory_sha256"]
+        stripped = copy.deepcopy(enriched)
+        stripped["constraints"].pop()
+        for scene in stripped["scenes"]:
+            scene.pop(cpm.SCENE_KEY)
+        assert stripped == plain                                       # every existing request field is preserved
+        assert info["request_sha256"] != bound.plain["requests"][pid]["request_sha256"]
+        for scene in enriched["scenes"]:
+            roles = {r["role_id"] for r in scene["context"] if not r["narrator"]}
+            assert {n["role_id"] for n in scene[cpm.SCENE_KEY]["notes"]} == roles and "narrator" not in roles
+        scene_coaching.validate_bundle(make_bundle(enriched))          # still a valid existing coaching request
+
+
+def test_a_bound_batch_applies_and_generates_and_records_the_memory_everywhere(bound):
+    args, state, out = bound.args, bound.state, bound.args.output_dir
+    write_memory_bundles(args, state)
+    state = batch.apply_bundles(args, state)
+    assert state["status"] == "ready", state["holds"]
+    for pid in state["requests"]:
+        applied = json.loads((out / "applied" / f"{pid}.json").read_bytes())
+        assert applied["performance_memory_sha256"] == bound.bundle["memory_sha256"] and applied["approved"] is False
+    result = batch.generate_batch(args, state, FakeWorker, render_function())
+    assert result["status"] == "generated" and len(FakeWorker.instances) == 1
+    assert len(all_calls()) == 5 and all(c["performance"]["native_instruction"] for c in all_calls())
+    for path in sorted((out / "chapters").rglob("chapter-*.json")):
+        receipt = json.loads(path.read_bytes())
+        assert receipt["performance_memory"] == {"memory_sha256": bound.bundle["memory_sha256"], "approved": False,
+                                                 "interpretation": "unapproved_model_interpretation",
+                                                 "model_requested": MEMORY_PROVENANCE["model_requested"]}
+        assert receipt["quality_improvement"] == "not_established" and receipt["fixture"]["is_fixture"] is True
+    assert batch.generate_batch(args, batch.load_state(out), FakeWorker, render_function())["status"] == "generated"
+    assert len(FakeWorker.instances) == 1                                # the completed retry starts no new worker
+
+
+def test_role_coverage_name_and_narrator_conflicts_hold_before_any_chapter_output(prepared):
+    world, plain_args, plain_state = prepared
+    only_erick = [memory_chapter_request("x", [("00", "narrator", "Narrator", True, "Fixture narration."),
+                                               ("01", "erick", "Erick", False, "“Open it,”")])]
+    renamed = [memory_chapter_request("x", [("00", "narrator", "Narrator", True, "Fixture narration."),
+                                            ("01", "erick", "Eric", False, "“Open it,”"),
+                                            ("02", "jane", "Jane", False, "“I will not,”")])]
+    for tag, requests, message in (("missing", only_erick, "no profile for role jane"),
+                                   ("renamed", renamed, "is named 'Erick'")):
+        path, _ = write_memory(world, plain_state, plain_args.output_dir, f"{tag}.json", requests=requests)
+        args = memory_args(world, path, tag)
+        with pytest.raises(batch.BatchError, match=message):
+            batch.prepare_batch(args)
+        out = args.output_dir
+        assert not (out / "state.json").exists() and not (out / "requests").exists()
+        assert not (out / "neutral").exists() and not (out / "plans").exists() and not (out / "projects").exists()
+
+
+def test_wrong_book_unreadable_or_tampered_memory_is_refused_before_the_output_exists(prepared):
+    world, plain_args, plain_state = prepared
+    wrong_book, _ = write_memory(world, plain_state, plain_args.output_dir, "book.json", book="d" * 64)
+    tampered, bundle = write_memory(world, plain_state, plain_args.output_dir, "tampered.json")
+    bundle["response"]["profiles"][0]["confidence"] = "high"
+    tampered.write_bytes(pilot.encoded(bundle))
+    garbage = world.tmp / "garbage.json"
+    garbage.write_bytes(b"not json")
+    for tag, path, message in (("book", wrong_book, "different book"), ("tamper", tampered, "hash mismatch"),
+                               ("garbage", garbage, "not valid JSON")):
+        args = memory_args(world, path, tag)
+        with pytest.raises(batch.BatchError, match=message):
+            batch.prepare_batch(args)
+        assert not args.output_dir.exists()
+    with pytest.raises(SystemExit):
+        batch.parse_args(argv_for(world, "--performance-memory", str(world.tmp / "absent.json")))
+
+
+def test_a_fixture_memory_cannot_condition_non_fixture_chapters(prepared):
+    world, plain_args, plain_state = prepared
+    path, _ = write_memory(world, plain_state, plain_args.output_dir)
+    with batch._projects_root(world.root):
+        for pid in world.ids:
+            project = load_project(pid)
+            project.metadata["coached_batch_fixture"] = False
+            save_project(project)
+    args = memory_args(world, path, "nonfixture")
+    with pytest.raises(batch.BatchError, match="fixture performance memory"):
+        batch.prepare_batch(args)
+    assert not (args.output_dir / "state.json").exists() and not (args.output_dir / "requests").exists()
+
+
+def test_identical_memory_resumes_without_changing_a_byte(bound):
+    before = tree_hashes(bound.args.output_dir)
+    copy_of_memory = bound.world.tmp / "same-bytes-elsewhere.json"
+    copy_of_memory.write_bytes(bound.path.read_bytes())
+    again = batch.prepare_batch(memory_args(bound.world, copy_of_memory))
+    assert again == bound.state and tree_hashes(bound.args.output_dir) == before
+
+
+def test_resume_holds_when_the_bound_memory_is_missing_or_changed(bound):
+    world = bound.world
+    before = tree_hashes(bound.args.output_dir)
+    with pytest.raises(batch.BatchError, match="bound to performance memory"):
+        batch.prepare_batch(args_for(world, output_dir=bound.args.output_dir, coaching_dir=bound.args.coaching_dir))
+    with pytest.raises(batch.BatchError, match="not found"):
+        batch.prepare_batch(memory_args(world, world.tmp / "deleted.json"))
+    other, _ = write_memory(world, bound.plain, bound.plain_args.output_dir, "other.json",
+                            mutate=lambda r: r["profiles"][0].update(confidence="high"))
+    with pytest.raises(batch.BatchError, match="differs from the memory bound"):
+        batch.prepare_batch(memory_args(world, other))
+    changed_model, _ = write_memory(world, bound.plain, bound.plain_args.output_dir, "model.json",
+                                    provenance={**MEMORY_PROVENANCE, "model_requested": "another-fixture"})
+    with pytest.raises(batch.BatchError, match="differs from the memory bound"):
+        batch.prepare_batch(memory_args(world, changed_model))
+    assert tree_hashes(bound.args.output_dir) == before                  # nothing was reused or rewritten
+
+
+def test_apply_and_generate_hold_without_or_with_a_different_memory(bound):
+    world, args, state = bound.world, bound.args, bound.state
+    write_memory_bundles(args, state)
+    no_memory = args_for(world, output_dir=args.output_dir, coaching_dir=args.coaching_dir)
+    other, _ = write_memory(world, bound.plain, bound.plain_args.output_dir, "other.json",
+                            mutate=lambda r: r["profiles"][1].update(confidence="low"))
+    different = memory_args(world, other)
+    for held_args in (no_memory, different):
+        with pytest.raises(batch.BatchError, match="performance memory"):
+            batch.apply_bundles(held_args, state)
+    assert not (args.output_dir / "applied").exists()
+    ready_state = batch.apply_bundles(args, state)
+    assert ready_state["status"] == "ready"
+    for held_args in (no_memory, different):
+        with pytest.raises(batch.BatchError, match="performance memory"):
+            batch.generate_batch(held_args, ready_state, FakeWorker, render_function())
+    assert FakeWorker.instances == []
+
+
+def test_a_memory_less_directory_never_silently_gains_a_memory(prepared):
+    world, args, state = prepared
+    path, _ = write_memory(world, state, args.output_dir)
+    before = tree_hashes(args.output_dir)
+    for call in (lambda: batch.prepare_batch(replace_memory(args, path)),
+                 lambda: batch.apply_bundles(replace_memory(args, path), state)):
+        with pytest.raises(batch.BatchError, match="prepared without performance memory"):
+            call()
+    assert tree_hashes(args.output_dir) == before
+
+
+def test_changed_memory_invalidates_coaching_captured_for_the_earlier_memory(bound):
+    world, args, state = bound.world, bound.args, bound.state
+    write_memory_bundles(args, state)                                    # captured for the first memory's requests
+    other, other_bundle = write_memory(world, bound.plain, bound.plain_args.output_dir, "other.json",
+                                       mutate=lambda r: r["profiles"][0].update(confidence="high"))
+    second = memory_args(world, other, "second")
+    second_state = batch.prepare_batch(second)
+    assert second_state["performance_memory"]["memory_sha256"] == other_bundle["memory_sha256"] != bound.bundle["memory_sha256"]
+    for pid, info in second_state["requests"].items():
+        assert info["request_sha256"] != state["requests"][pid]["request_sha256"]
+    second.coaching_dir.mkdir()
+    for path in args.coaching_dir.glob("coaching-*.json"):               # reuse the stale bundles under the new memory
+        (second.coaching_dir / path.name).write_bytes(path.read_bytes())
+    held = batch.apply_bundles(second, second_state)
+    assert held["status"] == "held" and not (second.output_dir / "applied").exists()
+    assert all("not captured for the frozen request" in h["detail"] for h in held["holds"]) and len(held["holds"]) == 2
+    assert not list((second.output_dir / "plans").glob("coached-*"))
+    write_memory_bundles(second, second_state)                           # captured for the new requests: accepted
+    assert batch.apply_bundles(second, second_state)["status"] == "ready"
+
+
+def test_a_plain_request_bundle_cannot_satisfy_a_memory_bound_batch(bound):
+    args, state = bound.args, bound.state
+    args.coaching_dir.mkdir()
+    for pid, info in bound.plain["requests"].items():
+        request = json.loads((bound.plain_args.output_dir / info["file"]).read_bytes())
+        (args.coaching_dir / f"coaching-{pid}.json").write_bytes(pilot.encoded(make_bundle(request)))
+    held = batch.apply_bundles(args, state)
+    assert held["status"] == "held" and len(held["holds"]) == 2
+    assert not (args.output_dir / "applied").exists()
+
+
+def test_private_memory_copy_or_binding_tampering_is_detected_on_every_load(bound):
+    out = bound.args.output_dir
+    binding = bound.state["performance_memory"]
+    memory_file = out / binding["file"]
+    original = memory_file.read_bytes()
+    memory_file.write_bytes(original + b"\n")
+    with pytest.raises(batch.BatchError, match="missing or changed"):
+        batch.load_state(out)
+    memory_file.write_bytes(original)
+    batch.load_state(out)
+    state_path = out / "state.json"
+    raw = state_path.read_bytes()
+    unbound = json.loads(raw)
+    unbound.pop("performance_memory")
+    state_path.write_bytes(pilot.encoded(unbound))
+    with pytest.raises(batch.BatchError, match="no memory binding"):
+        batch.load_state(out)
+    state_path.write_bytes(raw)
+    request_path = out / next(iter(bound.state["requests"].values()))["file"]
+    request_raw = request_path.read_bytes()
+    stripped = json.loads(request_raw)
+    stripped["constraints"].pop()
+    request_path.write_bytes(pilot.encoded(stripped))
+    with pytest.raises(batch.BatchError):                                # the published request changed
+        batch.load_state(out)
+    request_path.write_bytes(request_raw)
+    memory_file.unlink()
+    with pytest.raises(batch.BatchError, match="missing or changed"):
+        batch.load_state(out)
+
+
+def test_memory_never_reaches_narration_or_changes_synthesis_inputs(bound):
+    args, state = bound.args, bound.state
+    write_memory_bundles(args, state)
+    state = batch.apply_bundles(args, state)
+    batch.generate_batch(args, state, FakeWorker, render_function())
+    narration = {l["text"] for l in state["lines"] if l["narrator"]}
+    memory_words = json.dumps(bound.bundle["response"]["profiles"])
+    for call in all_calls():
+        assert call["text"] not in narration
+        assert memory_words not in json.dumps(call)                     # notes inform coaching only, never a worker call
+    for line in (l for l in state["lines"] if l["narrator"]):
+        assert not (args.output_dir / "samples" / line["project_id"] / f"{line['utterance_id']}.wav").exists()
+    assert json.loads((args.output_dir / "forwarding-audit.json").read_bytes())["narrator_instructions"] == 0
+
+
+def test_cli_accepts_the_option_reports_the_hash_and_holds_on_a_changed_memory(bound, capsys):
+    world = bound.world
+    argv = argv_for(world, "--performance-memory", str(bound.path))
+    assert batch.parse_args(argv).performance_memory == bound.path
+    assert batch.parse_args(argv_for(world)).performance_memory is None
+    assert batch.main(argv) == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["performance_memory_sha256"] == bound.bundle["memory_sha256"] and summary["status"] == "awaiting_coaching"
+    other, _ = write_memory(world, bound.plain, bound.plain_args.output_dir, "cli-other.json",
+                            mutate=lambda r: r["profiles"][0].update(confidence="high"))
+    assert batch.main(argv_for(world, "--performance-memory", str(other))) == 2
+    assert "differs from the memory bound" in json.loads(capsys.readouterr().out)["error"]
+    assert batch.main(argv_for(world)) == 2
+    assert "bound to performance memory" in json.loads(capsys.readouterr().out)["error"]
